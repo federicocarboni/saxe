@@ -5,12 +5,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build": "esbuild src/index.ts --outdir=lib/ --bundle --format=esm --mangle-props=\\^_ --sourcemap",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "esbuild": "^0.20.2",
     "prettier": "^3.2.5"
   }
 }
