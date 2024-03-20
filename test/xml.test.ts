@@ -7,7 +7,7 @@ describe("XML Declaration", () => {
     const STUFF = '<?xml version="1.0" encoding="UTF-8" ?>';
     const chunk = utf8.encode(STUFF);
     const parser = new SaxParser(null as any);
-    parser.feed(chunk);
+    parser.write(chunk);
     parser.eof();
     console.log(parser);
   });

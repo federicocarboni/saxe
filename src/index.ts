@@ -3,19 +3,34 @@ import {parseError} from "./error";
 export {type SaxError, type SaxErrorCode, isSaxError} from "./error";
 
 export type SaxReader = {
+  xml?(
+    version: string,
+    encoding: string | undefined,
+    standalone: boolean | undefined,
+  ): void;
+  doctype?(
+    name: string,
+    declaration: string,
+    publicId: string | undefined,
+    systemId: string | undefined,
+  ): void;
+  pi?(target: string, content: string): void;
+  comment?(text: string): void;
   start(name: string, attributes: Map<string, string>): void;
   empty(name: string, attributes: Map<string, string>): void;
   end(name: string): void;
   text(text: string): void;
   cdata(cdata: string): void;
   entity(entity: string): void;
-  xmlDeclaration(
-    version: string,
-    encoding?: string,
-    standalone?: boolean,
-  ): void;
-  doctype(): void;
 };
+
+const DEFAULT_ENTITIES = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  apos: "'",
+  quot: '"',
+} as const;
 
 // These enums are erased at compile time for better size and speed.
 const enum Encoding {
@@ -67,7 +82,7 @@ function getEncodingString(encoding: Encoding) {
 const TEXT_DECODER_FATAL: TextDecoderOptions = {
   // Cannot ignore decoding errors.
   fatal: true,
-  // Don't skip the Byte Order Mark as the parser skips it already.
+  // Don't skip the Byte Order Mark as the parser handles it.
   ignoreBOM: true,
 };
 
@@ -75,6 +90,8 @@ const TEXT_DECODER_REPLACEMENT: TextDecoderOptions = {ignoreBOM: true};
 
 const TEXT_DECODE_STREAM: TextDecodeOptions = {stream: true};
 
+// https://www.w3.org/TR/REC-xml/#NT-S
+// § White Space
 function isWhitespace(c: number) {
   // SP TAB LF CR
   return c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d;
@@ -82,6 +99,72 @@ function isWhitespace(c: number) {
 
 function isAsciiDigit(c: number) {
   return 0x30 <= c && c <= 0x39;
+}
+
+function isAsciiHexAlpha(c: number) {
+  return (0x61 <= c && c <= 0x66) || (0x41 <= c && c <= 0x46);
+}
+
+function isAlpha(c: number) {
+  return (0x61 <= c && c <= 0x7a) || (0x41 <= c && c <= 0x5a);
+}
+
+function isEncodingName(value: string) {
+  if (!isAlpha(value.charCodeAt(0))) return false;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if (
+      !isAlpha(c) &&
+      !isAsciiDigit(c) &&
+      c !== 0x2e /* . */ &&
+      c !== 0x5f /* _ */ &&
+      c !== 0x2d /* - */
+    )
+      return false;
+  }
+  return true;
+}
+
+function parseDec(dec: string): number | undefined {
+  let n = 0;
+  const length = dec.length;
+  for (let i = 0; i < length; i++) {
+    const digit = (dec.charCodeAt(i) - 0x30) >>> 0;
+    if (digit > 9) return undefined;
+    n = (n << 3) + (n << 1) + digit;
+  }
+  return n;
+}
+
+function parseHex(dec: string): number | undefined {
+  let n = 0;
+  const length = dec.length;
+  for (let i = 0; i < length; i++) {
+    const c = dec.charCodeAt(i);
+    let digit;
+    if (isAsciiDigit(c)) {
+      digit = c - 0x30;
+    } else if (isAsciiHexAlpha(c)) {
+      digit = (c | 0x20) - 0x57;
+    } else {
+      return undefined;
+    }
+    n = (n << 4) | digit;
+  }
+  return n;
+}
+
+// https://www.w3.org/TR/REC-xml/#NT-Char
+// § Character Range
+function isChar(c: number) {
+  return (
+    c === 0x9 ||
+    c === 0xa ||
+    c === 0xd ||
+    (0x20 <= c && c <= 0xd7ff) ||
+    (0xe000 <= c && c <= 0xfffd) ||
+    (0x10000 <= c && c <= 0x10ffff)
+  );
 }
 
 export class SaxParser {
@@ -118,8 +201,8 @@ export class SaxParser {
   private _xmlDeclAttr = "";
   /** @internal */
   private _xmlDeclValue = "";
-  // Default decoder is UTF-8 but non-fatal, meaning it will accept malformed
-  // content.
+  // Default decoder is UTF-8 but non-fatal, meaning it should accept non UTF-8
+  // encodings (by producing garbage on invalid data).
   /** @internal */
   private _textDecoder = new TextDecoder("utf-8", TEXT_DECODER_REPLACEMENT);
   /** @internal */
@@ -128,16 +211,15 @@ export class SaxParser {
   // guaranteed to retain order of defined values like an array.
   /** @internal */
   private _attributes = new Map<string, string>();
+  /** @internal */
+  private _stack: string[] = [];
+  private _seenRoot = false;
 
   constructor(reader: SaxReader, options?: Options) {
     this._reader = reader;
   }
 
-  /** @internal */
-  encoding() {
-    return getEncodingString(this._encoding);
-  }
-  feed(data: Uint8Array) {
+  write(data: Uint8Array) {
     if (this._state === State.INIT) {
       // Before the data can be decoded, we have to detect the encoding of the
       // file, until the byte order mark or XMLDecl is read the encoding is
@@ -177,15 +259,22 @@ export class SaxParser {
 
   /** @internal */
   private _decodeChunk(data?: Uint8Array, options?: TextDecodeOptions) {
+    if (this._index >= this._chunk.length) {
+      this._chunk = "";
+      this._index = 0;
+    }
     try {
-      this._chunk = this._textDecoder.decode(data, options);
+      this._chunk += this._textDecoder.decode(data, options);
     } catch {
       // The decoder will usually be in fatal mode, handle the error. `decode`
       // can only fail with a TypeError in fatal mode.
-      throw parseError("INVALID_ENCODED_DATA", 0, 0, this.encoding());
+      throw parseError(
+        "INVALID_ENCODED_DATA",
+        getEncodingString(this._encoding),
+      );
     }
-    this._index = 0;
-    if (this._chunk.length !== 0) this._char = this._chunk.codePointAt(0)!;
+    if (this._chunk.length !== 0)
+      this._char = this._chunk.codePointAt(this._index)!;
   }
 
   /** @internal */
@@ -204,18 +293,20 @@ export class SaxParser {
           this._encoding !== Encoding.UTF16LE &&
           this._encoding !== Encoding.UTF16BE)
       ) {
-        throw parseError("INVALID_UTF16_BOM", 0, 0);
+        // TODO: this is too strict
+        throw parseError("INVALID_UTF16_BOM");
       } else {
         // TODO: legacy encodings
-        throw parseError("ENCODING_NOT_SUPPORTED", 0, 0, encoding);
+        throw parseError("ENCODING_NOT_SUPPORTED", encoding);
       }
     }
+    // Encoding is set by default.
     if (this._encoding === Encoding.DEFAULT) this._encoding = Encoding.UTF8;
     this._textDecoder = new TextDecoder(
       getEncodingString(this._encoding),
       TEXT_DECODER_FATAL,
     );
-    // Validate first chunk and
+    // Validate first chunk and clean it up
     this._decodeRawChunk();
     this._rawChunk = undefined;
     this._rawChunkLen = 0;
@@ -236,9 +327,6 @@ export class SaxParser {
             // Default encoding is UTF-8, since the XML Declaration was not specified,
             // encoding MUST be UTF-8.
             this._setEncoding();
-            this._textDecoder = new TextDecoder("utf-8", TEXT_DECODER_FATAL);
-            // Ensure the first chunk decodes correctly.
-            this._decodeRawChunk();
             this._state = State.DOCTYPE_DECL;
           }
           break;
@@ -317,6 +405,11 @@ export class SaxParser {
             throw parseError("UNTERMINATED_XML_DECL");
           this._state = State.DOCTYPE_DECL;
           this._setEncoding();
+          this._reader.xml?.(
+            this._version!,
+            this._xmlDeclEncoding,
+            this._standalone,
+          );
           break;
         case State.DOCTYPE_DECL:
           return;
@@ -339,7 +432,10 @@ export class SaxParser {
         this._xmlDeclState = XmlDeclState.VERSION;
         break;
       case "encoding":
-        if (this._xmlDeclState !== XmlDeclState.VERSION)
+        if (
+          this._xmlDeclState !== XmlDeclState.VERSION ||
+          !isEncodingName(this._xmlDeclValue)
+        )
           throw parseError("INVALID_XML_DECL");
         this._xmlDeclEncoding = this._xmlDeclValue;
         this._xmlDeclState = XmlDeclState.ENCODING;
