@@ -1,18 +1,21 @@
 {
-  "type": "module",
+  "type": "commonjs",
   "name": "saxe",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "build": "esbuild src/index.ts --outdir=lib/ --bundle --format=esm --mangle-props=\\^_ --sourcemap",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha test/*.test.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/mocha": "^10.0.6",
     "esbuild": "^0.20.2",
-    "prettier": "^3.2.5"
+    "mocha": "^10.3.0",
+    "prettier": "^3.2.5",
+    "ts-node": "^10.9.2"
   }
 }

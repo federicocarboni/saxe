@@ -1,3 +1,7 @@
+import {parseError} from "./error";
+
+export {type SaxError, type SaxErrorCode, isSaxError} from "./error";
+
 export type SaxReader = {
   start(name: string, attributes: Map<string, string>): void;
   empty(name: string, attributes: Map<string, string>): void;
@@ -10,6 +14,7 @@ export type SaxReader = {
     encoding?: string,
     standalone?: boolean,
   ): void;
+  doctype(): void;
 };
 
 // These enums are erased at compile time for better size and speed.
@@ -31,6 +36,13 @@ const enum State {
   XML_DECL_VALUE_D,
   XML_DECL_END,
   DOCTYPE_DECL,
+}
+
+const enum XmlDeclState {
+  INIT,
+  VERSION,
+  ENCODING,
+  STANDALONE,
 }
 
 export type Options = {
@@ -61,81 +73,70 @@ const TEXT_DECODER_FATAL: TextDecoderOptions = {
 
 const TEXT_DECODER_REPLACEMENT: TextDecoderOptions = {ignoreBOM: true};
 
-const TEXT_DECODE_STREAM: TextDecodeOptions = {
-  stream: true,
-};
+const TEXT_DECODE_STREAM: TextDecodeOptions = {stream: true};
 
 function isWhitespace(c: number) {
   // SP TAB LF CR
   return c === 0x20 || c === 0x09 || c === 0x0a || c === 0x0d;
 }
 
-function equals10(
-  a: Uint8Array,
-  b0: number,
-  b1: number,
-  b2: number,
-  b3: number,
-  b4: number,
-  b5: number,
-  b6: number,
-  b7: number,
-  b8: number,
-  b9: number,
-) {
-  return (
-    a[0] === b0 &&
-    a[1] === b1 &&
-    a[2] === b2 &&
-    a[3] === b3 &&
-    a[4] === b4 &&
-    a[5] === b5 &&
-    a[6] === b6 &&
-    a[7] === b7 &&
-    a[8] === b8 &&
-    a[9] === b9
-  );
+function isAsciiDigit(c: number) {
+  return 0x30 <= c && c <= 0x39;
 }
 
 export class SaxParser {
+  /** @internal */
   private _reader: SaxReader;
   // Only UTF-8 and UTF-16 are supported as they are the only ones explicitly
   // required by the XML standard. All other encodings are considered legacy and
   // are not supported by this parser.
+  /** @internal */
   private _encoding = Encoding.DEFAULT;
+  /** @internal */
   private _rawChunk: Uint8Array | undefined = undefined;
+  /** @internal */
   private _rawChunkLen = 0;
   // Index in the current chunk
+  /** @internal */
   private _index = 0;
+  /** @internal */
   private _chunk = "";
+  /** @internal */
   private _content = "";
+  /** @internal */
   private _state = State.INIT;
-  private _version = "1.0";
-  private _xmlDeclEncoding = "utf-8";
-  private _xmlDeclStandalone = false;
+  /** @internal */
+  private _xmlDeclState = XmlDeclState.INIT;
+  /** @internal */
+  private _version: string | undefined = undefined;
+  /** @internal */
+  private _xmlDeclEncoding: string | undefined = undefined;
+  /** @internal */
+  private _standalone: boolean | undefined = undefined;
   //
+  /** @internal */
   private _xmlDeclAttr = "";
+  /** @internal */
   private _xmlDeclValue = "";
   // Default decoder is UTF-8 but non-fatal, meaning it will accept malformed
   // content.
+  /** @internal */
   private _textDecoder = new TextDecoder("utf-8", TEXT_DECODER_REPLACEMENT);
+  /** @internal */
   private _char = 0;
   // Using a Map because it has more efficient lookups than an object and is
   // guaranteed to retain order of defined values like an array.
+  /** @internal */
   private _attributes = new Map<string, string>();
 
   constructor(reader: SaxReader, options?: Options) {
     this._reader = reader;
-    // TODO: should it toLowerCase()?
-    // this.encoding_ = toEncoding(options?.encoding);
   }
 
-  // get encoding() {
-  //   return getEncodingString(this._encoding);
-  // }
-
-  private _handleRawChunk(data: Uint8Array) {}
-
+  /** @internal */
+  encoding() {
+    return getEncodingString(this._encoding);
+  }
   feed(data: Uint8Array) {
     if (this._state === State.INIT) {
       // Before the data can be decoded, we have to detect the encoding of the
@@ -146,7 +147,8 @@ export class SaxParser {
         this._rawChunk = data;
         this._rawChunkLen = data.length;
       } else {
-        this._rawChunk!.set(data, this._rawChunkLen);
+        if (this._rawChunk === undefined) this._rawChunk = new Uint8Array(256);
+        this._rawChunk.set(data, this._rawChunkLen);
         this._rawChunkLen += data.length;
       }
       // The Byte Order Mark must be read because it's required for UTF-16
@@ -154,96 +156,220 @@ export class SaxParser {
       if (this._rawChunkLen > 255) this._init();
       return;
     } else {
-      this._chunk = this._textDecoder.decode(data, TEXT_DECODE_STREAM);
+      this._decodeChunk(data, TEXT_DECODE_STREAM);
     }
+    this._parse();
   }
-
-  feedString(data: string) {}
 
   eof() {
-    this._textDecoder!.decode();
+    if (this._state === State.INIT) {
+      this._init();
+      this._parse();
+    } else this._decodeChunk();
   }
 
-  private _run() {
-    switch (this._state) {
-      case State.PROLOG:
-        // XML Declaration is optional, if the first characters don't match, abort parsing
-        // the declaration altogether.
-        if (this._chunk.slice(0, 5) === "<?xml") {
-          this._state = State.XML_DECL;
-        } else {
-          // Default encoding is UTF-8, since the XML Declaration was not specified,
-          // encoding MUST be UTF-8.
-          this._textDecoder = new TextDecoder("utf-8", TEXT_DECODER_FATAL);
-          // Ensure the first chunk decodes correctly.
-          this._decodeRawChunk();
-          this._state = State.DOCTYPE_DECL;
-        }
-        break;
-      case State.XML_DECL:
-        while (this._index < this._chunk.length) {
-          if (this._char === 0x3f /* ? */) {
-            this._state = State.XML_DECL_END;
-            break;
-          } else if (!isWhitespace(this._char)) {
-            this._state = State.XML_DECL_ATTR;
-            break;
-          }
-          this._advance();
-        }
-        break;
-      case State.XML_DECL_ATTR: {
-        const begin = this._index;
-        while (this._index < this._chunk.length) {
-          if (this._char === 0x3d /* = */) {
-            this._state = State.XML_DECL_VALUE;
-            break;
-          } else if (isWhitespace(this._char)) {
-            this._state = State.XML_DECL_ATTR_EQ;
-            break;
-          }
-          this._advance();
-        }
-        this._xmlDeclAttr += this._chunk.slice(begin, this._index);
-        break;
+  /** @internal */
+  private _advance() {
+    // Advance two places if the character is not BMP
+    this._index += +(this._char > 0xffff) + 1;
+    this._char = this._chunk.codePointAt(this._index)!;
+  }
+
+  /** @internal */
+  private _decodeChunk(data?: Uint8Array, options?: TextDecodeOptions) {
+    try {
+      this._chunk = this._textDecoder.decode(data, options);
+    } catch {
+      // The decoder will usually be in fatal mode, handle the error. `decode`
+      // can only fail with a TypeError in fatal mode.
+      throw parseError("INVALID_ENCODED_DATA", 0, 0, this.encoding());
+    }
+    this._index = 0;
+    if (this._chunk.length !== 0) this._char = this._chunk.codePointAt(0)!;
+  }
+
+  /** @internal */
+  private _setEncoding() {
+    // Validate and set declared encoding
+    if (this._xmlDeclEncoding !== undefined) {
+      const encoding = this._xmlDeclEncoding.toLowerCase();
+      if (encoding === "utf-8") {
+        this._encoding = Encoding.UTF8;
+      } else if (
+        (this._encoding !== Encoding.DEFAULT &&
+          encoding === "utf-16le" &&
+          this._encoding !== Encoding.UTF16LE) ||
+        (encoding === "utf-16be" && this._encoding !== Encoding.UTF16BE) ||
+        (encoding === "utf-16" &&
+          this._encoding !== Encoding.UTF16LE &&
+          this._encoding !== Encoding.UTF16BE)
+      ) {
+        throw parseError("INVALID_UTF16_BOM", 0, 0);
+      } else {
+        // TODO: legacy encodings
+        throw parseError("ENCODING_NOT_SUPPORTED", 0, 0, encoding);
       }
-      case State.XML_DECL_ATTR_EQ:
-        for (this._index++; this._index < this._rawChunkLen; this._index++) {
-          const b = this._rawChunk![this._index];
-          if (b === 0x3d /* = */) {
-            this._state = State.XML_DECL_VALUE;
-            break;
-          } else if (!isWhitespace(b)) {
-            throw "parse error";
+    }
+    if (this._encoding === Encoding.DEFAULT) this._encoding = Encoding.UTF8;
+    this._textDecoder = new TextDecoder(
+      getEncodingString(this._encoding),
+      TEXT_DECODER_FATAL,
+    );
+    // Validate first chunk and
+    this._decodeRawChunk();
+    this._rawChunk = undefined;
+    this._rawChunkLen = 0;
+  }
+
+  /** @internal */
+  private _parse() {
+    while (this._index < this._chunk.length)
+      switch (this._state) {
+        case State.PROLOG:
+          // XML Declaration is optional, if the first characters don't match, abort parsing
+          // the declaration altogether.
+          if (this._chunk.slice(0, 5) === "<?xml") {
+            this._state = State.XML_DECL;
+            this._index = 4;
+            this._advance();
+          } else {
+            // Default encoding is UTF-8, since the XML Declaration was not specified,
+            // encoding MUST be UTF-8.
+            this._setEncoding();
+            this._textDecoder = new TextDecoder("utf-8", TEXT_DECODER_FATAL);
+            // Ensure the first chunk decodes correctly.
+            this._decodeRawChunk();
+            this._state = State.DOCTYPE_DECL;
           }
+          break;
+        case State.XML_DECL:
+          while (this._index < this._chunk.length) {
+            if (this._char === 0x3f /* ? */) {
+              this._state = State.XML_DECL_END;
+              break;
+            } else if (!isWhitespace(this._char)) {
+              this._state = State.XML_DECL_ATTR;
+              break;
+            }
+            this._advance();
+          }
+          break;
+        case State.XML_DECL_ATTR: {
+          const begin = this._index;
+          while (this._index < this._chunk.length) {
+            if (this._char === 0x3d /* = */ || isWhitespace(this._char)) {
+              this._state = State.XML_DECL_ATTR_EQ;
+              break;
+            }
+            this._advance();
+          }
+          this._xmlDeclAttr += this._chunk.slice(begin, this._index);
+          break;
         }
+        case State.XML_DECL_ATTR_EQ:
+          while (this._index < this._chunk.length) {
+            const b = this._char;
+            if (b === 0x3d /* = */) {
+              this._state = State.XML_DECL_VALUE;
+              this._advance();
+              break;
+            } else if (!isWhitespace(b)) {
+              throw parseError("INVALID_XML_DECL");
+            }
+            this._advance();
+          }
+          break;
+        case State.XML_DECL_VALUE:
+          while (this._index < this._chunk.length) {
+            const b = this._char;
+            this._advance();
+            if (b === 0x27 /* ' */) {
+              this._state = State.XML_DECL_VALUE_S;
+              break;
+            } else if (b === 0x22 /* " */) {
+              this._state = State.XML_DECL_VALUE_D;
+              break;
+            } else if (!isWhitespace(b)) {
+              throw parseError("INVALID_XML_DECL");
+            }
+          }
+          break;
+        case State.XML_DECL_VALUE_S:
+        case State.XML_DECL_VALUE_D: {
+          let quote = this._chunk.indexOf(
+            this._state === State.XML_DECL_VALUE_S ? "'" : '"',
+            this._index,
+          );
+          if (quote === -1) {
+            quote = this._chunk.length;
+          } else {
+            this._state = State.XML_DECL;
+          }
+          this._xmlDeclValue += this._chunk.slice(this._index, quote);
+          this._index = quote;
+          this._advance();
+          if (this._state === State.XML_DECL) this._parseXmlDeclAttr();
+          break;
+        }
+        case State.XML_DECL_END:
+          this._advance();
+          if (this._char !== 0x3e /* > */)
+            throw parseError("UNTERMINATED_XML_DECL");
+          this._state = State.DOCTYPE_DECL;
+          this._setEncoding();
+          break;
+        case State.DOCTYPE_DECL:
+          return;
+        default:
+      }
+  }
+
+  /** @internal */
+  private _parseXmlDeclAttr() {
+    switch (this._xmlDeclAttr) {
+      case "version":
+        if (
+          this._xmlDeclState !== XmlDeclState.INIT ||
+          this._xmlDeclValue.length !== 3 ||
+          this._xmlDeclValue.slice(0, 2) !== "1." ||
+          !isAsciiDigit(this._xmlDeclValue.charCodeAt(2))
+        )
+          throw parseError("INVALID_XML_DECL");
+        this._version = this._xmlDeclValue;
+        this._xmlDeclState = XmlDeclState.VERSION;
         break;
-      case State.XML_DECL_VALUE:
-        for (; this._index < this._rawChunkLen; this._index++) {
-          const b = this._rawChunk![this._index];
-          if (b === 0x27 /* ' */) {
-            this._state = State.XML_DECL_VALUE_S;
-            break;
-          } else if (b === 0x22 /* " */) {
-            this._state = State.XML_DECL_VALUE_D;
-            break;
-          } else if (!isWhitespace(b)) {
-            throw "parse error";
-          }
-        }
+      case "encoding":
+        if (this._xmlDeclState !== XmlDeclState.VERSION)
+          throw parseError("INVALID_XML_DECL");
+        this._xmlDeclEncoding = this._xmlDeclValue;
+        this._xmlDeclState = XmlDeclState.ENCODING;
+        break;
+      case "standalone":
+        if (
+          (this._xmlDeclState !== XmlDeclState.VERSION &&
+            this._xmlDeclState !== XmlDeclState.ENCODING) ||
+          (this._xmlDeclValue !== "yes" && this._xmlDeclValue !== "no")
+        )
+          throw parseError("INVALID_XML_DECL");
+        this._standalone = this._xmlDeclValue === "yes";
+        this._xmlDeclState = XmlDeclState.STANDALONE;
         break;
       default:
+        throw parseError("INVALID_XML_DECL");
     }
+    this._xmlDeclAttr = "";
+    this._xmlDeclValue = "";
   }
 
+  /** @internal */
   private _decodeRawChunk() {
     this._chunk = this._textDecoder.decode(
-      this._rawChunk!.subarray(this._index),
+      this._rawChunk!.subarray(this._index, this._rawChunkLen),
       TEXT_DECODE_STREAM,
     );
   }
 
-  // length must be greater than 16
+  /** @internal */
   private _init() {
     // Read the Byte Order Mark, if specified it must be correct.
     const b0 = this._rawChunk![0];
@@ -273,13 +399,8 @@ export class SaxParser {
     this._char = this._chunk.codePointAt(0)!;
   }
 
-  private _advance() {
-    // Advance two places if the character is not BMP
-    this._index += +(this._char > 0xffff) + 1;
-    this._char = this._chunk.codePointAt(this._index)!;
-  }
-
   // For debugging
+  /** @internal */
   toString() {
     return `Parser {
   reader = ${this._reader};
