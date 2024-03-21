@@ -2,7 +2,7 @@ import {parseError} from "./error";
 
 export {type SaxError, type SaxErrorCode, isSaxError} from "./error";
 
-export type SaxReader = {
+export interface SaxReader {
   xml?(
     version: string,
     encoding: string | undefined,
@@ -22,7 +22,7 @@ export type SaxReader = {
   text(text: string): void;
   cdata(cdata: string): void;
   entity(entity: string): void;
-};
+}
 
 const DEFAULT_ENTITIES = {
   amp: "&",
@@ -51,6 +51,9 @@ const enum State {
   XML_DECL_VALUE_D,
   XML_DECL_END,
   DOCTYPE_DECL,
+  DOCTYPE_NAME_S,
+  DOCTYPE_NAME,
+  DOCTYPE_ID,
 }
 
 const enum XmlDeclState {
@@ -58,6 +61,13 @@ const enum XmlDeclState {
   VERSION,
   ENCODING,
   STANDALONE,
+}
+
+const enum CaptureFlag {
+  NONE = 0,
+  DOCTYPE = 1 << 0,
+  COMMENT = 1 << 1,
+  PI = 1 << 2,
 }
 
 export type Options = {
@@ -213,10 +223,14 @@ export class SaxParser {
   private _attributes = new Map<string, string>();
   /** @internal */
   private _stack: string[] = [];
-  private _seenRoot = false;
+  private _captureFlag = CaptureFlag.NONE;
 
   constructor(reader: SaxReader, options?: Options) {
     this._reader = reader;
+    // Avoid capturing information that will be ignored, (except for the DOCTYPE, they will still be validated).
+    if (this._reader.doctype != null) this._captureFlag |= CaptureFlag.DOCTYPE;
+    if (this._reader.comment != null) this._captureFlag |= CaptureFlag.COMMENT;
+    if (this._reader.pi != null) this._captureFlag |= CaptureFlag.PI;
   }
 
   write(data: Uint8Array) {
@@ -252,7 +266,7 @@ export class SaxParser {
 
   /** @internal */
   private _advance() {
-    // Advance two places if the character is not BMP
+    // Advance two places if the character is represented as a surrogate pair.
     this._index += +(this._char > 0xffff) + 1;
     this._char = this._chunk.codePointAt(this._index)!;
   }
@@ -412,7 +426,23 @@ export class SaxParser {
           );
           break;
         case State.DOCTYPE_DECL:
-          return;
+          if (this._chunk.length - this._index < 9) return;
+          if (this._chunk.slice(this._index, this._index + 9) === "<!DOCTYPE")
+            this._state = State.DOCTYPE_NAME_S;
+          break;
+        case State.DOCTYPE_NAME_S:
+          while (this._index < this._chunk.length) {
+            if (!isWhitespace(this._char)) break;
+            this._advance();
+          }
+          break;
+        case State.DOCTYPE_NAME: {
+          const begin = this._index;
+          while (this._index < this._chunk.length) {
+            if (isWhitespace(this._char)) break;
+          }
+          break;
+        }
         default:
       }
   }
@@ -495,20 +525,20 @@ export class SaxParser {
     this._char = this._chunk.codePointAt(0)!;
   }
 
-  // For debugging
-  /** @internal */
-  toString() {
-    return `Parser {
-  reader = ${this._reader};
-  version = ${this._version};
-  encoding = "${
-    {
-      [Encoding.DEFAULT]: undefined,
-      [Encoding.UTF8]: "utf-8",
-      [Encoding.UTF16LE]: "utf-16le",
-      [Encoding.UTF16BE]: "utf-16be",
-    }[this._encoding]
-  }";
-  }`;
-  }
+  // // For debugging
+  // /** @internal */
+  // toString() {
+  //   return `Parser {
+  // reader = ${this._reader};
+  // version = ${this._version};
+  // encoding = "${
+  //   {
+  //     [Encoding.DEFAULT]: undefined,
+  //     [Encoding.UTF8]: "utf-8",
+  //     [Encoding.UTF16LE]: "utf-16le",
+  //     [Encoding.UTF16BE]: "utf-16be",
+  //   }[this._encoding]
+  // }";
+  // }`;
+  // }
 }
