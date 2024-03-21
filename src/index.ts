@@ -24,7 +24,7 @@ export interface SaxReader {
   entity(entity: string): void;
 }
 
-const DEFAULT_ENTITIES = {
+let DEFAULT_ENTITIES = {
   amp: "&",
   lt: "<",
   gt: ">",
@@ -89,16 +89,16 @@ function getEncodingString(encoding: Encoding) {
   }
 }
 
-const TEXT_DECODER_FATAL: TextDecoderOptions = {
+let TEXT_DECODER_FATAL: TextDecoderOptions = {
   // Cannot ignore decoding errors.
   fatal: true,
   // Don't skip the Byte Order Mark as the parser handles it.
   ignoreBOM: true,
 };
 
-const TEXT_DECODER_REPLACEMENT: TextDecoderOptions = {ignoreBOM: true};
+let TEXT_DECODER_REPLACEMENT: TextDecoderOptions = {ignoreBOM: true};
 
-const TEXT_DECODE_STREAM: TextDecodeOptions = {stream: true};
+let TEXT_DECODE_STREAM: TextDecodeOptions = {stream: true};
 
 // https://www.w3.org/TR/REC-xml/#NT-S
 // § White Space
@@ -122,7 +122,7 @@ function isAlpha(c: number) {
 function isEncodingName(value: string) {
   if (!isAlpha(value.charCodeAt(0))) return false;
   for (let i = 0; i < value.length; i++) {
-    const c = value.charCodeAt(i);
+    let c = value.charCodeAt(i);
     if (
       !isAlpha(c) &&
       !isAsciiDigit(c) &&
@@ -137,9 +137,9 @@ function isEncodingName(value: string) {
 
 function parseDec(dec: string): number | undefined {
   let n = 0;
-  const length = dec.length;
+  let length = dec.length;
   for (let i = 0; i < length; i++) {
-    const digit = (dec.charCodeAt(i) - 0x30) >>> 0;
+    let digit = (dec.charCodeAt(i) - 0x30) >>> 0;
     if (digit > 9) return undefined;
     n = (n << 3) + (n << 1) + digit;
   }
@@ -148,9 +148,9 @@ function parseDec(dec: string): number | undefined {
 
 function parseHex(dec: string): number | undefined {
   let n = 0;
-  const length = dec.length;
+  let length = dec.length;
   for (let i = 0; i < length; i++) {
-    const c = dec.charCodeAt(i);
+    let c = dec.charCodeAt(i);
     let digit;
     if (isAsciiDigit(c)) {
       digit = c - 0x30;
@@ -295,7 +295,7 @@ export class SaxParser {
   private _setEncoding() {
     // Validate and set declared encoding
     if (this._xmlDeclEncoding !== undefined) {
-      const encoding = this._xmlDeclEncoding.toLowerCase();
+      let encoding = this._xmlDeclEncoding.toLowerCase();
       if (encoding === "utf-8") {
         this._encoding = Encoding.UTF8;
       } else if (
@@ -357,7 +357,7 @@ export class SaxParser {
           }
           break;
         case State.XML_DECL_ATTR: {
-          const begin = this._index;
+          let begin = this._index;
           while (this._index < this._chunk.length) {
             if (this._char === 0x3d /* = */ || isWhitespace(this._char)) {
               this._state = State.XML_DECL_ATTR_EQ;
@@ -370,7 +370,7 @@ export class SaxParser {
         }
         case State.XML_DECL_ATTR_EQ:
           while (this._index < this._chunk.length) {
-            const b = this._char;
+            let b = this._char;
             if (b === 0x3d /* = */) {
               this._state = State.XML_DECL_VALUE;
               this._advance();
@@ -383,7 +383,7 @@ export class SaxParser {
           break;
         case State.XML_DECL_VALUE:
           while (this._index < this._chunk.length) {
-            const b = this._char;
+            let b = this._char;
             this._advance();
             if (b === 0x27 /* ' */) {
               this._state = State.XML_DECL_VALUE_S;
@@ -437,7 +437,7 @@ export class SaxParser {
           }
           break;
         case State.DOCTYPE_NAME: {
-          const begin = this._index;
+          let begin = this._index;
           while (this._index < this._chunk.length) {
             if (isWhitespace(this._char)) break;
           }
@@ -498,9 +498,9 @@ export class SaxParser {
   /** @internal */
   private _init() {
     // Read the Byte Order Mark, if specified it must be correct.
-    const b0 = this._rawChunk![0];
-    const b1 = this._rawChunk![1];
-    const b2 = this._rawChunk![2];
+    let b0 = this._rawChunk![0];
+    let b1 = this._rawChunk![1];
+    let b2 = this._rawChunk![2];
     if (b0 === 0xff && b1 === 0xfe) {
       this._index = 2;
       this._encoding = Encoding.UTF16LE;

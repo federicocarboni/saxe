@@ -1,11 +1,12 @@
 {
-  "type": "commonjs",
+  "type": "module",
   "name": "saxe",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/index.ts --outdir=lib/ --bundle --format=esm --mangle-props=\\^_ --sourcemap",
+    "build": "esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=\\^_ --sourcemap",
+    "build-cjs": "esbuild src/index.ts --outdir=lib/ --out-extension:.js=.cjs --bundle --format=cjs --target=es2017 --mangle-props=\\^_ --sourcemap",
     "test": "mocha test/*.test.ts"
   },
   "keywords": [],
@@ -14,8 +15,10 @@
   "devDependencies": {
     "@types/mocha": "^10.0.6",
     "esbuild": "^0.20.2",
+    "eslint": "^8.57.0",
     "mocha": "^10.3.0",
     "prettier": "^3.2.5",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript-eslint": "^7.3.1"
   }
 }

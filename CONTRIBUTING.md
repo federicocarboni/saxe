@@ -13,3 +13,9 @@ Hash-prefixed properties and methods `#prop` are not used, so TypeScript `privat
 - `camelCase` for functions, methods, properties and variables.
 - Acronyms only have their first letter capitalized, e.g. `XMLParser` should instead be `XmlParser`.
 - `UPPER_SNAKE_CASE` for enum variants and values intended to be constant.
+- Avoid getters and setters. When that functionality is needed use methods instead.
+- No inheritance. Not even for `Error`s.
+
+### Compatibility
+
+This library targets modern JavaScript runtimes with support for ES2017 and the `TextDecoder` DOM API. Other than that avoid any weird prototype hacks (`__proto__` is banned, together with `Object.{set,get}PrototypeOf()`) and non portable runtime specific functionality.
