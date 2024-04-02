@@ -1,0 +1,20 @@
+{
+  "lineWidth": 100,
+  "useTabs": false,
+  "typescript": {
+    "quoteStyle": "preferDouble",
+    "arrowFunction.useParentheses": "force",
+    "spaceSurroundingProperties": false,
+    "importDeclaration.spaceSurroundingNamedImports": false,
+    "exportDeclaration.spaceSurroundingNamedExports": false,
+    "binaryExpression.operatorPosition": "sameLine"
+  },
+  "json": {
+    "trailingCommas": "never"
+  },
+  "excludes": ["**/node_modules"],
+  "plugins": [
+    "https://plugins.dprint.dev/typescript-0.89.3.wasm",
+    "https://plugins.dprint.dev/json-0.19.2.wasm"
+  ]
+}

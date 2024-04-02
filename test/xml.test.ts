@@ -1,14 +1,12 @@
-import {SaxParser} from "../src/index";
+import {SaxParser} from "../src/index.js";
 
-const utf8 = new TextEncoder();
-
-describe("XML Declaration", () => {
-  it("should do stuff", () => {
+describe("XML Declaration", function() {
+  it("should do stuff", function() {
     const STUFF = '<?xml version="1.0" encoding="UTF-8" ?>';
-    const chunk = utf8.encode(STUFF);
-    const parser = new SaxParser(null as any);
-    parser.write(chunk);
-    parser.eof();
+    const parser = new SaxParser({} as any);
+    parser.write(STUFF);
+    parser.end();
+    // parser.eof();
     console.log(parser);
   });
 });

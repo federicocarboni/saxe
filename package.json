@@ -5,7 +5,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=\\^_ --sourcemap",
+    "build": "tsc && esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=\\^_ --sourcemap",
     "build-cjs": "esbuild src/index.ts --outdir=lib/ --out-extension:.js=.cjs --bundle --format=cjs --target=es2017 --mangle-props=\\^_ --sourcemap",
     "test": "mocha test/*.test.ts"
   },
@@ -13,11 +13,14 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@rollup/pluginutils": "^5.1.0",
     "@types/mocha": "^10.0.6",
+    "acorn": "^8.11.3",
+    "dprint": "^0.45.0",
     "esbuild": "^0.20.2",
     "eslint": "^8.57.0",
+    "estree-walker": "^3.0.3",
     "mocha": "^10.3.0",
-    "prettier": "^3.2.5",
     "ts-node": "^10.9.2",
     "typescript-eslint": "^7.3.1"
   }
