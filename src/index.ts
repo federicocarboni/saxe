@@ -1,5 +1,13 @@
-import {isAsciiDigit, isEncodingName, isNameChar, isNameStartChar, isWhitespace} from "./chars.js";
-import {SaxError} from "./error.js";
+import {
+  isAsciiDigit,
+  isEncodingName,
+  isNameChar,
+  isNameStartChar,
+  isWhitespace,
+  parseDec,
+  parseHex,
+} from "./chars.js";
+import {SaxError, makeError} from "./error.js";
 
 export {isSaxError, type SaxError, type SaxErrorCode} from "./error.js";
 
@@ -105,7 +113,7 @@ const enum State {
   DOCTYPE_PUBLIC_ID,
   DOCTYPE_MAYBE_DTD,
   DOCTYPE_DTD,
-  DOCTYPE_DTD_END,
+  DOCTYPE_END,
   MISC,
   COMMENT,
   COMMENT_END,
@@ -144,66 +152,85 @@ const enum Flags {
 
 export class SaxParser {
   /** @internal */
-  private _reader: SaxReader;
+  private reader_: SaxReader;
 
   // State
   /** @internal */
-  private _chunk = "";
+  private chunk_ = "";
   /** @internal */
-  private _index = 0;
+  private index_ = 0;
   /** @internal */
-  private _char = 0;
+  private char_ = 0;
   /** @internal */
-  private _state = State.INIT;
+  private state_ = State.INIT;
   /** @internal */
-  private _flags = Flags.INIT;
+  private flags_ = Flags.INIT;
 
   // Accumulators
   /** Used for attribute names, XML Decl attributes @internal */
-  private _name = "";
+  private name_ = "";
   /** Used for attribute values, XML Decl attribute values @internal */
-  private _value = "";
+  private value_ = "";
   /** @internal */
-  private _element = "";
+  private element_ = "";
   /** @internal */
-  private _content = "";
+  private content_ = "";
   /** @internal */
-  private _attributes = new Map<string, string>();
+  private attributes_ = new Map<string, string>();
 
   // XML Declaration
   /** @internal */
-  private _version: string | undefined = undefined;
+  private version_: string | undefined = undefined;
   /** @internal */
-  private _encoding: string | undefined = undefined;
+  private encoding_: string | undefined = undefined;
   /** @internal */
-  private _standalone: boolean | undefined = undefined;
+  private standalone_: boolean | undefined = undefined;
 
   constructor(reader: SaxReader) {
-    this._reader = reader;
+    this.reader_ = reader;
     // Avoid capturing information that will be ignored, (except for the DOCTYPE, they will still be
     // validated).
-    if (this._reader.comment != null) this._flags |= Flags.CAPTURE_COMMENT;
-    if (this._reader.doctype != null) this._flags |= Flags.CAPTURE_DOCTYPE;
-    if (this._reader.pi != null) this._flags |= Flags.CAPTURE_PI;
+    if (this.reader_.comment != null) this.flags_ |= Flags.CAPTURE_COMMENT;
+    if (this.reader_.doctype != null) this.flags_ |= Flags.CAPTURE_DOCTYPE;
+    if (this.reader_.pi != null) this.flags_ |= Flags.CAPTURE_PI;
+  }
+
+  /**
+   * Returns the encoding declared in the XML Declaration.
+   * @internal
+   */
+  get encoding() {
+    return this.encoding_;
   }
 
   // getEncoding() {
   //   return this._encoding;
   // }
 
+  /**
+   * Add more data for the parser to process. May be called repeatedly to parse a streaming source.
+   * @param input - string contents to parse
+   * @throws {@link SaxError}
+   * @since 1.0.0
+   */
   write(input: string) {
-    this._chunk += input;
-    if (this._chunk.length !== 0) {
-      this._char = input.codePointAt(this._index)!;
+    this.chunk_ += input;
+    if (this.chunk_.length !== 0) {
+      this.char_ = input.codePointAt(this.index_)!;
     }
-    if (!this._run()) {
-      this._chunk = "";
-      this._index = 0;
+    if (!this.run_()) {
+      this.chunk_ = "";
+      this.index_ = 0;
     }
   }
 
+  /**
+   * Signal to the parser that the source has ended.
+   * @throws {@link SaxError}
+   * @since 1.0.0
+   */
   end() {
-    this._run()
+    if (this.run_()) throw makeError("TRUNCATED");
   }
 
   /**
@@ -211,24 +238,24 @@ export class SaxParser {
    * surrogate range and are not carriage returns or line feeds.
    * @internal
    */
-  private _advanceBy(units: number) {
-    this._index += units;
-    this._char = this._chunk.codePointAt(this._index)!;
+  private advanceBy_(units: number) {
+    this.index_ += units;
+    this.char_ = this.chunk_.codePointAt(this.index_)!;
   }
 
   /** @internal */
-  private _advance() {
-    this._index += 1 + +(this._char > 0xFFFF);
-    this._char = this._chunk.codePointAt(this._index)!;
+  private advance_() {
+    this.index_ += 1 + +(this.char_ > 0xffff);
+    this.char_ = this.chunk_.codePointAt(this.index_)!;
     // Normalize line endings
     // https://www.w3.org/TR/xml/#sec-line-ends
-    if (this._char === 0x0D /* CR */) {
-      if (this._chunk.charCodeAt(this._index + 1) === 0x0A /* LF */) {
-        this._index += 1;
-      } else if (this._index >= this._chunk.length) {
-        this._flags |= Flags.CARRIAGE_RETURN;
+    if (this.char_ === 0x0d /* CR */) {
+      if (this.chunk_.charCodeAt(this.index_ + 1) === 0x0a /* LF */) {
+        this.index_ += 1;
+      } else if (this.index_ >= this.chunk_.length) {
+        this.flags_ |= Flags.CARRIAGE_RETURN;
       }
-      this._char = 0x0A /* LF */;
+      this.char_ = 0x0a /* LF */;
     }
   }
 
@@ -236,414 +263,448 @@ export class SaxParser {
    * Returns true if the parser needs more data before parsing the chunk.
    * @internal
    */
-  private _run(): boolean {
-    while (this._index < this._chunk.length) {
-      switch (this._state) {
+  private run_(): boolean {
+    while (this.index_ < this.chunk_.length) {
+      switch (this.state_) {
         case State.INIT:
         case State.PROLOG:
-          if (this._chunk.slice(0, 5) === "<?xml") {
-            this._state = State.XML_DECL;
-            this._advanceBy(5);
+          if (this.chunk_.slice(0, 5) === "<?xml") {
+            this.state_ = State.XML_DECL;
+            this.advanceBy_(5);
           } else {
-            this._state = State.DOCTYPE_DECL;
+            this.state_ = State.DOCTYPE_DECL;
           }
           break;
         case State.XML_DECL:
-          while (this._index < this._chunk.length) {
-            const b = this._char;
+          while (this.index_ < this.chunk_.length) {
+            const b = this.char_;
             if (b === 0x3f /* ? */) {
-              this._state = State.XML_DECL_END;
-              this._advance();
+              this.state_ = State.XML_DECL_END;
+              this.advance_();
               break;
             } else if (!isWhitespace(b)) {
-              this._state = State.XML_DECL_ATTR;
+              this.state_ = State.XML_DECL_ATTR;
               break;
             }
-            this._advance();
+            this.advance_();
           }
           break;
         case State.XML_DECL_ATTR: {
-          const begin = this._index;
-          while (this._index < this._chunk.length) {
-            if (this._char === 0x3d /* = */ || isWhitespace(this._char)) {
-              this._state = State.XML_DECL_ATTR_EQ;
+          const begin = this.index_;
+          while (this.index_ < this.chunk_.length) {
+            if (this.char_ === 0x3d /* = */ || isWhitespace(this.char_)) {
+              this.state_ = State.XML_DECL_ATTR_EQ;
               break;
             }
-            this._advance();
+            this.advance_();
           }
           // Too long, unknown XMLDecl attribute
-          if (this._name.length + (this._index - begin) > 10) {
-            throw SaxError("INVALID_XML_DECL");
+          if (this.name_.length + (this.index_ - begin) > 10) {
+            throw makeError("INVALID_XML_DECL");
           }
-          this._name += this._chunk.slice(begin, this._index);
+          this.name_ += this.chunk_.slice(begin, this.index_);
           break;
         }
         case State.XML_DECL_ATTR_EQ:
-          while (this._index < this._chunk.length) {
-            const b = this._char;
-            this._advance();
+          while (this.index_ < this.chunk_.length) {
+            const b = this.char_;
+            this.advance_();
             if (b === 0x3d /* = */) {
-              this._state = State.XML_DECL_VALUE;
+              this.state_ = State.XML_DECL_VALUE;
               break;
             } else if (!isWhitespace(b)) {
-              throw SaxError("INVALID_XML_DECL");
+              throw makeError("INVALID_XML_DECL");
             }
           }
           break;
         case State.XML_DECL_VALUE:
-          while (this._index < this._chunk.length) {
-            const b = this._char;
-            this._advance();
+          while (this.index_ < this.chunk_.length) {
+            const b = this.char_;
+            this.advance_();
             if (b === 0x27 /* ' */) {
-              this._state = State.XML_DECL_VALUE_S;
+              this.state_ = State.XML_DECL_VALUE_S;
               break;
             } else if (b === 0x22 /* " */) {
-              this._state = State.XML_DECL_VALUE_D;
+              this.state_ = State.XML_DECL_VALUE_D;
               break;
             } else if (!isWhitespace(b)) {
-              throw SaxError("INVALID_XML_DECL");
+              throw makeError("INVALID_XML_DECL");
             }
           }
           break;
         case State.XML_DECL_VALUE_S:
         case State.XML_DECL_VALUE_D:
-          this._value += this._readQuoted(this._state === State.XML_DECL_VALUE_S, State.XML_DECL);
+          this.value_ += this.readQuoted_(
+            this.state_ === State.XML_DECL_VALUE_S,
+            State.XML_DECL,
+          );
           // @ts-ignore
-          if (this._state === State.XML_DECL) this._parseXmlDeclAttr();
+          if (this.state_ === State.XML_DECL) this.parseXmlDeclAttr_();
           break;
         case State.XML_DECL_END:
           if (
-            this._char !== 0x3e /* > */ ||
+            this.char_ !== 0x3e /* > */ ||
             // version is required
-            (this._flags & Flags.XML_VERSION) === 0
+            (this.flags_ & Flags.XML_VERSION) === 0
           ) {
-            throw SaxError("INVALID_XML_DECL");
+            throw makeError("INVALID_XML_DECL");
           }
-          this._state = State.DOCTYPE_DECL;
-          this._reader.xml?.({
-            version: this._version!,
-            encoding: this._encoding,
-            standalone: this._standalone,
+          this.advance_();
+          this.state_ = State.DOCTYPE_DECL;
+          this.reader_.xml?.({
+            version: this.version_!,
+            encoding: this.encoding_,
+            standalone: this.standalone_,
           });
           break;
         case State.MISC:
         case State.DOCTYPE_DECL:
-          if (!this._skipWhitespace() || this._chunk.length - this._index < 9) return true;
+          if (this.skipWhitespace_() || this.chunk_.length - this.index_ < 9) {
+            return true;
+          }
           if (
-            this._state === State.DOCTYPE_DECL &&
-            this._chunk.slice(this._index, this._index + 9) === "<!DOCTYPE"
+            this.state_ === State.DOCTYPE_DECL &&
+            this.chunk_.slice(this.index_, this.index_ + 9) === "<!DOCTYPE"
           ) {
-            this._index += 8;
-            this._advance();
-            this._state = State.DOCTYPE_NAME_S;
+            this.index_ += 8;
+            this.advance_();
+            this.state_ = State.DOCTYPE_NAME_S;
           } else if (
-            this._chunk.slice(this._index, this._index + 4) === "<!--"
+            this.chunk_.slice(this.index_, this.index_ + 4) === "<!--"
           ) {
-            this._index += 3;
-            this._advance();
-            this._state = State.COMMENT;
-          } else if (this._chunk.slice(this._index, this._index + 2) === "<?") {
-            this._index += 1;
-            this._advance();
-            this._state = State.PI;
-          } else if (this._state === State.MISC) {
-            if (this._char !== 0x3C /* < */) {
-              throw SaxError("INVALID_START_TAG");
+            this.index_ += 3;
+            this.advance_();
+            this.state_ = State.COMMENT;
+          } else if (this.chunk_.slice(this.index_, this.index_ + 2) === "<?") {
+            this.index_ += 1;
+            this.advance_();
+            this.state_ = State.PI;
+          } else if (this.state_ === State.MISC) {
+            if (this.char_ !== 0x3c /* < */) {
+              throw makeError("INVALID_START_TAG");
             }
-            this._advance();
-            if (!isNameStartChar(this._char)) {
-              throw SaxError("INVALID_START_TAG");
+            this.advance_();
+            if (!isNameStartChar(this.char_)) {
+              throw makeError("INVALID_START_TAG");
             }
-            this._element = this._chunk.slice(this._index, this._index + 1);
-            this._advance();
-            this._state = State.START_TAG_NAME;
+            this.element_ = this.chunk_.slice(this.index_, this.index_ + 1);
+            this.advance_();
+            this.state_ = State.START_TAG_NAME;
           } else {
-            throw SaxError("INVALID_DOCTYPE");
+            throw makeError("INVALID_DOCTYPE");
           }
           break;
         case State.DOCTYPE_NAME_S:
-          while (this._index < this._chunk.length) {
-            const c = this._char;
-            this._advance();
+          while (this.index_ < this.chunk_.length) {
+            const c = this.char_;
+            this.advance_();
             if (isNameStartChar(c)) {
-              this._state = State.DOCTYPE_NAME;
+              this.state_ = State.DOCTYPE_NAME;
               break;
             } else if (!isWhitespace(c)) {
-              throw SaxError("INVALID_DOCTYPE");
+              throw makeError("INVALID_DOCTYPE");
             }
           }
           break;
         case State.DOCTYPE_NAME: {
-          const begin = this._index;
-          while (this._index < this._chunk.length) {
-            if (isWhitespace(this._char)) {
-              this._state = State.DOCTYPE_EXTERNAL_ID;
+          const begin = this.index_;
+          while (this.index_ < this.chunk_.length) {
+            if (isWhitespace(this.char_)) {
+              this.state_ = State.DOCTYPE_EXTERNAL_ID;
               break;
-            } else if (!isNameChar(this._char)) {
-              throw SaxError("INVALID_DOCTYPE");
+            } else if (this.char_ === 0x3e /* > */) {
+              this.state_ = State.DOCTYPE_END;
+              break;
+            } else if (!isNameChar(this.char_)) {
+              throw makeError("INVALID_DOCTYPE");
             }
-            this._advance();
+            this.advance_();
           }
-          if (this._flags & Flags.SEEN_DOCTYPE) {
-            this._element += this._chunk.slice(begin, this._index);
+          if (this.flags_ & Flags.SEEN_DOCTYPE) {
+            this.element_ += this.chunk_.slice(begin, this.index_);
           }
           break;
         }
         case State.DOCTYPE_EXTERNAL_ID:
-          while (this._index < this._chunk.length) {
-            if (!isWhitespace(this._char)) break;
-            this._advance();
+          while (this.index_ < this.chunk_.length) {
+            if (!isWhitespace(this.char_)) break;
+            this.advance_();
           }
-          if (this._chunk.length - this._index < 7) return true;
+          if (this.chunk_.length - this.index_ < 7) return true;
           if (
-            this._chunk.slice(this._index, this._index + 6) === "SYSTEM" &&
-            isWhitespace(this._chunk.charCodeAt(this._index + 6))
+            this.chunk_.slice(this.index_, this.index_ + 6) === "SYSTEM" &&
+            isWhitespace(this.chunk_.charCodeAt(this.index_ + 6))
           ) {
-            this._index += 6;
-            this._advance();
-            this._state = State.DOCTYPE_SYSTEM_ID;
+            this.advanceBy_(7);
+            this.state_ = State.DOCTYPE_SYSTEM_ID;
           } else if (
-            this._chunk.slice(this._index, this._index + 6) === "PUBLIC" &&
-            isWhitespace(this._chunk.charCodeAt(this._index + 6))
+            this.chunk_.slice(this.index_, this.index_ + 6) === "PUBLIC" &&
+            isWhitespace(this.chunk_.charCodeAt(this.index_ + 6))
           ) {
-            this._index += 6;
-            this._advance();
-            this._state = State.DOCTYPE_PUBLIC_ID;
-            this._flags |= Flags.DOCTYPE_PUBLIC_ID;
-          } else if (this._char === 0x5B /* [ */) {
-            this._advance();
-            this._state = State.DOCTYPE_DTD;
-            this._flags |= Flags.DOCTYPE_DTD;
+            this.advanceBy_(7);
+            this.state_ = State.DOCTYPE_PUBLIC_ID;
+            this.flags_ |= Flags.DOCTYPE_PUBLIC_ID;
+          } else if (this.char_ === 0x5b /* [ */) {
+            this.advance_();
+            this.state_ = State.DOCTYPE_DTD;
+            this.flags_ |= Flags.DOCTYPE_DTD;
           } else {
-            throw SaxError("INVALID_DOCTYPE");
+            throw makeError("INVALID_DOCTYPE");
           }
           break;
         case State.DOCTYPE_SYSTEM_ID:
-          if (!this._skipWhitespace()) return true;
-          if (this._char === 0x27 /* " */) {
-            this._state = State.DOCTYPE_SYSTEM_ID_D;
-          } else if (this._char === 0x22 /* ' */) {
-            this._state = State.DOCTYPE_SYSTEM_ID_S;
+          if (!this.skipWhitespace_()) return true;
+          if (this.char_ === 0x27 /* " */) {
+            this.state_ = State.DOCTYPE_SYSTEM_ID_D;
+          } else if (this.char_ === 0x22 /* ' */) {
+            this.state_ = State.DOCTYPE_SYSTEM_ID_S;
           } else {
-            throw SaxError("INVALID_DOCTYPE");
+            throw makeError("INVALID_DOCTYPE");
           }
-          this._advance();
+          this.advance_();
           break;
         case State.DOCTYPE_SYSTEM_ID_D:
         case State.DOCTYPE_SYSTEM_ID_S: {
-          const systemId = this._readQuoted(
-            this._state === State.DOCTYPE_SYSTEM_ID_S,
+          const systemId = this.readQuoted_(
+            this.state_ === State.DOCTYPE_SYSTEM_ID_S,
             State.DOCTYPE_MAYBE_DTD,
           );
-          if (this._flags & Flags.CAPTURE_DOCTYPE) {
-            this._name += systemId;
+          if (this.flags_ & Flags.CAPTURE_DOCTYPE) {
+            this.name_ += systemId;
           }
           break;
         }
         case State.DOCTYPE_MAYBE_DTD:
-          if (!this._skipWhitespace()) return true;
-          if (this._char === 0x5B /* [ */) {
-            this._advance();
-            this._state = State.DOCTYPE_DTD;
-            this._flags |= Flags.DOCTYPE_DTD;
-          } else if (this._char === 0x3E /* > */) {
-            this._advance();
-            this._state = State.MISC;
+          if (!this.skipWhitespace_()) return true;
+          if (this.char_ === 0x5b /* [ */) {
+            this.advance_();
+            this.state_ = State.DOCTYPE_DTD;
+            this.flags_ |= Flags.DOCTYPE_DTD;
+          } else if (this.char_ === 0x3e /* > */) {
+            this.advance_();
+            this.state_ = State.MISC;
           } else {
-            throw SaxError("INVALID_DOCTYPE");
+            throw makeError("INVALID_DOCTYPE");
           }
           break;
         case State.DOCTYPE_DTD: {
-          let index = this._chunk.indexOf("]", this._index);
+          let index = this.chunk_.indexOf("]", this.index_);
           if (index === -1) {
-            this._state = State.DOCTYPE_DTD_END;
-            index = this._chunk.length;
+            this.state_ = State.DOCTYPE_END;
+            index = this.chunk_.length;
           }
-          this._content += this._chunk.slice(0, index);
-          this._advanceBy(index - this._index);
+          this.content_ += this.chunk_.slice(0, index);
+          this.advanceBy_(index - this.index_);
           break;
         }
-        case State.DOCTYPE_DTD_END:
-          if (!this._skipWhitespace()) return true;
-          if (this._char !== 0x3E /* > */) {
-            throw SaxError("INVALID_DOCTYPE");
+        case State.DOCTYPE_END:
+          if (this.skipWhitespace_()) return true;
+          if (this.char_ !== 0x3e /* > */) {
+            throw makeError("INVALID_DOCTYPE");
           }
-          this._advance();
-          this._state = State.MISC;
-          this._flags |= Flags.SEEN_DOCTYPE;
-          this._name = "";
-          this._value = "";
-          this._content = "";
+          this.advance_();
+          this.state_ = State.MISC;
+          this.flags_ |= Flags.SEEN_DOCTYPE;
+          this.name_ = "";
+          this.value_ = "";
+          this.content_ = "";
           break;
         case State.COMMENT:
-          if (this._flags & Flags.MAYBE_COMMENT_END && this._char === 0x2D /* - */) {
-            this._state = State.COMMENT_END;
-            this._advance();
+          if (
+            this.flags_ & Flags.MAYBE_COMMENT_END &&
+            this.char_ === 0x2d /* - */
+          ) {
+            this.state_ = State.COMMENT_END;
+            this.advance_();
           } else {
-            let end = this._chunk.indexOf("--", this._index);
+            let end = this.chunk_.indexOf("--", this.index_);
             if (end === -1) {
-              end = this._chunk.length;
-              if (this._chunk.endsWith("-")) {
-                this._flags |= Flags.MAYBE_COMMENT_END;
+              end = this.chunk_.length;
+              if (this.chunk_.endsWith("-")) {
+                this.flags_ |= Flags.MAYBE_COMMENT_END;
                 end -= 1;
               }
             } else {
-              this._state = State.COMMENT_END;
+              this.state_ = State.COMMENT_END;
             }
-            if (this._flags & Flags.CAPTURE_COMMENT) {
-              this._content += this._chunk.slice(this._index, end);
+            if (this.flags_ & Flags.CAPTURE_COMMENT) {
+              this.content_ += this.chunk_.slice(this.index_, end);
             }
-            this._advanceBy(end - this._index);
+            this.advanceBy_(end - this.index_);
           }
           break;
         case State.COMMENT_END:
-          if (this._char !== 0x3E /* > */) {
-            throw SaxError("INVALID_COMMENT");
+          if (this.char_ !== 0x3e /* > */) {
+            throw makeError("INVALID_COMMENT");
           }
-          this._advance();
-          this._reader.comment?.(this._content);
-          this._content = "";
-          if (this._flags & Flags.SEEN_DOCTYPE) {
-            this._state = State.MISC;
+          this.advance_();
+          this.reader_.comment?.(this.content_);
+          this.content_ = "";
+          if (this.flags_ & Flags.SEEN_DOCTYPE) {
+            this.state_ = State.MISC;
           } else {
-            this._state = State.DOCTYPE_DECL;
+            this.state_ = State.DOCTYPE_DECL;
           }
           break;
         case State.PI:
-          throw SaxError("UNIMPLEMENTED");
+          throw makeError("UNIMPLEMENTED");
         case State.START_TAG_NAME: {
-          const start = this._index;
-          while (this._index < this._chunk.length) {
-            const b = this._char;
-            this._advance();
-            if (isWhitespace(b)) {
-              this._state = State.START_TAG;
+          const start = this.index_;
+          while (this.index_ < this.chunk_.length) {
+            if (isWhitespace(this.char_) || this.char_ === 0x3e /* > */) {
+              this.state_ = State.START_TAG;
               break;
-            } else if (b === 0x3E /* > */) {
-              this._state = State.CONTENT;
-              break;
-            } else if (!isNameChar(b)) {
-              throw SaxError("INVALID_START_TAG");
+            } else if (!isNameChar(this.char_)) {
+              throw makeError("INVALID_START_TAG");
             }
+            this.advance_();
           }
-          this._element += this._chunk.slice(start, this._index);
+          this.element_ += this.chunk_.slice(start, this.index_);
           break;
         }
         case State.START_TAG:
-          while (this._index < this._chunk.length) {
-            if (this._char === 0x3E /* > */) {
-              this._state = State.CONTENT;
-              this._advance();
+          while (this.index_ < this.chunk_.length) {
+            if (this.char_ === 0x3e /* > */) {
+              this.state_ = State.CONTENT;
+              this.advance_();
+              this.reader_.start(this.element_, this.attributes_);
+              this.attributes_.clear();
               break;
-            } else if (isNameStartChar(this._char)) {
-              this._state = State.START_TAG_ATTR;
+            } else if (isNameStartChar(this.char_)) {
+              this.state_ = State.START_TAG_ATTR;
               break;
-            } else if (!isWhitespace(this._char)) {
-              throw SaxError("INVALID_START_TAG");
+            } else if (!isWhitespace(this.char_)) {
+              throw makeError("INVALID_START_TAG");
             }
-            this._advance();
+            this.advance_();
           }
           break;
         case State.START_TAG_ATTR: {
-          const start = this._index;
-          while (this._index < this._chunk.length) {
-            const b = this._char;
-            this._advance();
-            if (b === 0x3D /* = */) {
-              this._state = State.START_TAG_ATTR_VALUE;
+          const start = this.index_;
+          while (this.index_ < this.chunk_.length) {
+            const b = this.char_;
+            this.advance_();
+            if (b === 0x3d /* = */) {
+              this.state_ = State.START_TAG_ATTR_VALUE;
               break;
             } else if (isWhitespace(b)) {
-              this._state = State.START_TAG_ATTR_EQ;
+              this.state_ = State.START_TAG_ATTR_EQ;
               break;
             } else if (!isNameChar(b)) {
-              throw SaxError("INVALID_START_TAG");
+              throw makeError("INVALID_START_TAG");
             }
           }
-          this._name += this._chunk.slice(start, this._index);
+          this.name_ += this.chunk_.slice(start, this.index_);
           break;
         }
         case State.START_TAG_ATTR_EQ:
-          if (!this._skipWhitespace()) return true;
-          if (this._char !== 0x3D /* = */) {
-            throw SaxError("INVALID_START_TAG");
+          if (!this.skipWhitespace_()) return true;
+          if (this.char_ !== 0x3d /* = */) {
+            throw makeError("INVALID_START_TAG");
           }
-          this._advance();
-          this._state = State.START_TAG_ATTR_VALUE;
+          this.advance_();
+          this.state_ = State.START_TAG_ATTR_VALUE;
           break;
         case State.START_TAG_ATTR_VALUE:
-          if (!this._skipWhitespace()) return true;
-          if (this._char === 0x22 /* " */) {
-            this._state = State.START_TAG_ATTR_VALUE_D;
-          } else if (this._char === 0x27 /* ' */) {
-            this._state = State.START_TAG_ATTR_VALUE_S;
+          if (!this.skipWhitespace_()) return true;
+          if (this.char_ === 0x22 /* " */) {
+            this.state_ = State.START_TAG_ATTR_VALUE_D;
+          } else if (this.char_ === 0x27 /* ' */) {
+            this.state_ = State.START_TAG_ATTR_VALUE_S;
           } else {
-            throw SaxError("INVALID_START_TAG");
+            throw makeError("INVALID_START_TAG");
           }
           break;
         case State.START_TAG_ATTR_VALUE_D:
         case State.START_TAG_ATTR_VALUE_S:
-          this._value += this._readQuoted(
-            this._state === State.START_TAG_ATTR_VALUE_S,
+          this.value_ += this.readQuoted_(
+            this.state_ === State.START_TAG_ATTR_VALUE_S,
             State.START_TAG,
           );
           // @ts-ignore
-          if (this._state === State.START_TAG) {
-            this._attributes.set(this._name, this._value);
-            this._name = "";
-            this._value = "";
+          if (this.state_ === State.START_TAG) {
+            this.attributes_.set(this.name_, this.unescape_(this.value_));
+            this.name_ = "";
+            this.value_ = "";
           }
           break;
         case State.CONTENT: {
-          let end = this._chunk.indexOf("<", this._index);
+          let end = this.chunk_.indexOf("<", this.index_);
           if (end === -1) {
-            end = this._chunk.length;
+            end = this.chunk_.length;
           } else {
-            this._state = State.OPEN_ANGLE_BRACKET;
+            this.state_ = State.OPEN_ANGLE_BRACKET;
           }
-          const chunk = this._chunk.slice(this._index, end);
-          this._content += chunk;
-          if (this._state === State.OPEN_ANGLE_BRACKET) {
-            if (this._content.indexOf("]]>") !== -1) {
-              throw SaxError("INVALID_CDATA");
+          const chunk = this.chunk_.slice(this.index_, end);
+          this.content_ += chunk;
+          if (this.state_ === State.OPEN_ANGLE_BRACKET) {
+            if (this.content_.indexOf("]]>") !== -1) {
+              throw makeError("INVALID_CDATA");
             }
-            this._reader.text(this._unescape(this._content));
-            this._content = "";
+            this.reader_.text(this.unescape_(this.content_));
+            this.content_ = "";
           }
           break;
         }
-        default:
-          throw new Error("unreachable");
+        case State.OPEN_ANGLE_BRACKET:
+          if (this.chunk_.length - this.index_ < 3) return true;
+          if (this.char_ === 0x2f /* / */) {
+            this.state_ = State.END_TAG;
+          } else if (
+            this.chunk_.slice(this.index_, this.index_ + 3) === "!--"
+          ) {
+            this.advanceBy_(3);
+            this.state_ = State.COMMENT;
+          } else if (isNameStartChar(this.char_)) {
+            this.state_ = State.START_TAG_NAME;
+          } else {
+            throw makeError("INVALID_START_TAG");
+          }
+          break;
+        case State.END_TAG:
+          break;
       }
     }
-    return this._index < this._chunk.length - 1;
+    return this.index_ < this.chunk_.length - 1;
   }
 
   /** @internal */
-  private _unescape(content: string) {
+  private unescape_(content: string) {
     let index = 0;
     let unescaped = "";
     while (true) {
-      let end = content.indexOf("&", index);
-      if (end === -1) break;
-      unescaped += content.slice(index, end);
-      index = end;
+      // Replace entity references
+      let amp = content.indexOf("&", index);
+      if (amp === -1) break;
+      unescaped += content.slice(index, amp);
+      index = amp;
       let c = content.codePointAt(index)!;
+      let replacement;
       if (c === 0x23 /* # */) {
-
+        let end = content.indexOf(";", index);
+        const codePoint = content.slice(index, index + 2) === "#x"
+          ? parseHex(content.slice(index + 2, end))
+          : parseDec(content.slice(index + 1, end));
+        if (end === -1 || codePoint === undefined || codePoint >= 0x10ffff) {
+          throw makeError("INVALID_CHAR_REF");
+        }
+        replacement = String.fromCodePoint(codePoint);
+      } else {
+        if (!isNameStartChar(c)) {
+          throw makeError("INVALID_ENTITY_REF");
+        }
+        do {
+          index += 1 + +(c > 0xffff);
+          c = content.codePointAt(index)!;
+        } while (isNameChar(c));
+        replacement = this.resolveEntity_(content.slice(amp, index));
+        if (c !== 0x3b /* ; */) {
+          throw makeError("INVALID_ENTITY_REF");
+        }
       }
-      if (!isNameStartChar(c)) {
-        throw SaxError("INVALID_ENTITY");
-      }
-      do {
-        index += 1 + +(c > 0xFFFF);
-        c = content.codePointAt(index)!
-      } while (isNameChar(c));
-      if (c !== 0x3B /* ; */) {
-        throw SaxError("INVALID_ENTITY");
-      }
-      const entity = content.slice(end, index);
-      unescaped += this._resolveEntity(entity);
+      unescaped += replacement;
     }
+    // Last chunk
     unescaped += content.slice(index);
     // XML normalizes line endings to be UNIX style even if they not litterally the same in the
     // document
@@ -652,81 +713,79 @@ export class SaxParser {
   }
 
   /** @internal */
-  private _readQuoted(single: boolean, nextState: State) {
-    let quote = this._chunk.indexOf(
-      single ? "'" : '"',
-      this._index,
-    );
+  private readQuoted_(single: boolean, nextState: State) {
+    let quote = this.chunk_.indexOf(single ? "'" : '"', this.index_);
     if (quote === -1) {
-      quote = this._chunk.length;
+      quote = this.chunk_.length;
     } else {
-      this._state = nextState;
+      this.state_ = nextState;
     }
-    const chunk = this._chunk.slice(this._index, quote);
-    this._index = quote;
-    this._advance();
+    const chunk = this.chunk_.slice(this.index_, quote);
+    this.index_ = quote;
+    this.advance_();
     return chunk;
   }
 
   /** @internal */
-  private _parseXmlDeclAttr() {
-    switch (this._name) {
+  private parseXmlDeclAttr_() {
+    switch (this.name_) {
       case "version":
         if (
-          (this._flags & Flags.XML) !== Flags.INIT ||
-          this._value.length !== 3 ||
-          this._value.slice(0, 2) !== "1." ||
-          !isAsciiDigit(this._value.charCodeAt(2))
+          (this.flags_ & Flags.XML) !== Flags.INIT ||
+          this.value_.length !== 3 ||
+          this.value_.slice(0, 2) !== "1." ||
+          !isAsciiDigit(this.value_.charCodeAt(2))
         ) {
-          throw SaxError("INVALID_XML_DECL");
+          throw makeError("INVALID_XML_DECL");
         }
-        this._version = this._value;
-        this._flags |= Flags.XML_VERSION;
+        this.version_ = this.value_;
+        this.flags_ |= Flags.XML_VERSION;
         break;
       case "encoding":
         if (
-          (this._flags & Flags.XML) !== Flags.XML_VERSION ||
-          !isEncodingName(this._value)
+          (this.flags_ & Flags.XML) !== Flags.XML_VERSION ||
+          !isEncodingName(this.value_)
         ) {
-          throw SaxError("INVALID_XML_DECL");
+          throw makeError("INVALID_XML_DECL");
         }
-        this._encoding = this._value.toLowerCase();
-        this._flags |= Flags.XML_ENCODING;
+        this.encoding_ = this.value_.toLowerCase();
+        this.flags_ |= Flags.XML_ENCODING;
         break;
       case "standalone":
         if (
-          (this._flags & Flags.XML_VERSION) === 0 ||
-          (this._flags & Flags.XML_STANDALONE) !== 0 ||
-          (this._value !== "yes" && this._value !== "no")
+          (this.flags_ & Flags.XML_VERSION) === 0 ||
+          (this.flags_ & Flags.XML_STANDALONE) !== 0 ||
+          (this.value_ !== "yes" && this.value_ !== "no")
         ) {
-          throw SaxError("INVALID_XML_DECL");
+          throw makeError("INVALID_XML_DECL");
         }
-        this._standalone = this._value === "yes";
-        this._flags |= Flags.XML_STANDALONE;
+        this.standalone_ = this.value_ === "yes";
+        this.flags_ |= Flags.XML_STANDALONE;
         break;
       default:
-        throw SaxError("INVALID_XML_DECL");
+        throw makeError("INVALID_XML_DECL");
     }
-    this._name = "";
-    this._value = "";
+    this.name_ = "";
+    this.value_ = "";
   }
 
   /** @internal */
-  private _skipWhitespace() {
-    while (this._index < this._chunk.length) {
-      if (!isWhitespace(this._char)) break;
-      this._advance();
+  private skipWhitespace_() {
+    while (this.index_ < this.chunk_.length) {
+      if (!isWhitespace(this.char_)) break;
+      this.advance_();
     }
-    return this._index >= this._chunk.length;
+    return this.index_ >= this.chunk_.length;
   }
 
   /** @internal */
-  private _resolveEntity(entity: string): string {
+  private resolveEntity_(entity: string) {
+    // Default entities always have priority
     if (DEFAULT_ENTITIES.hasOwnProperty(entity)) {
       return DEFAULT_ENTITIES[entity as keyof typeof DEFAULT_ENTITIES];
     }
-    const entity2 = this._reader.resolveEntity?.(entity);
-    if (entity2 == null) throw SaxError("UNRESOLVED_ENTITY", entity);
+    const entity2 = this.reader_.resolveEntity?.(entity);
+    if (entity2 == null) throw makeError("UNRESOLVED_ENTITY", entity);
     return entity2;
   }
 }
