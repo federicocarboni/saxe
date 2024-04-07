@@ -11,7 +11,9 @@ const ERRORS = {
   INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
     `Invalid char reference U+${(char || 0).toString(16).padStart(4, "0")}`,
   UNRESOLVED_ENTITY: ({entity}: {entity: string}) =>
-    `Unresolved entity "${entity}"`,
+    `Entity "${entity}" cannot be resolved`,
+  RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
+    `Entity "${entity}" directly or indirectly references itself`,
   INVALID_START_TAG: () => "Expected start tag",
   DUPLICATE_ATTR: () => "Duplicate attribute",
   INVALID_END_TAG: () => "Invalid end tag",
@@ -23,7 +25,6 @@ const ERRORS = {
 
 type SaxErrorCodes = {
   [Code in keyof typeof ERRORS]: {
-    /**  X*/
     name: "SaxError";
     /** A string representing a specific error. */
     code: Code;
