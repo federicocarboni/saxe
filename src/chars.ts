@@ -1,5 +1,17 @@
+/** @internal */
+export const enum Chars {
+  APOSTROPHE = 0x27,
+  QUOTE = 0x22,
+  LT = 0x3C,
+  EQ = 0x3D,
+  GT = 0x3E,
+  QUESTION = 0x3F,
+  LOWER_X = 0x78,
+}
+
 // https://www.w3.org/TR/REC-xml/#NT-S
 // § White Space
+/** @internal */
 export function isWhitespace(c: number) {
   return (
     c === 0x20 /* SP */ ||
@@ -9,10 +21,12 @@ export function isWhitespace(c: number) {
   );
 }
 
+/** @internal */
 export function isAsciiDigit(c: number) {
   return 0x30 <= c && c <= 0x39;
 }
 
+/** @internal */
 export function isAsciiHexAlpha(c: number) {
   return (
     (0x61 /* a */ <= c && c <= 0x66) /* f */ ||
@@ -20,6 +34,7 @@ export function isAsciiHexAlpha(c: number) {
   );
 }
 
+/** @internal */
 export function isAlpha(c: number) {
   return (
     (0x61 /* a */ <= c && c <= 0x7a) /* z */ ||
@@ -27,6 +42,7 @@ export function isAlpha(c: number) {
   );
 }
 
+/** @internal */
 export function isEncodingName(value: string) {
   if (!isAlpha(value.charCodeAt(0))) return false;
   for (let i = 0; i < value.length; i++) {
@@ -44,6 +60,7 @@ export function isEncodingName(value: string) {
   return true;
 }
 
+/** @internal */
 export function parseDec(dec: string): number | undefined {
   let n = 0;
   const length = dec.length;
@@ -56,6 +73,7 @@ export function parseDec(dec: string): number | undefined {
   return n;
 }
 
+/** @internal */
 export function parseHex(dec: string): number | undefined {
   let n = 0;
   const length = dec.length;
@@ -77,23 +95,25 @@ export function parseHex(dec: string): number | undefined {
 
 // https://www.w3.org/TR/REC-xml/#NT-Char
 // § Character Range
+/** @internal */
 export function isChar(c: number) {
   return (
     c === 0x9 ||
-    c === 0xa ||
-    c === 0xd ||
-    (0x20 <= c && c <= 0xd7ff) ||
-    (0xe000 <= c && c <= 0xfffd) ||
-    (0x10000 <= c && c <= 0x10ffff)
+    c === 0xA ||
+    c === 0xD ||
+    (0x20 <= c && c <= 0xD7FF) ||
+    (0xE000 <= c && c <= 0xFFFD) ||
+    (0x10000 <= c && c <= 0x10FFFF)
   );
 }
 
 // https://www.w3.org/TR/REC-xml/#NT-NameStartChar
+/** @internal */
 export function isNameStartChar(c: number) {
   return (
     isAlpha(c) ||
-    c === 0x3a /* : */ ||
-    c === 0x5f /* _ */ ||
+    c === 0x3A /* : */ ||
+    c === 0x5F /* _ */ ||
     (0xc0 <= c && c <= 0xd6) ||
     (0xd8 <= c && c <= 0xf6) ||
     (0xf8 <= c && c <= 0x2ff) ||
@@ -110,6 +130,7 @@ export function isNameStartChar(c: number) {
 }
 
 // https://www.w3.org/TR/REC-xml/#NT-NameChar
+/** @internal */
 export function isNameChar(c: number) {
   return (
     isNameStartChar(c) ||

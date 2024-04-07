@@ -2,7 +2,8 @@ import {SaxParser, SaxReader} from "../src/index.js";
 
 describe("XML Declaration", function() {
   it("should do stuff", function() {
-    const STUFF = '<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE something><element>CONTENT<';
+    const STUFF =
+      '<?xml version="1.0" encoding="UTF-8" ?><!DOCTYPE something><element>CONTENT</element>';
     const parser = new SaxParser(
       {
         text(text) {
@@ -20,7 +21,7 @@ describe("XML Declaration", function() {
       } satisfies SaxReader,
     );
     parser.write(STUFF);
-    // parser.end();
+    parser.end();
     // parser.eof();
     console.log(parser);
   });

@@ -9,7 +9,16 @@ export default tseslint.config(
   {
     rules: {
       "no-proto": "error",
+      // Prototype builtins can be used correctly.
       "no-prototype-builtins": "off",
+      "no-constant-condition": ["error", {checkLoops: false}],
+      "eqeqeq": [
+        "error",
+        "always",
+        {
+          null: "ignore",
+        },
+      ],
     },
   },
 );
