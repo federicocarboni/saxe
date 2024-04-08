@@ -10,12 +10,12 @@ const ERRORS = {
   INVALID_DOCTYPE: () => "Invalid or missing DOCTYPE declaration",
   INVALID_ENTITY_REF: () => "Invalid entity",
   INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
-    `Invalid char reference U+${(char || 0).toString(16).padStart(4, "0")}`,
+    `Reference to invalid character: ${char}`,
   UNRESOLVED_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" cannot be resolved`,
   RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" directly or indirectly references itself`,
-  INVALID_START_TAG: () => "Expected start tag",
+  INVALID_START_TAG: () => "Invalid start tag",
   DUPLICATE_ATTR: () => "Duplicate attribute",
   INVALID_END_TAG: () => "Invalid end tag",
   INVALID_COMMENT: () => "Comments cannot contain --",
