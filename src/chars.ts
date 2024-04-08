@@ -1,7 +1,11 @@
 /** @internal */
 export const enum Chars {
+  LF = 0xA,
+  CR = 0xD,
   APOSTROPHE = 0x27,
+  BANG = 0x21,
   QUOTE = 0x22,
+  SLASH = 0x2F,
   LT = 0x3C,
   EQ = 0x3D,
   GT = 0x3E,

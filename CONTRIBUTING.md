@@ -40,13 +40,13 @@ class MyClass {
   not a good fit for JavaScript APIs.
 - Only use `undefined` instead of `null` internally but assume they are
   interchangeable when receiving values from the user, similar to the behavior
-  of the optional chaining operator.
+  of the optional chaining operator. Types SHOULD NOT declare `null`.
 
 ## Compatibility
 
 This library targets modern JavaScript runtimes with support for ES2017 and the
 `TextDecoder` DOM API. Additionally any functionality which is difficult to
-polyfill or reproduced should be avoided when possible. For example `null`
+polyfill or reproduce should be avoided when possible. For example `null`
 prototype object are banned together with any weird prototype hacks (`__proto__`
 and `Object.{set,get}PrototypeOf()`) and any non portable runtime specific
 functionality.

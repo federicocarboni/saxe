@@ -14,6 +14,12 @@ import {createSaxError, SaxError} from "./error.js";
 export {isSaxError, type SaxError, type SaxErrorCode} from "./error.js";
 
 /**
+ * XML Declaration (XMLDecl)
+ *
+ * ```xml
+ * <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+ * ```
+ *
  * @since 1.0.0
  */
 export interface XmlDeclaration {
@@ -42,10 +48,28 @@ export interface Doctype {
   systemId?: string | undefined;
 }
 
-/** */
+/**
+ * A processing instruction.
+ *
+ * ```xml
+ * <?target content?>
+ * ```
+ * @since 1.0.0
+ */
 export interface Pi {
+  /** Target name of the processing instruction. */
   target: string;
-  content: string;
+  /**
+   * Content of the processing instruction or `undefined` if omitted.
+   *
+   * Empty and omitted content is subtly different:
+   *
+   * ```xml
+   * <?target?><!-- omitted, content = undefined -->
+   * <?target ?><!-- empty, content = "" -->
+   * ```
+   */
+  content?: string | undefined;
 }
 
 interface SaxDtdHandler {
@@ -59,14 +83,15 @@ interface SaxDtdHandler {
 /** */
 export interface SaxReader {
   /**
-   * Resolve an entity by name. Users are expected to handle `<!ENTITY ...>`
+   * Resolve an entity reference by name. Users are expected to handle `<!ENTITY ...>`
    * declarations in the DTD where applicable or have a hard coded set of
    * possible ones.
    *
    * @param entity
+   * @returns resolved entity contents or `undefined` if not found.
    * @since 1.0.0
    */
-  resolveEntity?(entity: string): string | undefined;
+  resolveEntityRef?(entity: string): string | undefined;
   /**
    * @param declaration
    * @since 1.0.0
@@ -93,7 +118,7 @@ export interface SaxReader {
    */
   comment?(text: string): void;
   /**
-   * Start tag `<element attr="value">`.
+   * Start tag `<element attr="value">`. Attributes are passed to
    * @param name
    * @param attributes
    * @since 1.0.0
@@ -122,11 +147,16 @@ export interface SaxReader {
 }
 
 export interface SaxOptions {
+  /**
+   *
+   */
   comments?: boolean | undefined;
-  entities?: boolean | undefined;
+  /**
+   * @defaultValue 3
+   */
+  maxNestedEntityRef?: number | undefined;
 }
 
-// https://www.w3.org/TR/REC-xml/#sec-predefined-ent
 const PREDEFINED_ENTITIES = {
   amp: "&",
   lt: "<",
@@ -158,7 +188,13 @@ const enum State {
   MISC,
   COMMENT,
   COMMENT_END,
-  PI,
+  PI_TARGET_START,
+  PI_TARGET,
+  PI_CONTENT,
+  PI_CONTENT_S,
+  PI_EMPTY,
+  OPEN_ANGLE_BRACKET,
+  OPEN_ANGLE_BRACKET_BANG,
   START_TAG_NAME,
   START_TAG,
   START_TAG_ATTR,
@@ -170,33 +206,33 @@ const enum State {
   END_TAG_START,
   END_TAG,
   END_TAG_END,
-  OPEN_ANGLE_BRACKET,
   CDATA,
 }
 
 const enum Flags {
   INIT = 0,
   SEEN_XML_DECL = 1 << 0,
-  XML_VERSION = 1 << 1,
-  XML_ENCODING = 1 << 2,
-  XML_STANDALONE = 1 << 3,
-  SEEN_DOCTYPE = 1 << 4,
-  DOCTYPE_PUBLIC_ID = 1 << 5,
-  DOCTYPE_DTD = 1 << 6,
-  XML = Flags.XML_VERSION | Flags.XML_ENCODING | Flags.XML_STANDALONE,
+  SEEN_DOCTYPE = 1 << 1,
+  SEEN_ROOT = 1 << 2,
 
-  CARRIAGE_RETURN = 1 << 7,
-  SEEN_ROOT = 1 << 8,
-  MAYBE_COMMENT_END = 1 << 9,
-  MAYBE_CEND = 1 << 10,
-  SINGLE_QUOTE = 1 << 11,
+  CARRIAGE_RETURN = 1 << 8,
+
+  XML_VERSION = 1 << 3,
+  XML_ENCODING = 1 << 4,
+  XML_STANDALONE = 1 << 5,
+  XML_ALL = Flags.XML_VERSION | Flags.XML_ENCODING | Flags.XML_STANDALONE,
+
+  DOCTYPE_PUBLIC_ID = 1 << 6,
+  DOCTYPE_DTD = 1 << 7,
 
   CAPTURE_COMMENT = 1 << 16,
   CAPTURE_DOCTYPE = 1 << 17,
   CAPTURE_PI = 1 << 18,
 }
 
+// Normalize XML line endings.
 function normalize(s: string) {
+  // Yet to find a method faster than a simple replace.
   return s.replace(/\r\n?/g, "\n");
 }
 
@@ -270,6 +306,7 @@ export class SaxParser {
     if (this.chunk_.length !== 0) {
       this.char_ = input.codePointAt(this.index_)!;
     }
+    while (this.index_ < this.chunk_.length && this.runStateMachine_());
     // if (!this.run_()) {
     //   this.chunk_ = "";
     //   this.index_ = 0;
@@ -303,23 +340,30 @@ export class SaxParser {
           this.skipTo_(6);
           this.state_ = State.XML_DECL;
         } else {
-          this.state_ = State.PROLOG;
+          this.state_ = State.MISC;
         }
         break;
       case State.PROLOG:
         break;
       case State.XML_DECL:
         if (!this.skipWhitespace_()) return false;
-        if (this.collectXmlAttrName_()) {
+        if (this.char_ === Chars.QUESTION) {
+          this.advance_();
+          this.state_ = State.XML_DECL_END;
+        } else if (this.collectXmlAttrName_()) {
           this.state_ = State.XML_DECL_VALUE;
         }
         break;
       case State.XML_DECL_S:
-        if (!isWhitespace(this.char_)) {
+        if (this.char_ === Chars.QUESTION) {
+          this.advance_();
+          this.state_ = State.XML_DECL_END;
+        } else if (isWhitespace(this.char_)) {
+          this.advance_();
+          this.state_ = State.XML_DECL;
+        } else {
           this.error_(createSaxError("INVALID_XML_DECL"));
         }
-        this.advance_();
-        this.state_ = State.XML_DECL;
         break;
       case State.XML_DECL_VALUE:
         if (!this.skipWhitespace_()) return false;
@@ -335,10 +379,22 @@ export class SaxParser {
       case State.XML_DECL_VALUE_S:
       case State.XML_DECL_VALUE_D:
         if (this.readQuotedValue_(this.state_ === State.XML_DECL_VALUE_S)) {
-
+          this.handleXmlDeclAttr_();
+          this.state_ = State.XML_DECL_S;
         }
         break;
       case State.XML_DECL_END:
+        if (this.char_ !== Chars.GT || this.version_ === undefined) {
+          this.error_(createSaxError("INVALID_XML_DECL"));
+        }
+        this.advance_();
+        this.reader_.xml?.({
+          version: this.version_,
+          encoding: this.encoding_,
+          standalone: this.standalone_,
+        });
+        this.state_ = State.MISC;
+        break;
       case State.DOCTYPE_DECL:
       case State.DOCTYPE_NAME_S:
       case State.DOCTYPE_NAME:
@@ -350,10 +406,120 @@ export class SaxParser {
       case State.DOCTYPE_MAYBE_DTD:
       case State.DOCTYPE_DTD:
       case State.DOCTYPE_END:
+        throw new Error("not implemented");
       case State.MISC:
+        if (!this.skipWhitespace_()) return false;
+        if (this.char_ === Chars.LT) {
+          this.state_ = State.OPEN_ANGLE_BRACKET;
+        } else {
+          this.error_(createSaxError("INVALID_START_TAG"));
+        }
+        this.advance_();
+        break;
       case State.COMMENT:
+        this.readComment_();
+        break;
       case State.COMMENT_END:
-      case State.PI:
+        if (this.char_ !== Chars.GT) {
+          this.error_(createSaxError("INVALID_COMMENT"));
+        }
+        this.advance_();
+        this.state_ = this.stack_.length === 0 ? State.MISC : State.CONTENT;
+        if (this.flags_ & Flags.CAPTURE_COMMENT) {
+          this.reader_.comment?.(normalize(this.content_));
+        }
+        this.content_ = "";
+        break;
+      case State.PI_TARGET_START:
+        if (!isNameStartChar(this.char_)) {
+          this.error_(createSaxError("INVALID_PI"));
+        }
+        if (this.flags_ & Flags.CAPTURE_PI) {
+          this.element_ = String.fromCodePoint(this.char_);
+        }
+        this.advance_();
+        this.state_ = State.PI_TARGET;
+        break;
+      case State.PI_TARGET: {
+        const start = this.index_;
+        while (this.index_ < this.chunk_.length) {
+          if (isWhitespace(this.char_)) {
+            this.state_ = State.PI_CONTENT_S;
+            break;
+          } else if (this.char_ === Chars.QUESTION) {
+            this.state_ = State.PI_EMPTY;
+            break;
+          } else if (!isNameChar(this.char_)) {
+            this.error_(createSaxError("INVALID_PI"));
+          }
+          this.advance_();
+        }
+        if (this.flags_ & Flags.CAPTURE_PI) {
+          this.element_ += this.chunk_.slice(start, this.index_);
+        }
+        break;
+      }
+      case State.PI_CONTENT:
+        this.readPi_();
+        break;
+      case State.PI_CONTENT_S:
+        if (!this.skipWhitespace_()) return false;
+        this.state_ = State.PI_CONTENT;
+        break;
+      case State.PI_EMPTY:
+        if (this.char_ !== Chars.GT) {
+          this.error_(createSaxError("INVALID_PI"));
+        }
+        this.advance_();
+        this.state_ = State.MISC;
+        this.reader_.pi?.({
+          target: this.element_,
+          content: undefined,
+        });
+        this.element_ = "";
+        break;
+      case State.OPEN_ANGLE_BRACKET: {
+        const char = this.char_;
+        this.advance_();
+        if (char === Chars.SLASH) {
+          this.state_ = State.END_TAG_START;
+        } else if (char === Chars.BANG) {
+          this.state_ = State.OPEN_ANGLE_BRACKET_BANG;
+        } else if (char === Chars.QUESTION) {
+          this.state_ = State.PI_TARGET_START;
+        } else if (isNameStartChar(char)) {
+          this.state_ = State.START_TAG_NAME;
+          this.element_ = String.fromCodePoint(char);
+        } else {
+          this.error_(createSaxError("INVALID_START_TAG"));
+        }
+        break;
+      }
+      case State.OPEN_ANGLE_BRACKET_BANG: {
+        if (this.chunk_.slice(this.index_, this.index_ + 7) === "[CDATA[") {
+          this.skipTo_(this.index_ + 7);
+          this.state_ = State.CDATA;
+        } else if (
+          this.chunk_.slice(this.index_, this.index_ + 7) === "DOCTYPE"
+        ) {
+          if (
+            this.flags_ & Flags.SEEN_DOCTYPE ||
+            this.flags_ & Flags.SEEN_ROOT
+          ) {
+            this.error_(createSaxError("INVALID_DOCTYPE"));
+          }
+          this.skipTo_(this.index_ + 7);
+          this.state_ = State.DOCTYPE_DECL;
+        } else if (this.chunk_.slice(this.index_, this.index_ + 2) === "--") {
+          this.skipTo_(this.index_ + 2);
+          this.state_ = State.COMMENT;
+        } else if (this.chunk_.length - this.index_ < 7) {
+          return false;
+        } else {
+          this.error_(createSaxError("INVALID_START_TAG"));
+        }
+        break;
+      }
       case State.START_TAG_NAME:
       case State.START_TAG:
       case State.START_TAG_ATTR:
@@ -365,14 +531,13 @@ export class SaxParser {
       case State.END_TAG_START:
       case State.END_TAG:
       case State.END_TAG_END:
-      case State.OPEN_ANGLE_BRACKET:
       case State.CDATA:
     }
     return true;
   }
 
   // @internal
-  private error_(error: SaxError) {
+  private error_(error: SaxError): never {
     throw error;
   }
 
@@ -395,16 +560,26 @@ export class SaxParser {
     this.index_ += 1 + +(this.char_ > 0xffff);
     this.char_ = this.chunk_.codePointAt(this.index_)!;
 
+    // Previous chunk ended in CR, may be waiting on a following LF in the next chunk.
+    // if (this.flags_ & Flags.CARRIAGE_RETURN) {
+    //   if (this.char_ === Chars.LF) {
+    //     this.advance_();
+    //     return;
+    //   }
+    //   this.flags_ ^= Flags.CARRIAGE_RETURN;
+    // }
+
+    // TODO: is this actually needed
     // Normalize line endings
     // https://www.w3.org/TR/xml/#sec-line-ends
-    if (this.char_ === 0xD /* CR */) {
-      if (this.chunk_.charCodeAt(this.index_ + 1) === 0xA /* LF */) {
-        this.index_ += 1;
-      } else if (this.index_ >= this.chunk_.length) {
-        this.flags_ |= Flags.CARRIAGE_RETURN;
-      }
-      this.char_ = 0xA /* LF */;
-    }
+    // if (this.char_ === Chars.CR) {
+    // if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF) {
+    // this.index_ += 1;
+    // } else if (this.index_ >= this.chunk_.length) {
+    // this.flags_ |= Flags.CARRIAGE_RETURN;
+    // }
+    // this.char_ = Chars.LF;
+    // }
   }
 
   // @internal
@@ -421,6 +596,43 @@ export class SaxParser {
     this.attributeName_ += this.chunk_.slice(this.index_, end);
     this.skipTo_(end + 1);
     return index !== -1;
+  }
+
+  // @internal
+  private readComment_() {
+    // indexOf is highly optimized native code, so we can skip over a (probably)
+    // large number of code points without having to read them manually.
+    // This also means that we have no way to track line and column info, and
+    // not even character offsets (JavaScript charCodes are not characters).
+    // Comments end at --
+    const index = this.chunk_.indexOf("--", this.index_);
+    const end = index === -1 ? this.chunk_.length - 1 : index;
+    if (this.flags_ & Flags.CAPTURE_COMMENT) {
+      this.content_ += this.chunk_.slice(this.index_, end);
+    }
+    this.skipTo_(end + 2);
+    if (index !== -1) this.state_ = State.COMMENT_END;
+  }
+
+  // @internal
+  private readPi_() {
+    const index = this.chunk_.indexOf("?>", this.index_);
+    const end = index === -1 ? this.chunk_.length - 1 : index;
+    if (this.flags_ & Flags.CAPTURE_PI) {
+      this.content_ += this.chunk_.slice(this.index_, end);
+    }
+    this.skipTo_(end + 2);
+    if (index !== -1) {
+      this.state_ = State.MISC;
+      // Only line endings are normalized in PI content. Anything else,
+      // entity references char references etc... is just passed through.
+      this.reader_.pi?.({
+        target: this.element_,
+        content: normalize(this.content_),
+      });
+      this.element_ = "";
+      this.content_ = "";
+    }
   }
 
   // Collect characters into accumulator until sequence is found and advance
@@ -449,18 +661,28 @@ export class SaxParser {
     const quote = this.chunk_.indexOf(isSingleQuote ? "'" : '"', this.index_);
     const end = quote === -1 ? this.chunk_.length : quote;
     this.attributeValue_ += this.chunk_.slice(this.index_, end);
-    this.skipTo_(end);
+    this.skipTo_(end + 1);
     return quote !== -1;
   }
 
   // @internal
   private resolveEntity_(entity: string) {
+    // https://www.w3.org/TR/REC-xml/#sec-predefined-ent
     // Even if predefined entities are declared somewhere in a DTD they MUST
-    // have replacement text equal to
-    if (PREDEFINED_ENTITIES.hasOwnProperty(entity)) {
-      return PREDEFINED_ENTITIES[entity as keyof typeof PREDEFINED_ENTITIES];
+    // have replacement text equal to the predefined ones.
+    switch (entity) {
+      case "amp":
+        return "&";
+      case "lt":
+        return "<";
+      case "gt":
+        return ">";
+      case "apos":
+        return "'";
+      case "quot":
+        return '"';
     }
-    const entityValue = this.reader_.resolveEntity?.(entity);
+    const entityValue = this.reader_.resolveEntityRef?.(entity);
     if (entityValue == null) {
       throw createSaxError("UNRESOLVED_ENTITY", {entity});
     }
@@ -469,10 +691,11 @@ export class SaxParser {
 
   // @internal
   private handleXmlDeclAttr_() {
+    // XMLDecl must also validate the order of attributes
     switch (this.attributeName_) {
       case "version":
         if (
-          (this.flags_ & Flags.XML) !== Flags.INIT ||
+          (this.flags_ & Flags.XML_ALL) !== Flags.INIT ||
           this.attributeValue_.length !== 3 ||
           this.attributeValue_.slice(0, 2) !== "1." ||
           !isAsciiDigit(this.attributeValue_.charCodeAt(2))
@@ -484,10 +707,10 @@ export class SaxParser {
         break;
       case "encoding":
         if (
-          (this.flags_ & Flags.XML) !== Flags.XML_VERSION ||
+          (this.flags_ & Flags.XML_ALL) !== Flags.XML_VERSION ||
           !isEncodingName(this.attributeValue_)
         ) {
-          throw createSaxError("INVALID_XML_DECL");
+          this.error_(createSaxError("INVALID_XML_DECL"));
         }
         this.encoding_ = this.attributeValue_.toLowerCase();
         this.flags_ |= Flags.XML_ENCODING;
@@ -498,13 +721,13 @@ export class SaxParser {
           (this.flags_ & Flags.XML_STANDALONE) !== 0 ||
           (this.attributeValue_ !== "yes" && this.attributeValue_ !== "no")
         ) {
-          throw createSaxError("INVALID_XML_DECL");
+          this.error_(createSaxError("INVALID_XML_DECL"));
         }
         this.standalone_ = this.attributeValue_ === "yes";
         this.flags_ |= Flags.XML_STANDALONE;
         break;
       default:
-        throw createSaxError("INVALID_XML_DECL");
+        this.error_(createSaxError("INVALID_XML_DECL"));
     }
     this.attributeName_ = "";
     this.attributeValue_ = "";

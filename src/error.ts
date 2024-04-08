@@ -6,6 +6,7 @@ const ERRORS = {
   INVALID_UTF16_BOM: () =>
     "Missing or invalid byte order mark with UTF-16 encoding",
   INVALID_XML_DECL: () => "Invalid XML Declaration",
+  INVALID_PI: () => "Invalid processing instruction",
   INVALID_DOCTYPE: () => "Invalid or missing DOCTYPE declaration",
   INVALID_ENTITY_REF: () => "Invalid entity",
   INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
@@ -93,6 +94,6 @@ export function createSaxError(code: SaxErrorCode, info?: any): SaxError {
   // never works). Not to mention that using nominal typing in a dynamic
   // language makes little to no sense.
   // - Using a code property on errors is a tried-and-true way to handle many
-  // different error conditions see Node.js.
+  // different error conditions (see Node.js).
   return Object.assign(new Error(message), {name: "SaxError", code} as const);
 }
