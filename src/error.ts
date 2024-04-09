@@ -8,6 +8,7 @@ const ERRORS = {
     "Missing or invalid byte order mark with UTF-16 encoding",
   // XMLDecl
   INVALID_XML_DECL: () => "Invalid XML Declaration",
+  RESERVED_PI: () => "Processing instruction name 'XML' is reserved",
   INVALID_PI: () => "Invalid processing instruction",
   INVALID_DOCTYPE: () => "Invalid or missing DOCTYPE declaration",
   INVALID_ENTITY_REF: () => "Invalid entity",
