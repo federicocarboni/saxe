@@ -1,11 +1,16 @@
 /** @internal */
 export const enum Chars {
+  TAB = 0x9,
   LF = 0xA,
   CR = 0xD,
+  SP = 0x20,
+  AMP = 0x26,
   APOSTROPHE = 0x27,
   BANG = 0x21,
   QUOTE = 0x22,
+  HASH = 0x23,
   SLASH = 0x2F,
+  SEMICOLON = 0x3B,
   LT = 0x3C,
   EQ = 0x3D,
   GT = 0x3E,
@@ -17,12 +22,11 @@ export const enum Chars {
 // § White Space
 /** @internal */
 export function isWhitespace(c: number) {
-  return (
-    c === 0x20 /* SP */ ||
-    c === 0x09 /* TAB */ ||
-    c === 0x0a /* LF */ ||
-    c === 0x0d /* CR */
-  );
+  return c === Chars.SP || c === Chars.TAB || c === Chars.LF || c === Chars.CR;
+}
+
+export function isWhitespaceNonSP(c: number) {
+  return c === Chars.TAB || c === Chars.LF || c === Chars.CR;
 }
 
 /** @internal */
@@ -65,7 +69,7 @@ export function isEncodingName(value: string) {
 }
 
 /** @internal */
-export function parseDec(dec: string): number | undefined {
+export function parseDecCharRef(dec: string): number | undefined {
   let n = 0;
   const length = dec.length;
   if (length === 0) return undefined;
