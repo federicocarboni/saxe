@@ -11,7 +11,8 @@
     "quoteProps": "consistent",
     "constructorType.spaceAfterNewKeyword": true,
     "constructSignature.spaceAfterNewKeyword": true,
-    "functionExpression.spaceAfterFunctionKeyword": false
+    "functionExpression.spaceAfterFunctionKeyword": false,
+    "useBraces": "always"
   },
   "json": {
     "trailingCommas": "never"

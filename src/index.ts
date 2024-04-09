@@ -158,6 +158,33 @@ export interface SaxReader {
  */
 export interface SaxOptions {
   /**
+   * Enable passing incomplete text nodes to the `text` handler. By default the
+   * parser collects text segments as if it were to form a DOM Text Node even if
+   * they are split in multiple chunks. This option makes it so the parser emits
+   * `text` every time a chunk is received, reducing memory usage for large text
+   * nodes.
+   *
+   * E.g. if the parser receives the following chunks:
+   *
+   * ```xml
+   * <element>some content
+   * ```
+   *
+   * ```xml
+   * some other content</element>
+   * ```
+   *
+   * For `incompleteTextNodes: false`, the parser will call `text` once with
+   * `some content some other content`.
+   *
+   * For `incompleteTextNodes: true`, the parser will instead call `text` twice,
+   * once with `some content` and the next with `some other content`.
+   *
+   * The same concept is also applied to CDATA sections.
+   */
+  incompleteTextNodes?: boolean | undefined;
+  maxTextNodeLength?: number | undefined;
+  /**
    * To protect against malicious input this can be used to cap the number of
    * characters which can be produced while expanding an entity. If it is not
    * specified or set to `undefined` entity expansion is uncapped.
@@ -167,7 +194,7 @@ export interface SaxOptions {
    */
   maxEntityLength?: number | undefined;
   // TODO: maxEntityLength should already be enough to prevent billion laughs
-  //  attack and mitigate other XML bomb exploits, is anything else needed?
+  //  attack and mitigate some other XML bomb exploits, is anything else needed?
   //  Possible other limits:
   // maxNestedEntityRef?: number | undefined;
   // maxAttributes?: number | undefined;
@@ -183,7 +210,6 @@ const enum State {
   XML_DECL_VALUE_S,
   XML_DECL_VALUE_D,
   XML_DECL_END,
-  //
   DOCTYPE_DECL,
   DOCTYPE_NAME_S,
   DOCTYPE_NAME,
@@ -227,8 +253,6 @@ const enum Flags {
   SEEN_DOCTYPE = 1 << 1,
   SEEN_ROOT = 1 << 2,
 
-  CARRIAGE_RETURN = 1 << 8,
-
   XML_VERSION = 1 << 3,
   XML_ENCODING = 1 << 4,
   XML_STANDALONE = 1 << 5,
@@ -237,9 +261,13 @@ const enum Flags {
   DOCTYPE_PUBLIC_ID = 1 << 6,
   DOCTYPE_DTD = 1 << 7,
 
-  CAPTURE_COMMENT = 1 << 16,
-  CAPTURE_DOCTYPE = 1 << 17,
-  CAPTURE_PI = 1 << 18,
+  CARRIAGE_RETURN = 1 << 8,
+
+  CAPTURE_DOCTYPE = 1 << 10,
+  CAPTURE_PI = 1 << 11,
+  CAPTURE_COMMENT = 1 << 12,
+
+  OPT_INCOMPLETE_TEXT_NODES = 1 << 13,
 }
 
 // Normalize XML line endings.
@@ -247,8 +275,24 @@ function normalize(s: string) {
   return s.replace(/\r\n?/g, "\n");
 }
 
-function normalizeAttrValue(value: string) {
-  return value.replace(/  +/g, " ");
+// Even if predefined entities are declared somewhere in a DTD they MUST
+// have replacement text equal to the predefined ones, so we can have fast
+// cases for these.
+// https://www.w3.org/TR/REC-xml/#sec-predefined-ent
+function getPredefinedEntity(entityName: string) {
+  switch (entityName) {
+    case "amp":
+      return "&";
+    case "lt":
+      return "<";
+    case "gt":
+      return ">";
+    case "apos":
+      return "'";
+    case "quot":
+      return '"';
+  }
+  return undefined;
 }
 
 /**
@@ -275,6 +319,7 @@ export class SaxParser {
   private char_ = 0;
   // @internal
   private state_ = State.INIT;
+  // Stores flags and boolean options.
   // @internal
   private flags_ = Flags.INIT;
 
@@ -304,7 +349,14 @@ export class SaxParser {
   // @internal
   private stack_: string[] = [];
 
-  // XML Declaration attributes
+  // TODO: should we support xml:space and/or xml:lang scope?
+  // @internal
+  private xmlLang_: string | undefined;
+  // @internal
+  private xmlSpace_: string | undefined;
+
+  // XML Declaration attributes are held onto because they may be useful
+  // (e.g. XML 1.1) in the future?
   // @internal
   private version_: string | undefined = undefined;
   // @internal
@@ -312,13 +364,27 @@ export class SaxParser {
   // @internal
   private standalone_: boolean | undefined = undefined;
 
+  /**
+   * Create a new XML parser.
+   * @param reader
+   * @param options
+   */
   constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
-    this.maxEntityLength_ = options?.maxEntityLength;
     this.reader_ = reader;
     // Avoid capturing information that will be ignored
-    if (this.reader_.comment != null) this.flags_ |= Flags.CAPTURE_COMMENT;
-    if (this.reader_.doctype != null) this.flags_ |= Flags.CAPTURE_DOCTYPE;
-    if (this.reader_.pi != null) this.flags_ |= Flags.CAPTURE_PI;
+    if (this.reader_.doctype != null) {
+      this.flags_ |= Flags.CAPTURE_DOCTYPE;
+    }
+    if (this.reader_.pi != null) {
+      this.flags_ |= Flags.CAPTURE_PI;
+    }
+    if (this.reader_.comment != null) {
+      this.flags_ |= Flags.CAPTURE_COMMENT;
+    }
+    if (options?.incompleteTextNodes) {
+      this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
+    }
+    this.maxEntityLength_ = options?.maxEntityLength ?? undefined;
   }
 
   /**
@@ -352,13 +418,20 @@ export class SaxParser {
     // if (this.run_()) throw createSaxError("TRUNCATED");
   }
 
+  // @internal
+  private isIncompleteTextNodes_() {
+    return !!(this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES);
+  }
+
   // Main parsing method
   // @internal
   private runStateMachine_() {
     switch (this.state_) {
       case State.INIT:
         // No well-formed XML Document can have less than 6 characters.
-        if (this.chunk_.length < 6) return false;
+        if (this.chunk_.length < 6) {
+          return false;
+        }
         if (
           this.chunk_.slice(0, 5) === "<?xml" &&
           isWhitespace(this.chunk_.charCodeAt(5))
@@ -372,7 +445,9 @@ export class SaxParser {
       case State.PROLOG:
         break;
       case State.XML_DECL:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
         if (this.char_ === Chars.QUESTION) {
           this.advance_();
           this.state_ = State.XML_DECL_END;
@@ -392,7 +467,7 @@ export class SaxParser {
         }
         break;
       case State.XML_DECL_VALUE:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) { return false; }
         if (this.char_ === Chars.APOSTROPHE) {
           this.state_ = State.XML_DECL_VALUE_S;
         } else if (this.char_ === Chars.QUOTE) {
@@ -434,7 +509,9 @@ export class SaxParser {
       case State.DOCTYPE_END:
         throw new Error("not implemented");
       case State.MISC:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
         if (this.char_ === Chars.LT) {
           this.state_ = State.OPEN_ANGLE_BRACKET;
         } else {
@@ -443,7 +520,7 @@ export class SaxParser {
         this.advance_();
         break;
       case State.COMMENT:
-        if (!this.readComment_()) return false;
+        if (!this.readComment_()) { return false; }
         break;
       case State.COMMENT_END:
         if (this.char_ !== Chars.GT) {
@@ -487,10 +564,14 @@ export class SaxParser {
         break;
       }
       case State.PI_CONTENT:
-        if (!this.readPi_()) return false;
+        if (!this.readPi_()) {
+          return false;
+        }
         break;
       case State.PI_CONTENT_S:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
         this.state_ = State.PI_CONTENT;
         break;
       case State.PI_EMPTY:
@@ -577,7 +658,7 @@ export class SaxParser {
         this.advance_();
         break;
       case State.START_TAG_ATTR_START:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) { return false; }
         if (isNameStartChar(this.char_)) {
           this.state_ = State.START_TAG_ATTR;
         } else if (this.char_ === Chars.GT) {
@@ -613,7 +694,9 @@ export class SaxParser {
         break;
       }
       case State.START_TAG_ATTR_EQ:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
         if (this.char_ === Chars.EQ) {
           this.state_ = State.START_TAG_ATTR_VALUE;
           this.advance_();
@@ -622,7 +705,9 @@ export class SaxParser {
         }
         break;
       case State.START_TAG_ATTR_VALUE:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
         if (this.char_ === Chars.QUOTE) {
           this.state_ = State.START_TAG_ATTR_VALUE_D;
         } else if (this.char_ === Chars.APOSTROPHE) {
@@ -681,7 +766,9 @@ export class SaxParser {
         break;
       }
       case State.END_TAG_END:
-        if (!this.skipWhitespace_()) return false;
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
         // For well-formedness also verify that the element we're ending was
         // last started
         if (this.char_ !== Chars.GT || this.stack_.pop() !== this.element_) {
@@ -692,7 +779,18 @@ export class SaxParser {
         this.element_ = "";
         this.state_ = this.stack_.length === 0 ? State.MISC : State.CONTENT;
         break;
-      case State.CDATA:
+      case State.CDATA: {
+        const isCdataEnd = this.readCdataSection_();
+        if (isCdataEnd) {
+          // CDATA is just raw text and not actually a node in and of itself, so
+          // it won't call the text handler.
+          this.state_ = State.CONTENT;
+        }
+        if (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES) {
+          this.emitIncompleteText_();
+        }
+        return isCdataEnd;
+      }
     }
     return true;
   }
@@ -705,14 +803,6 @@ export class SaxParser {
     this.attributes_.clear();
   }
 
-  // Skips the specified number of code points. Assumes all skipped code points
-  // are not in the surrogate range and are not carriage returns or line feeds.
-  // @internal
-  private skip_(units: number) {
-    this.index_ += units;
-    this.char_ = this.chunk_.codePointAt(this.index_)!;
-  }
-
   // @internal
   private skipTo_(index: number) {
     this.index_ = index;
@@ -723,6 +813,20 @@ export class SaxParser {
   private advance_() {
     this.index_ += 1 + +(this.char_ > 0xffff);
     this.char_ = this.chunk_.codePointAt(this.index_)!;
+  }
+
+  // @internal
+  private emitIncompleteText_() {
+    let content = this.content_;
+    // Unlikely case of a chunk ending with a carriage return, leave the
+    // carriage return to be handled by the next chunk.
+    if (content.charCodeAt(content.length - 1) === Chars.CR) {
+      content = content.slice(0, -1);
+      this.content_ = "\r";
+    } else {
+      this.content_ = "";
+    }
+    this.reader_.text(normalize(content));
   }
 
   // @internal
@@ -754,7 +858,9 @@ export class SaxParser {
       this.content_ += this.chunk_.slice(this.index_, end);
     }
     this.skipTo_(index !== -1 ? end + 2 : end);
-    if (index !== -1) this.state_ = State.COMMENT_END;
+    if (index !== -1) {
+      this.state_ = State.COMMENT_END;
+    }
     return index !== -1;
   }
 
@@ -777,6 +883,15 @@ export class SaxParser {
       this.element_ = "";
       this.content_ = "";
     }
+    return index !== -1;
+  }
+
+  // @internal
+  private readCdataSection_() {
+    const index = this.chunk_.indexOf("]]>", this.index_);
+    const end = index === -1 ? this.chunk_.length - 2 : index;
+    this.content_ += this.chunk_.slice(this.index_, end);
+    this.skipTo_(index !== -1 ? end + 2 : end);
     return index !== -1;
   }
 
@@ -826,10 +941,13 @@ export class SaxParser {
             }
             index += 1 + +(c > 0xFFFF);
           }
-          // Verify max entity length is not exceeded.
-          normalized += this.checkEntityLength_(
-            this.normalizeAttrValue_(this.resolveEntityRef_(entityName)),
-          );
+          const entityValue = getPredefinedEntity(entityName);
+          normalized += entityValue !== undefined
+            ? entityValue
+            // Verify max entity length is not exceeded.
+            : this.checkEntityLength_(
+              this.normalizeAttrValue_(this.resolveEntityRef_(entityName)),
+            );
           start = index + 1;
         } else if (startChar === Chars.HASH) {
           normalized += this.parseCharRef_(value.slice(index + 1, end));
@@ -865,27 +983,15 @@ export class SaxParser {
     return String.fromCodePoint(char);
   }
 
+  // Does not handle predefined entities.
   // @internal
   private resolveEntityRef_(entity: string) {
-    // https://www.w3.org/TR/REC-xml/#sec-predefined-ent
-    // Even if predefined entities are declared somewhere in a DTD they MUST
-    // have replacement text equal to the predefined ones, so we can have fast
-    // cases for these.
-    switch (entity) {
-      case "amp":
-        return "&#38;";
-      case "lt":
-        return "&#60;";
-      case "gt":
-        return ">";
-      case "apos":
-        return "'";
-      case "quot":
-        return '"';
-    }
     const entityValue = this.reader_.resolveEntityRef?.(entity);
     if (entityValue == null) {
       throw createSaxError("UNRESOLVED_ENTITY", {entity});
+    }
+    if (entityValue.length > this.maxEntityLength_!) {
+      throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED");
     }
     return entityValue;
   }
@@ -939,7 +1045,7 @@ export class SaxParser {
   // @internal
   private skipWhitespace_() {
     while (this.index_ < this.chunk_.length) {
-      if (!isWhitespace(this.char_)) break;
+      if (!isWhitespace(this.char_)) { break; }
       this.advance_();
     }
     return this.index_ !== this.chunk_.length;

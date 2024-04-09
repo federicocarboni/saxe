@@ -1,10 +1,12 @@
 const ERRORS = {
+  // Encoding errors
   ENCODING_NOT_SUPPORTED: ({encoding}: {encoding: string}) =>
     `The "${encoding}" encoding is not supported`,
   ENCODING_INVALID_DATA: ({encoding}: {encoding: string}) =>
     `Encoded data is not valid for encoding "${encoding}"`,
   INVALID_UTF16_BOM: () =>
     "Missing or invalid byte order mark with UTF-16 encoding",
+  // XMLDecl
   INVALID_XML_DECL: () => "Invalid XML Declaration",
   INVALID_PI: () => "Invalid processing instruction",
   INVALID_DOCTYPE: () => "Invalid or missing DOCTYPE declaration",
