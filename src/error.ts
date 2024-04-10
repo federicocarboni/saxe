@@ -19,14 +19,16 @@ const ERRORS = {
   RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" directly or indirectly references itself`,
   INVALID_START_TAG: () => "Invalid start tag",
-  INVALID_ATTRIBUTE_VALUE: () => "Attribute values cannot contain a literal '<'",
+  INVALID_ATTRIBUTE_VALUE: () =>
+    "Attribute values cannot contain a literal '<'",
   DUPLICATE_ATTR: () => "Duplicate attribute",
   INVALID_END_TAG: () => "Invalid end tag",
   INVALID_COMMENT: () => "Comments cannot contain --",
   UNIMPLEMENTED: () => "Parsing not implemented",
   INVALID_CDATA: () => "Invalid character data",
   TRUNCATED: () => "Input appears to be missing data",
-  MAX_ENTITY_LENGTH_EXCEEDED: () => "Entity expands to very large data",
+  MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
+    `Entity "${entity}" expands to very large data`,
 } as const;
 
 type SaxErrorCodes = {
@@ -80,7 +82,7 @@ export function isSaxError(error: unknown): error is SaxError {
 }
 
 //
-/** @internal */
+// @internal
 export function createSaxError<T extends SaxErrorCode>(
   code: T,
   ...args: Parameters<typeof ERRORS[T]>

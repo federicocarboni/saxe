@@ -1,3 +1,7 @@
+/**
+ * @author Federico Carboni
+ */
+
 import {
   Chars,
   isAsciiDigit,
@@ -11,7 +15,7 @@ import {
   parseDecCharRef as parseDec,
   parseHex,
 } from "./chars.js";
-import {createSaxError, SaxError} from "./error.js";
+import {createSaxError} from "./error.js";
 
 export {isSaxError, type SaxError, type SaxErrorCode} from "./error.js";
 
@@ -26,12 +30,24 @@ export {isSaxError, type SaxError, type SaxErrorCode} from "./error.js";
  */
 export interface XmlDeclaration {
   /**
-   * Version declared in the XML Declaration.
+   * Version declared in the XML Declaration. Generally `1.0` or `1.1`, this
+   * parser does not explicitly support XML `1.1` but differences are minimal
+   * so most documents parse correctly.
+   *
    * @since 1.0.0
    */
   version: string;
   /**
-   * Encoding declared in the XML Declaration, or `undefined` when unspecified.
+   * Encoding in the XML Declaration, or `undefined` when unspecified. The
+   * encoding label is in upper case because official names are upper case and
+   * encoding labels should be processed in a case-insensiteve way.
+   *
+   * The parser does not validate that the encoding labels is one of the
+   * officially assigned [IANA Character Sets].
+   *
+   * [IANA Character Sets]:
+   * https://www.iana.org/assignments/character-sets/character-sets.xhtml
+   *
    * @since 1.0.0
    */
   encoding?: string | undefined;
@@ -39,6 +55,7 @@ export interface XmlDeclaration {
    * Standalone value declared in the XML Declaration. `true` when set to `yes`,
    * `false` when set to `no`, or `undefined` when unspecified (should be
    * treated as a `false`).
+   *
    * @since 1.0.0
    */
   standalone?: boolean | undefined;
@@ -74,26 +91,14 @@ export interface Pi {
   content?: string | undefined;
 }
 
-interface SaxDtdHandler {
-  start(
-    name: string,
-    publicId?: string | undefined,
-    systemId?: string | undefined,
-  ): void;
-}
-
 /**
  * @since 1.0.0
  */
 export interface SaxReader {
   /**
-   * Resolve an entity reference by name. Users are expected to handle `<!ENTITY ...>`
-   * declarations in the DTD where applicable or have a hard coded set of
-   * possible ones.
-   *
-   * It is responsability of the user to make sure that the returned contents do
-   * not reference the entity recursively, as this will cause an infinite loop
-   * which will crash the program!
+   * Returns the replacement text for a given entity name. This is needed for
+   * attribute values, entity references in content are handled by `entityRef`
+   * unless `textOnlyEntities` is enabled.
    *
    * @param entity
    * @returns resolved entity contents or `undefined` if not found.
@@ -103,24 +108,33 @@ export interface SaxReader {
    * XML Declaration. Usually not required.
    * @param declaration
    */
-  xml?(declaration: XmlDeclaration): void;
+  xml?(context: SaxContext, declaration: XmlDeclaration): void;
   /**
    * To improve performance, if processing instructions are not required do not
    * define this handler.
    * @param doctype
    */
-  doctype?(doctype: Doctype): void;
+  doctype?(context: SaxContext, doctype: Doctype): void;
   /**
    * A processing instruction `<?target content?>`. To improve performance, if
    * processing instructions are not required do not define this handler.
    * @param pi
    */
-  pi?(pi: Pi): void;
+  pi?(context: SaxContext, pi: Pi): void;
   /**
    * A comment `<!-- text -->`. To improve performance, if comments are not
    * required do not define this handler.
    */
-  comment?(text: string): void;
+  comment?(context: SaxContext, text: string): void;
+  /**
+   * An entity reference in content. For entity references in attributes
+   * `resolveEntityRef` must be implemented and return the expected replacement
+   * text for the given entity.
+   *
+   * @param context
+   * @param entity - referenced entity name
+   */
+  entityRef?(context: SaxContext, entity: string): void;
   /**
    * Start tag.
    *
@@ -128,12 +142,15 @@ export interface SaxReader {
    * <element attr="value">
    * ```
    *
-   * Attributes are passed to
-   *
+   * @param context -
    * @param name
    * @param attributes
    */
-  start(name: string, attributes: ReadonlyMap<string, string>): void;
+  start(
+    context: SaxContext,
+    name: string,
+    attributes: ReadonlyMap<string, string>,
+  ): void;
   /**
    * An empty element.
    *
@@ -144,18 +161,35 @@ export interface SaxReader {
    * @param name
    * @param attributes
    */
-  empty(name: string, attributes: ReadonlyMap<string, string>): void;
+  empty(
+    context: SaxContext,
+    name: string,
+    attributes: ReadonlyMap<string, string>,
+  ): void;
   /**
    * An end tag `</element>`.
    * @param name
    */
-  end(name: string): void;
+  end(context: SaxContext, name: string): void;
   /**
-   * Text content of an element, `<element>text &amp; content</element>`
-   * would produce text `"text & content"`.
+   * Text content of an element.
+   *
+   * ```xml
+   * <element>text &amp; content</element>
+   * ```
+   *
+   * The above example produces a `text` event with `text & content`.
+   *
+   * By default text is collected as if to form a DOM Text Node (CDATA sections
+   * are treated as part of text nodes), to reduce memory usage but produce more
+   * `text` events for the same text node enable `incompleteTextNodes`.
+   *
+   * Entity references which are not predefined (i.e. not `amp`, `lt`, `gt`,
+   * `apos` or `quot`) are handled by `entityRef`.
+   *
    * @param text
    */
-  text(text: string): void;
+  text(context: SaxContext, text: string): void;
 }
 
 /**
@@ -191,6 +225,14 @@ export interface SaxOptions {
    */
   incompleteTextNodes?: boolean | undefined;
   /**
+   * Entity expansion is not implemented (yet?) for markup content, so any
+   * entity reference in XML content must be handled in `entityRef` or, this
+   * option should be enabled to simply append the result of `resolveEntityRef`
+   * to the content without any processing. This behavior is not standard for
+   * entities which contain markup or escapes, so use with caution!
+   */
+  textOnlyEntities?: boolean | undefined;
+  /**
    * To protect against malicious input this can be used to cap the number of
    * characters which can be produced while expanding an entity. If it is not
    * specified or set to `undefined` entity expansion is uncapped.
@@ -204,12 +246,12 @@ export interface SaxOptions {
   //  Possible other limits:
   // maxNestedEntityRef?: number | undefined;
   // maxAttributes?: number | undefined;
+  // maxAttributeLength?: number | undefined;
   // maxContentLength?: number | undefined;
 }
 
 const enum State {
   INIT,
-  PROLOG,
   XML_DECL,
   XML_DECL_S,
   XML_DECL_VALUE,
@@ -217,15 +259,24 @@ const enum State {
   XML_DECL_VALUE_D,
   XML_DECL_END,
   DOCTYPE_DECL,
-  DOCTYPE_NAME_S,
+  DOCTYPE_NAME_START,
   DOCTYPE_NAME,
+  DOCTYPE_NAME_END,
+  DOCTYPE_MAYBE_EXTERNAL_ID,
   DOCTYPE_EXTERNAL_ID,
   DOCTYPE_SYSTEM_ID,
   DOCTYPE_SYSTEM_ID_S,
   DOCTYPE_SYSTEM_ID_D,
   DOCTYPE_PUBLIC_ID,
+  DOCTYPE_PUBLIC_ID_S,
+  DOCTYPE_PUBLIC_ID_D,
+  DOCTYPE_PUBLIC_ID_END,
   DOCTYPE_MAYBE_DTD,
   DOCTYPE_DTD,
+  DOCTYPE_DTD_OPEN_BRACKET,
+  DOCTYPE_DTD_OPEN_BRACKET_BANG,
+  DOCTYPE_DTD_QUOTED_S,
+  DOCTYPE_DTD_QUOTED_D,
   DOCTYPE_END,
   MISC,
   COMMENT,
@@ -269,8 +320,8 @@ const enum Flags {
   XML_STANDALONE = 1 << 5,
   XML_ALL = Flags.XML_VERSION | Flags.XML_ENCODING | Flags.XML_STANDALONE,
 
-  DOCTYPE_PUBLIC_ID = 1 << 6,
-  DOCTYPE_DTD = 1 << 7,
+  DOCTYPE_SYSTEM_ID = 1 << 6,
+  DOCTYPE_PUBLIC_ID = 1 << 7,
 
   CARRIAGE_RETURN = 1 << 8,
 
@@ -279,6 +330,8 @@ const enum Flags {
   CAPTURE_COMMENT = 1 << 12,
 
   OPT_INCOMPLETE_TEXT_NODES = 1 << 13,
+  OPT_TEXT_ONLY_ENTITIES = 1 << 14,
+  IN_DOCTYPE = 1 << 15,
 }
 
 // Normalize XML line endings.
@@ -306,9 +359,66 @@ function getPredefinedEntity(entityName: string) {
   return undefined;
 }
 
+// These are internal until we can define how namespace support will work.
+// @internal
+export function getPrefix(name: string): string | undefined {
+  const colon = name.indexOf(":");
+  if (colon === -1) {
+    return name;
+  }
+  const prefix = name.slice(0, colon);
+  return colon === 0 || colon === name.length - 1 ? undefined : prefix;
+}
+
+// @internal
+export function getLocal(name: string): string | undefined {
+  const colon = name.indexOf(":");
+  if (colon === -1) {
+    return name;
+  }
+  const local = name.slice(colon + 1);
+  return colon === 0 || colon === name.length - 1 ? undefined : local;
+}
+
+export interface SaxContext {
+  /**
+   * Contains the hierarchy of elements opened so far. As start and end tags
+   * are read element names are pushed and popped so that the last element in
+   * the array is always the last start tag and the first is always the root
+   * (unless the parser is still outside of it).
+   *
+   * ```xml
+   * <root>
+   *   <element>
+   *     <!-- Parser is here -->
+   *   </element>
+   * </root>
+   * ```
+   *
+   * In the above situation elements has value:
+   *
+   * ```js
+   * ["root", "element"]
+   * ```
+   */
+  readonly elements: readonly string[];
+  // TODO: Namespace support?
+  // readonly namespaces: ReadonlyMap<string, string>;
+  // TODO: xml:space and xml:lang support?
+  // /**
+  //  * `xml:space` attribute.
+  //  */
+  // readonly xmlSpace?: "preserve" | "default" | undefined;
+  // /**
+  //  * `xml:lang` attribute.
+  //  */
+  // readonly xmlLang?: string | undefined;
+}
+
 /**
  * Streaming non-validating XML Parser enforcing well-formedness, it makes no
- * attempt to recover well-formedness errors.
+ * attempt to recover well-formedness errors. If an internal DTD is present it
+ * is not parsed or processed in any way.
  *
  * To optimize for efficiency the parser does not store line information.
  *
@@ -337,11 +447,22 @@ export class SaxParser {
   // @internal
   private charRef_ = 0;
 
+  // @internal
+  private context_: {
+    elements: string[];
+    xmlSpace: "preserve" | "default" | undefined;
+    xmlLang: string | undefined;
+  } = {
+    // Current stack of XML elements, required to validate open and end tags.
+    elements: [],
+    // namespaces: new Map<string, string>(),
+    xmlSpace: undefined,
+    xmlLang: undefined,
+  };
+
   // Accumulators
 
   // Generic accumulator
-  // @internal
-  private accumulator_ = "";
   // Current attribute name (or XML Decl attribute value)
   // @internal
   private attributeName_ = "";
@@ -359,15 +480,6 @@ export class SaxParser {
   // plain object.
   // @internal
   private attributes_ = new Map<string, string>();
-  // Current stack of XML elements, required to validate open and end tags.
-  // @internal
-  private elements_: string[] = [];
-
-  // TODO: should we support xml:space and/or xml:lang scope?
-  // @internal
-  private xmlLang_: string | undefined;
-  // @internal
-  private xmlSpace_: string | undefined;
 
   // XML Declaration attributes are held onto because they may be useful
   // (e.g. XML 1.1) in the future?
@@ -383,7 +495,7 @@ export class SaxParser {
    * @param reader
    * @param options
    */
-  constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
+  constructor(reader: SaxReader, options?: SaxOptions | undefined) {
     this.reader_ = reader;
     // Avoid capturing information that will be ignored
     if (this.reader_.doctype != null) {
@@ -398,20 +510,10 @@ export class SaxParser {
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
+    if (options?.textOnlyEntities) {
+      this.flags_ |= Flags.OPT_TEXT_ONLY_ENTITIES;
+    }
     this.maxEntityLength_ = options?.maxEntityLength ?? undefined;
-  }
-
-  /**
-   * @returns
-   * @internal
-   */
-  getCurrentElements(): readonly string[] {
-    return this.elements_;
-  }
-
-  /** @internal */
-  getXmlLang() {
-    return this.xmlLang_;
   }
 
   /**
@@ -427,11 +529,6 @@ export class SaxParser {
       this.char_ = input.codePointAt(this.index_)!;
     }
     while (this.index_ < this.chunk_.length && this.runStateMachine_());
-    // if (!this.run_()) {
-    //   this.chunk_ = "";
-    //   this.index_ = 0;
-    // }
-
     // Chunk may not have been consumed completely
     this.chunk_ = this.chunk_.slice(this.index_);
     this.index_ = 0;
@@ -443,7 +540,16 @@ export class SaxParser {
    * @since 1.0.0
    */
   end() {
-    // if (this.run_()) throw createSaxError("TRUNCATED");
+    if (
+      this.context_.elements.length !== 0 ||
+      this.chunk_.length !== 0 && this.chunk_ !== "\r"
+    ) {
+      throw createSaxError("INVALID_END_TAG");
+    }
+    if (this.chunk_ === "\r") {
+      this.write("\n");
+      this.end();
+    }
   }
 
   // Main parsing method
@@ -464,8 +570,6 @@ export class SaxParser {
         } else {
           this.state_ = State.MISC;
         }
-        break;
-      case State.PROLOG:
         break;
       case State.XML_DECL:
         if (!this.skipWhitespace_()) {
@@ -512,7 +616,7 @@ export class SaxParser {
           throw createSaxError("INVALID_XML_DECL");
         }
         this.advance_();
-        this.reader_.xml?.({
+        this.reader_.xml?.(this.context_, {
           version: this.version_,
           encoding: this.encoding_,
           standalone: this.standalone_,
@@ -520,17 +624,209 @@ export class SaxParser {
         this.state_ = State.MISC;
         break;
       case State.DOCTYPE_DECL:
-      case State.DOCTYPE_NAME_S:
-      case State.DOCTYPE_NAME:
-      case State.DOCTYPE_EXTERNAL_ID:
+        if (!isWhitespace(this.char_)) {
+          throw createSaxError("INVALID_DOCTYPE");
+        }
+        this.advance_();
+        this.state_ = State.DOCTYPE_NAME_START;
+        this.flags_ |= Flags.IN_DOCTYPE;
+        break;
+      case State.DOCTYPE_NAME_START:
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
+        if (!isNameStartChar(this.char_)) {
+          throw createSaxError("INVALID_DOCTYPE");
+        }
+        this.element_ = String.fromCodePoint(this.char_);
+        this.state_ = State.DOCTYPE_NAME;
+        break;
+      case State.DOCTYPE_NAME: {
+        const start = this.index_;
+        while (this.index_ < this.chunk_.length) {
+          if (!isNameChar(this.char_)) {
+            this.state_ = State.DOCTYPE_NAME_END;
+            break;
+          }
+          this.advance_();
+        }
+        this.element_ += this.chunk_.slice(start, this.index_);
+        break;
+      }
+      case State.DOCTYPE_NAME_END: {
+        if (this.char_ === Chars.GT) {
+          this.state_ = State.DOCTYPE_END;
+          break;
+        } else if (isWhitespace(this.char_)) {
+          this.state_ = State.DOCTYPE_MAYBE_EXTERNAL_ID;
+        } else if (this.char_ === Chars.OPEN_BRACKET) {
+          this.state_ = State.DOCTYPE_DTD;
+        }
+        this.advance_();
+        break;
+      }
+      case State.DOCTYPE_MAYBE_EXTERNAL_ID:
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
+        if (this.char_ === Chars.OPEN_BRACKET) {
+          this.state_ = State.DOCTYPE_DTD;
+          this.advance_();
+        } else if (this.char_ === Chars.LT) {
+          this.state_ = State.DOCTYPE_END;
+          this.advance_();
+        } else {
+          this.state_ = State.DOCTYPE_EXTERNAL_ID;
+        }
+        break;
+      case State.DOCTYPE_EXTERNAL_ID: {
+        if (this.chunk_.length - this.index_ < 7) {
+          return false;
+        }
+        const start = this.chunk_.slice(this.index_, this.index_ + 6);
+        const isS = isWhitespace(this.index_ + 6);
+        if (start === "SYSTEM" && isS) {
+          this.flags_ |= Flags.DOCTYPE_SYSTEM_ID;
+          this.state_ = State.DOCTYPE_SYSTEM_ID;
+        } else if (start === "PUBLIC" && isS) {
+          this.flags_ |= Flags.DOCTYPE_PUBLIC_ID;
+          this.state_ = State.DOCTYPE_PUBLIC_ID;
+        } else {
+          throw createSaxError("INVALID_DOCTYPE");
+        }
+        break;
+      }
       case State.DOCTYPE_SYSTEM_ID:
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
+        if (this.char_ === Chars.APOSTROPHE) {
+          this.state_ = State.DOCTYPE_SYSTEM_ID_S;
+        } else if (this.char_ === Chars.QUOTE) {
+          this.state_ = State.DOCTYPE_SYSTEM_ID_D;
+        } else {
+          throw createSaxError("INVALID_DOCTYPE");
+        }
+        break;
       case State.DOCTYPE_SYSTEM_ID_S:
       case State.DOCTYPE_SYSTEM_ID_D:
+        if (this.readQuotedValue_(this.state_ === State.DOCTYPE_SYSTEM_ID_S)) {
+          this.state_ = State.DOCTYPE_MAYBE_DTD;
+        }
+        break;
       case State.DOCTYPE_PUBLIC_ID:
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
+        if (this.char_ === Chars.APOSTROPHE) {
+          this.state_ = State.DOCTYPE_PUBLIC_ID_S;
+        } else if (this.char_ === Chars.QUOTE) {
+          this.state_ = State.DOCTYPE_PUBLIC_ID_D;
+        } else {
+          throw createSaxError("INVALID_DOCTYPE");
+        }
+        break;
+      case State.DOCTYPE_PUBLIC_ID_S:
+      case State.DOCTYPE_PUBLIC_ID_D:
+        if (this.readQuotedValue_(this.state_ === State.DOCTYPE_PUBLIC_ID_S)) {
+          this.state_ = State.DOCTYPE_PUBLIC_ID_END;
+        }
+        break;
+      case State.DOCTYPE_PUBLIC_ID_END:
+        if (!isWhitespace(this.char_)) {
+          throw createSaxError("INVALID_DOCTYPE");
+        }
+        this.advance_();
+        this.attributeName_ = this.attributeValue_;
+        this.attributeValue_ = "";
+        this.state_ = State.DOCTYPE_SYSTEM_ID;
+        break;
       case State.DOCTYPE_MAYBE_DTD:
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
+        if (this.char_ === Chars.GT) {
+          this.state_ = State.DOCTYPE_END;
+        } else if (this.char_ === Chars.OPEN_BRACKET) {
+          this.state_ = State.DOCTYPE_DTD;
+          this.advance_();
+        }
+        break;
       case State.DOCTYPE_DTD:
+        while (this.index_ < this.chunk_.length) {
+          const char = this.char_;
+          this.advance_();
+          if (char === Chars.LT) {
+            this.state_ = State.DOCTYPE_DTD_OPEN_BRACKET;
+          } else if (char === Chars.APOSTROPHE) {
+            this.state_ = State.DOCTYPE_DTD_QUOTED_S;
+          } else if (char === Chars.QUOTE) {
+            this.state_ = State.DOCTYPE_DTD_QUOTED_D;
+          } else if (char === Chars.CLOSE_BRACKET) {
+            this.state_ = State.DOCTYPE_END;
+          } else {
+            continue;
+          }
+          break;
+        }
+        break;
+      case State.DOCTYPE_DTD_OPEN_BRACKET:
+        if (this.char_ === Chars.BANG) {
+          this.state_ = State.DOCTYPE_DTD_OPEN_BRACKET_BANG;
+        } else if (this.char_ === Chars.QUESTION) {
+          this.state_ = State.PI_TARGET_START;
+        } else {
+          this.state_ = State.DOCTYPE_DTD;
+          break;
+        }
+        this.advance_();
+        break;
+      case State.DOCTYPE_DTD_OPEN_BRACKET_BANG:
+        if (this.chunk_.length - this.index_ < 2) {
+          return false;
+        }
+        if (this.chunk_.slice(this.index_, this.index_ + 2) === "--") {
+          this.skipTo_(this.index_ + 2);
+          this.state_ = State.COMMENT;
+        } else {
+          this.state_ = State.DOCTYPE_DTD;
+        }
+        break;
+      case State.DOCTYPE_DTD_QUOTED_S:
+      case State.DOCTYPE_DTD_QUOTED_D: {
+        const index = this.chunk_.indexOf(
+          this.state_ === State.DOCTYPE_DTD_QUOTED_S ? "'" : '"',
+          this.index_,
+        );
+        this.skipTo_(index === -1 ? this.chunk_.length : index + 1);
+        if (index !== -1) {
+          this.state_ = State.DOCTYPE_DTD;
+        }
+        break;
+      }
       case State.DOCTYPE_END:
-        throw new Error("not implemented");
+        if (!this.skipWhitespace_()) {
+          return false;
+        }
+        if (this.char_ !== Chars.GT) {
+          throw createSaxError("INVALID_DOCTYPE");
+        }
+        this.state_ = State.MISC;
+        this.advance_();
+        this.flags_ ^= Flags.IN_DOCTYPE;
+        this.reader_.doctype?.(this.context_, {
+          name: this.element_,
+          systemId: this.flags_ & Flags.DOCTYPE_SYSTEM_ID
+            ? this.attributeValue_
+            : undefined,
+          publicId: this.flags_ & Flags.DOCTYPE_PUBLIC_ID
+            ? this.attributeName_
+            : undefined,
+        });
+        this.element_ = "";
+        this.attributeName_ = "";
+        this.attributeValue_ = "";
+        break;
       case State.MISC:
         if (!this.skipWhitespace_()) {
           return false;
@@ -543,7 +839,9 @@ export class SaxParser {
         this.advance_();
         break;
       case State.COMMENT:
-        if (!this.readComment_()) { return false; }
+        if (!this.readComment_()) {
+          return false;
+        }
         break;
       case State.COMMENT_END:
         if (this.char_ !== Chars.GT) {
@@ -551,11 +849,13 @@ export class SaxParser {
         }
         this.advance_();
         // Inside elements must return to CONTENT
-        this.state_ = this.elements_.length === 0
+        this.state_ = this.flags_ & Flags.IN_DOCTYPE
+          ? State.DOCTYPE_DTD
+          : this.context_.elements.length === 0
           ? State.MISC
           : State.CONTENT;
         if (this.flags_ & Flags.CAPTURE_COMMENT) {
-          this.reader_.comment?.(normalize(this.content_));
+          this.reader_.comment?.(this.context_, normalize(this.content_));
         }
         this.content_ = "";
         break;
@@ -609,10 +909,12 @@ export class SaxParser {
         }
         this.advance_();
         // Inside elements must return to CONTENT
-        this.state_ = this.elements_.length === 0
+        this.state_ = this.flags_ & Flags.IN_DOCTYPE
+          ? State.DOCTYPE_DTD
+          : this.context_.elements.length === 0
           ? State.MISC
           : State.CONTENT;
-        this.reader_.pi?.({
+        this.reader_.pi?.(this.context_, {
           target: this.element_,
           content: undefined,
         });
@@ -630,6 +932,7 @@ export class SaxParser {
         } else if (isNameStartChar(char)) {
           this.state_ = State.START_TAG_NAME;
           this.element_ = String.fromCodePoint(char);
+          this.flags_ |= Flags.SEEN_ROOT;
         } else {
           throw createSaxError("INVALID_START_TAG");
         }
@@ -653,10 +956,6 @@ export class SaxParser {
         } else if (this.chunk_.slice(this.index_, this.index_ + 2) === "--") {
           this.skipTo_(this.index_ + 2);
           this.state_ = State.COMMENT;
-        } else if (isNameStartChar(this.char_)) {
-          this.state_ = State.START_TAG_NAME;
-          this.element_ = String.fromCodePoint(this.char_);
-          this.advance_();
         } else if (this.chunk_.length - this.index_ < 7) {
           return false;
         } else {
@@ -770,15 +1069,16 @@ export class SaxParser {
           throw createSaxError("INVALID_START_TAG");
         }
         this.advance_();
-        this.reader_.empty(this.element_, this.attributes_);
+        this.reader_.empty(this.context_, this.element_, this.attributes_);
         this.element_ = "";
         this.attributes_.clear();
+        this.state_ = State.CONTENT;
         break;
       case State.CONTENT: {
         // TODO: check if this is actually faster than a single loop
         const openWaka = this.chunk_.indexOf("<", this.index_);
         const amp = this.chunk_.indexOf("&", this.index_);
-        if (amp !== -1) {
+        if (amp !== -1 && amp < openWaka) {
           this.content_ += normalize(this.chunk_.slice(this.index_, amp));
           this.skipTo_(amp + 1);
           this.emitIncompleteText_();
@@ -825,14 +1125,21 @@ export class SaxParser {
         this.element_ += this.chunk_.slice(start, this.index_);
         if (this.state_ !== State.ENTITY_REF) {
           this.advance_();
-          const entityValue = getPredefinedEntity(this.element_);
-          this.content_ += entityValue === undefined
-            ? this.resolveEntityRef_(this.element_)
-            : entityValue;
-          this.element_ = "";
-          if (entityValue === undefined) {
-            this.emitIncompleteText_();
+          const predefinedEntity = getPredefinedEntity(this.element_);
+          if (predefinedEntity === undefined) {
+            if (this.flags_ & Flags.OPT_TEXT_ONLY_ENTITIES) {
+              this.emitIncompleteText_();
+              this.content_ += this.resolveEntityRef_(this.element_);
+              this.emitIncompleteText_();
+            } else {
+              this.emitText_();
+              this.reader_.entityRef?.(this.context_, this.element_);
+            }
+          } else {
+            // Predefined entities have no further processing.
+            this.content_ += predefinedEntity;
           }
+          this.element_ = "";
         }
         break;
       }
@@ -914,14 +1221,14 @@ export class SaxParser {
         // last started
         if (
           this.char_ !== Chars.GT ||
-          this.elements_.pop() !== this.element_
+          this.context_.elements.pop() !== this.element_
         ) {
           throw createSaxError("INVALID_END_TAG");
         }
         this.advance_();
-        this.reader_.end(this.element_);
+        this.reader_.end(this.context_, this.element_);
         this.element_ = "";
-        this.state_ = this.elements_.length === 0
+        this.state_ = this.context_.elements.length === 0
           ? State.MISC
           : State.CONTENT;
         break;
@@ -941,8 +1248,8 @@ export class SaxParser {
 
   // @internal
   private emitStart_() {
-    this.elements_.push(this.element_);
-    this.reader_.start(this.element_, this.attributes_);
+    this.context_.elements.push(this.element_);
+    this.reader_.start(this.context_, this.element_, this.attributes_);
     this.element_ = "";
     this.attributes_.clear();
   }
@@ -956,7 +1263,7 @@ export class SaxParser {
 
   // @internal
   private emitText_() {
-    this.reader_.text(this.content_);
+    this.reader_.text(this.context_, this.content_);
     this.content_ = "";
   }
 
@@ -1025,10 +1332,14 @@ export class SaxParser {
     }
     this.skipTo_(index !== -1 ? end + 2 : end);
     if (index !== -1) {
-      this.state_ = this.elements_.length === 0 ? State.MISC : State.COMMENT;
+      this.state_ = this.flags_ & Flags.IN_DOCTYPE
+        ? State.DOCTYPE_DTD
+        : this.context_.elements.length === 0
+        ? State.MISC
+        : State.COMMENT;
       // Only line endings are normalized in PI content. Anything else,
       // entity references char references etc... is just passed through.
-      this.reader_.pi?.({
+      this.reader_.pi?.(this.context_, {
         target: this.element_,
         content: normalize(this.content_),
       });
@@ -1056,14 +1367,6 @@ export class SaxParser {
     return index !== -1;
   }
 
-  // @internal
-  private readContent_() {
-    const index = this.chunk_.indexOf("<", this.index_);
-    if (index === -1) {
-    }
-    this.chunk_.indexOf("&");
-  }
-
   // Read a quoted attribute value into attributeValue.
   // @internal
   private readQuotedValue_(isSingleQuote: boolean) {
@@ -1072,14 +1375,6 @@ export class SaxParser {
     this.attributeValue_ += this.chunk_.slice(this.index_, end);
     this.skipTo_(end + 1);
     return quote !== -1;
-  }
-
-  // @internal
-  private checkEntityLength_(content: string) {
-    if (content.length > this.maxEntityLength_!) {
-      throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED");
-    }
-    return content;
   }
 
   // This parser is not a validating parser so all values are read as CDATA.
@@ -1101,7 +1396,7 @@ export class SaxParser {
           throw createSaxError("INVALID_ENTITY_REF");
         }
         if (isNameStartChar(startChar)) {
-          const entityName = value.slice(index, end);
+          const entity = value.slice(index, end);
           index += 1 + +(startChar > 0xFFFF);
           while (index < end) {
             const c = value.codePointAt(index)!;
@@ -1110,13 +1405,18 @@ export class SaxParser {
             }
             index += 1 + +(c > 0xFFFF);
           }
-          const entityValue = getPredefinedEntity(entityName);
-          normalized += entityValue !== undefined
+          const entityValue = getPredefinedEntity(entity);
+          const normalizedEntityValue = entityValue !== undefined
             ? entityValue
-            // Verify max entity length is not exceeded.
-            : this.checkEntityLength_(
-              this.normalizeAttrValue_(this.resolveEntityRef_(entityName)),
-            );
+            : this.normalizeAttrValue_(this.resolveEntityRef_(entity));
+          // Verify max entity length is not exceeded.
+          if (
+            entityValue === undefined &&
+            normalizedEntityValue.length > this.maxEntityLength_!
+          ) {
+            throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED", {entity});
+          }
+          normalized += normalizedEntityValue;
           start = index + 1;
         } else if (startChar === Chars.HASH) {
           normalized += this.parseCharRef_(value.slice(index + 1, end));
@@ -1125,16 +1425,17 @@ export class SaxParser {
         }
         start = end + 1;
       } else if (isWhitespaceNonSP(char)) {
+        normalized += value.slice(start, index) + " ";
         if (char === Chars.CR && value.charCodeAt(index + 1) === Chars.LF) {
           index++;
         }
-        normalized += value.slice(start, index) + " ";
         start = index + 1;
       } else if (char === Chars.LT) {
         throw createSaxError("INVALID_ATTRIBUTE_VALUE");
       }
       index++;
     }
+    normalized += value.slice(start);
     return normalized;
   }
 
@@ -1159,8 +1460,10 @@ export class SaxParser {
     if (entityValue == null) {
       throw createSaxError("UNRESOLVED_ENTITY", {entity});
     }
+    // Assume processing the replacement text will produce a bigger output, even
+    // if it might not be the case.
     if (entityValue.length > this.maxEntityLength_!) {
-      throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED");
+      throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED", {entity});
     }
     return entityValue;
   }
@@ -1190,7 +1493,7 @@ export class SaxParser {
         ) {
           throw createSaxError("INVALID_XML_DECL");
         }
-        this.encoding_ = this.attributeValue_.toLowerCase();
+        this.encoding_ = this.attributeValue_.toUpperCase();
         this.flags_ |= Flags.XML_ENCODING;
         break;
       case "standalone":

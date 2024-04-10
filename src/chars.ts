@@ -15,6 +15,8 @@ export const enum Chars {
   EQ = 0x3D,
   GT = 0x3E,
   QUESTION = 0x3F,
+  OPEN_BRACKET = 0x5B,
+  CLOSE_BRACKET = 0x5D,
   LOWER_X = 0x78,
 }
 
