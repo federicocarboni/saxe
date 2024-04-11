@@ -108,24 +108,24 @@ export interface SaxReader {
    * XML Declaration. Usually not required.
    * @param declaration
    */
-  xml?(context: SaxContext, declaration: XmlDeclaration): void;
+  xml?(declaration: XmlDeclaration): void;
   /**
    * To improve performance, if processing instructions are not required do not
    * define this handler.
    * @param doctype
    */
-  doctype?(context: SaxContext, doctype: Doctype): void;
+  doctype?(doctype: Doctype): void;
   /**
    * A processing instruction `<?target content?>`. To improve performance, if
    * processing instructions are not required do not define this handler.
    * @param pi
    */
-  pi?(context: SaxContext, pi: Pi): void;
+  pi?(pi: Pi): void;
   /**
    * A comment `<!-- text -->`. To improve performance, if comments are not
    * required do not define this handler.
    */
-  comment?(context: SaxContext, text: string): void;
+  comment?(text: string): void;
   /**
    * An entity reference in content. For entity references in attributes
    * `resolveEntityRef` must be implemented and return the expected replacement
@@ -134,7 +134,7 @@ export interface SaxReader {
    * @param context
    * @param entity - referenced entity name
    */
-  entityRef?(context: SaxContext, entity: string): void;
+  entityRef?(entity: string): void;
   /**
    * Start tag.
    *
@@ -146,11 +146,7 @@ export interface SaxReader {
    * @param name
    * @param attributes
    */
-  start(
-    context: SaxContext,
-    name: string,
-    attributes: ReadonlyMap<string, string>,
-  ): void;
+  start(name: string, attributes: ReadonlyMap<string, string>): void;
   /**
    * An empty element.
    *
@@ -161,16 +157,12 @@ export interface SaxReader {
    * @param name
    * @param attributes
    */
-  empty(
-    context: SaxContext,
-    name: string,
-    attributes: ReadonlyMap<string, string>,
-  ): void;
+  empty(name: string, attributes: ReadonlyMap<string, string>): void;
   /**
    * An end tag `</element>`.
    * @param name
    */
-  end(context: SaxContext, name: string): void;
+  end(name: string): void;
   /**
    * Text content of an element.
    *
@@ -189,7 +181,7 @@ export interface SaxReader {
    *
    * @param text
    */
-  text(context: SaxContext, text: string): void;
+  text(text: string): void;
 }
 
 /**
@@ -235,7 +227,8 @@ export interface SaxOptions {
   /**
    * To protect against malicious input this can be used to cap the number of
    * characters which can be produced while expanding an entity. If it is not
-   * specified or set to `undefined` entity expansion is uncapped.
+   * specified or set to `undefined` entity expansion is uncapped. By number of
+   * characters
    *
    * It is recommended to set this to a sensible value when handling potentially
    * malicious input.
@@ -244,10 +237,10 @@ export interface SaxOptions {
   // TODO: maxEntityLength should already be enough to prevent billion laughs
   //  attack and mitigate some other XML bomb exploits, is anything else needed?
   //  Possible other limits:
-  // maxNestedEntityRef?: number | undefined;
+  // maxNestedEntities?: number | undefined;
   // maxAttributes?: number | undefined;
   // maxAttributeLength?: number | undefined;
-  // maxContentLength?: number | undefined;
+  // maxTextLength?: number | undefined;
 }
 
 const enum State {
@@ -616,7 +609,7 @@ export class SaxParser {
           throw createSaxError("INVALID_XML_DECL");
         }
         this.advance_();
-        this.reader_.xml?.(this.context_, {
+        this.reader_.xml?.({
           version: this.version_,
           encoding: this.encoding_,
           standalone: this.standalone_,
@@ -814,7 +807,7 @@ export class SaxParser {
         this.state_ = State.MISC;
         this.advance_();
         this.flags_ ^= Flags.IN_DOCTYPE;
-        this.reader_.doctype?.(this.context_, {
+        this.reader_.doctype?.({
           name: this.element_,
           systemId: this.flags_ & Flags.DOCTYPE_SYSTEM_ID
             ? this.attributeValue_
@@ -855,7 +848,7 @@ export class SaxParser {
           ? State.MISC
           : State.CONTENT;
         if (this.flags_ & Flags.CAPTURE_COMMENT) {
-          this.reader_.comment?.(this.context_, normalize(this.content_));
+          this.reader_.comment?.(normalize(this.content_));
         }
         this.content_ = "";
         break;
@@ -914,7 +907,7 @@ export class SaxParser {
           : this.context_.elements.length === 0
           ? State.MISC
           : State.CONTENT;
-        this.reader_.pi?.(this.context_, {
+        this.reader_.pi?.({
           target: this.element_,
           content: undefined,
         });
@@ -1069,7 +1062,7 @@ export class SaxParser {
           throw createSaxError("INVALID_START_TAG");
         }
         this.advance_();
-        this.reader_.empty(this.context_, this.element_, this.attributes_);
+        this.reader_.empty(this.element_, this.attributes_);
         this.element_ = "";
         this.attributes_.clear();
         this.state_ = State.CONTENT;
@@ -1133,7 +1126,7 @@ export class SaxParser {
               this.emitIncompleteText_();
             } else {
               this.emitText_();
-              this.reader_.entityRef?.(this.context_, this.element_);
+              this.reader_.entityRef?.(this.element_);
             }
           } else {
             // Predefined entities have no further processing.
@@ -1226,7 +1219,7 @@ export class SaxParser {
           throw createSaxError("INVALID_END_TAG");
         }
         this.advance_();
-        this.reader_.end(this.context_, this.element_);
+        this.reader_.end(this.element_);
         this.element_ = "";
         this.state_ = this.context_.elements.length === 0
           ? State.MISC
@@ -1249,7 +1242,7 @@ export class SaxParser {
   // @internal
   private emitStart_() {
     this.context_.elements.push(this.element_);
-    this.reader_.start(this.context_, this.element_, this.attributes_);
+    this.reader_.start(this.element_, this.attributes_);
     this.element_ = "";
     this.attributes_.clear();
   }
@@ -1263,7 +1256,7 @@ export class SaxParser {
 
   // @internal
   private emitText_() {
-    this.reader_.text(this.context_, this.content_);
+    this.reader_.text(this.content_);
     this.content_ = "";
   }
 
@@ -1339,7 +1332,7 @@ export class SaxParser {
         : State.COMMENT;
       // Only line endings are normalized in PI content. Anything else,
       // entity references char references etc... is just passed through.
-      this.reader_.pi?.(this.context_, {
+      this.reader_.pi?.({
         target: this.element_,
         content: normalize(this.content_),
       });
