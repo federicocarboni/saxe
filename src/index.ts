@@ -441,17 +441,7 @@ export class SaxParser {
   private charRef_ = 0;
 
   // @internal
-  private context_: {
-    elements: string[];
-    xmlSpace: "preserve" | "default" | undefined;
-    xmlLang: string | undefined;
-  } = {
-    // Current stack of XML elements, required to validate open and end tags.
-    elements: [],
-    // namespaces: new Map<string, string>(),
-    xmlSpace: undefined,
-    xmlLang: undefined,
-  };
+  private elements_: string[] = [];
 
   // Accumulators
 
@@ -534,7 +524,7 @@ export class SaxParser {
    */
   end() {
     if (
-      this.context_.elements.length !== 0 ||
+      this.elements_.length !== 0 ||
       this.chunk_.length !== 0 && this.chunk_ !== "\r"
     ) {
       throw createSaxError("INVALID_END_TAG");
@@ -844,7 +834,7 @@ export class SaxParser {
         // Inside elements must return to CONTENT
         this.state_ = this.flags_ & Flags.IN_DOCTYPE
           ? State.DOCTYPE_DTD
-          : this.context_.elements.length === 0
+          : this.elements_.length === 0
           ? State.MISC
           : State.CONTENT;
         if (this.flags_ & Flags.CAPTURE_COMMENT) {
@@ -904,7 +894,7 @@ export class SaxParser {
         // Inside elements must return to CONTENT
         this.state_ = this.flags_ & Flags.IN_DOCTYPE
           ? State.DOCTYPE_DTD
-          : this.context_.elements.length === 0
+          : this.elements_.length === 0
           ? State.MISC
           : State.CONTENT;
         this.reader_.pi?.({
@@ -1214,14 +1204,14 @@ export class SaxParser {
         // last started
         if (
           this.char_ !== Chars.GT ||
-          this.context_.elements.pop() !== this.element_
+          this.elements_.pop() !== this.element_
         ) {
           throw createSaxError("INVALID_END_TAG");
         }
         this.advance_();
         this.reader_.end(this.element_);
         this.element_ = "";
-        this.state_ = this.context_.elements.length === 0
+        this.state_ = this.elements_.length === 0
           ? State.MISC
           : State.CONTENT;
         break;
@@ -1241,7 +1231,7 @@ export class SaxParser {
 
   // @internal
   private emitStart_() {
-    this.context_.elements.push(this.element_);
+    this.elements_.push(this.element_);
     this.reader_.start(this.element_, this.attributes_);
     this.element_ = "";
     this.attributes_.clear();
@@ -1327,15 +1317,17 @@ export class SaxParser {
     if (index !== -1) {
       this.state_ = this.flags_ & Flags.IN_DOCTYPE
         ? State.DOCTYPE_DTD
-        : this.context_.elements.length === 0
+        : this.elements_.length === 0
         ? State.MISC
         : State.COMMENT;
       // Only line endings are normalized in PI content. Anything else,
       // entity references char references etc... is just passed through.
-      this.reader_.pi?.({
-        target: this.element_,
-        content: normalize(this.content_),
-      });
+      if (this.flags_ & Flags.CAPTURE_PI) {
+        this.reader_.pi!({
+          target: this.element_,
+          content: normalize(this.content_),
+        });
+      }
       this.element_ = "";
       this.content_ = "";
     }
