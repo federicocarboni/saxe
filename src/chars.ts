@@ -4,11 +4,12 @@ export const enum Chars {
   LF = 0xA,
   CR = 0xD,
   SP = 0x20,
-  AMP = 0x26,
+  AMPERSAND = 0x26,
   APOSTROPHE = 0x27,
   BANG = 0x21,
   QUOTE = 0x22,
   HASH = 0x23,
+  HYPHEN = 0x2D,
   SLASH = 0x2F,
   SEMICOLON = 0x3B,
   LT = 0x3C,
@@ -49,22 +50,22 @@ export function isAsciiHexAlpha(c: number) {
 /** @internal */
 export function isAlpha(c: number) {
   return (
-    (0x61 /* a */ <= c && c <= 0x7a) /* z */ ||
-    (0x41 /* A */ <= c && c <= 0x5a) /* Z */
+    (0x61 /* a */ <= c && c <= 0x7A) /* z */ ||
+    (0x41 /* A */ <= c && c <= 0x5A) /* Z */
   );
 }
 
 /** @internal */
 export function isEncodingName(value: string) {
-  if (!isAlpha(value.charCodeAt(0))) return false;
+  if (!isAlpha(value.charCodeAt(0))) { return false; }
   for (let i = 0; i < value.length; i++) {
     const c = value.charCodeAt(i);
     if (
       !isAlpha(c) &&
       !isAsciiDigit(c) &&
-      c !== 0x2e /* . */ &&
-      c !== 0x5f /* _ */ &&
-      c !== 0x2d /* - */
+      c !== 0x2E /* . */ &&
+      c !== 0x5F /* _ */ &&
+      c !== 0x2D /* - */
     ) {
       return false;
     }
@@ -76,10 +77,10 @@ export function isEncodingName(value: string) {
 export function parseDecCharRef(dec: string): number | undefined {
   let n = 0;
   const length = dec.length;
-  if (length === 0) return undefined;
+  if (length === 0) { return undefined; }
   for (let i = 0; i < length; i++) {
     const digit = (dec.charCodeAt(i) - 0x30) >>> 0;
-    if (digit > 9) return undefined;
+    if (digit > 9) { return undefined; }
     n = n * 10 + digit;
   }
   return n;
@@ -89,7 +90,7 @@ export function parseDecCharRef(dec: string): number | undefined {
 export function parseHex(dec: string): number | undefined {
   let n = 0;
   const length = dec.length;
-  if (length === 0) return undefined;
+  if (length === 0) { return undefined; }
   for (let i = 0; i < length; i++) {
     const c = dec.charCodeAt(i);
     let digit;
@@ -123,21 +124,13 @@ export function isChar(c: number) {
 /** @internal */
 export function isNameStartChar(c: number) {
   return (
-    isAlpha(c) ||
-    c === 0x3A /* : */ ||
-    c === 0x5F /* _ */ ||
-    (0xc0 <= c && c <= 0xd6) ||
-    (0xd8 <= c && c <= 0xf6) ||
-    (0xf8 <= c && c <= 0x2ff) ||
-    (0x370 <= c && c <= 0x37d) ||
-    (0x37f <= c && c <= 0x1fff) ||
-    (0x200c <= c && c <= 0x200d) ||
-    (0x2070 <= c && c <= 0x218f) ||
-    (0x2c00 <= c && c <= 0x2fef) ||
-    (0x3001 <= c && c <= 0xd7ff) ||
-    (0xf900 <= c && c <= 0xfdcf) ||
-    (0xfdf0 <= c && c <= 0xfffd) ||
-    (0x10000 <= c && c <= 0xeffff)
+    isAlpha(c) || c === 0x3A /* : */ || c === 0x5F /* _ */ ||
+    0xC0 <= c && c <= 0xD6 || 0xD8 <= c && c <= 0xF6 ||
+    0xF8 <= c && c <= 0x2FF || 0x370 <= c && c <= 0x37D ||
+    0x37F <= c && c <= 0x1FFF || 0x200C <= c && c <= 0x200D ||
+    0x2070 <= c && c <= 0x218F || 0x2C00 <= c && c <= 0x2FEF ||
+    0x3001 <= c && c <= 0xD7FF || 0xF900 <= c && c <= 0xFDCF ||
+    0xFDF0 <= c && c <= 0xFFFD || 0x10000 <= c && c <= 0xEFFFF
   );
 }
 
@@ -145,12 +138,51 @@ export function isNameStartChar(c: number) {
 /** @internal */
 export function isNameChar(c: number) {
   return (
-    isNameStartChar(c) ||
-    c === 0x2d /* - */ ||
-    c === 0x2e /* . */ ||
-    isAsciiDigit(c) ||
-    c === 0xb7 ||
-    (0x0300 <= c && c <= 0x036f) ||
-    (0x203f <= c && c <= 0x2040)
+    isNameStartChar(c) || c === 0x2D /* - */ || c === 0x2E /* . */ ||
+    isAsciiDigit(c) || c === 0xB7 || 0x0300 <= c && c <= 0x036F ||
+    0x203F <= c && c <= 0x2040
   );
+}
+
+// Astral characters are not considered because enabling Unicode support on
+// regexes is a performance hit and we assume strings are well-formed.
+const INVALID_CHAR_REGEX = /[^\t\n\r\x20-\uFFFD]/g;
+
+// @internal
+export function hasInvalidChar(s: string) {
+  return INVALID_CHAR_REGEX.test(s);
+}
+
+export function isNotChar2(s: string) {
+  const length = s.length;
+  let index = 0;
+  let char;
+  while (index < length) {
+    char = s.charCodeAt(index);
+    if (char < 0xD800) {
+      if (
+        char < 0x20 && char !== Chars.CR && char !== Chars.LF &&
+        char !== Chars.TAB
+      ) {
+        return true;
+      }
+    } else if (char > 0xDBFF) {
+      // This is a specialized version of isChar10 that takes into account
+      // that in this context char > 0xDBFF and char <= 0xFFFF. So it does not
+      // test cases that don't need testing.
+      if (!(char >= 0xE000 && char <= 0xFFFD)) {
+        return true;
+      }
+    } else {
+      const achar = 0x10000 + ((char - 0xD800) * 0x400) +
+        (s.charCodeAt(index + 1) - 0xDC00);
+      index++;
+      if (achar > 0x10FFFF) {
+        return true;
+      }
+    }
+
+    index++;
+  }
+  return false;
 }

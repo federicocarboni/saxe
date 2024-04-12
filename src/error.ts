@@ -4,8 +4,6 @@ const ERRORS = {
     `The "${encoding}" encoding is not supported`,
   ENCODING_INVALID_DATA: ({encoding}: {encoding: string}) =>
     `Encoded data is not valid for encoding "${encoding}"`,
-  INVALID_UTF16_BOM: () =>
-    "Missing or invalid byte order mark with UTF-16 encoding",
   // XMLDecl
   INVALID_XML_DECL: () => "Invalid XML Declaration",
   RESERVED_PI: () => "Processing instruction name 'XML' is reserved",
@@ -25,10 +23,12 @@ const ERRORS = {
   INVALID_END_TAG: () => "Invalid end tag",
   INVALID_COMMENT: () => "Comments cannot contain --",
   UNIMPLEMENTED: () => "Parsing not implemented",
+  INVALID_CDEND: () => 'Character data cannot contain "]]>"',
   INVALID_CDATA: () => "Invalid character data",
   TRUNCATED: () => "Input appears to be missing data",
   MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
     `Entity "${entity}" expands to very large data`,
+  INVALID_CHAR: () => "Input contains invalid character",
 } as const;
 
 type SaxErrorCodes = {
@@ -49,8 +49,9 @@ export type SaxErrorCode = keyof SaxErrorCodes;
 /**
  * A parsing or decoding error in an XML Document.
  *
- * Since this error type is intended to be recoverable (handled by the user of the library)
- * it provides a `code` string property, making it easy to distinguish different errors.
+ * Since this error type is intended to be recoverable (handled by the user of
+ * the library) it provides a `code` string property, making it easy to
+ * distinguish different errors.
  *
  * @since 1.0.0
  */
@@ -58,6 +59,10 @@ export interface SaxError extends Error {
   name: "SaxError";
   /** A string representing a specific error. */
   code: SaxErrorCode;
+  // TODO: add the offset character that originated the error?
+  //  Tracking lines and columns is not possible with the current design but
+  //  even basic UTF-16 offset tracking is more useful than not, right?
+  // offset: number;
 }
 
 /**
