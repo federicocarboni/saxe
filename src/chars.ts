@@ -56,24 +56,6 @@ export function isAlpha(c: number) {
 }
 
 /** @internal */
-export function isEncodingName(value: string) {
-  if (!isAlpha(value.charCodeAt(0))) { return false; }
-  for (let i = 0; i < value.length; i++) {
-    const c = value.charCodeAt(i);
-    if (
-      !isAlpha(c) &&
-      !isAsciiDigit(c) &&
-      c !== 0x2E /* . */ &&
-      c !== 0x5F /* _ */ &&
-      c !== 0x2D /* - */
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-/** @internal */
 export function parseDecCharRef(dec: string): number | undefined {
   let n = 0;
   const length = dec.length;
@@ -142,6 +124,23 @@ export function isNameChar(c: number) {
     isAsciiDigit(c) || c === 0xB7 || 0x0300 <= c && c <= 0x036F ||
     0x203F <= c && c <= 0x2040
   );
+}
+
+const NAME_START_CHAR_CLASS =
+  ":A-Z_a-z\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u{10000}-\u{EFFFF}";
+
+const NAME_CHAR_CLASS = NAME_START_CHAR_CLASS +
+  "-.0-9\xB7\u0300-\u036F\u203F-\u2040";
+
+const NAME_REGEX = new RegExp(
+  `^[${NAME_START_CHAR_CLASS}][${NAME_CHAR_CLASS}]*$`,
+  "u",
+);
+
+// Entity references check isName using this regex
+// @internal
+export function isName(s: string) {
+  return NAME_REGEX.test(s);
 }
 
 // Astral characters are not considered because enabling Unicode support on

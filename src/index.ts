@@ -5,23 +5,18 @@
 import {
   Chars,
   hasInvalidChar,
-  isAsciiDigit,
-  isAsciiHexAlpha,
   isChar,
-  isEncodingName,
+  isName,
   isNameChar,
   isNameStartChar,
   isWhitespace,
-  isWhitespaceNonSP,
-  parseDecCharRef,
-  parseHex,
 } from "./chars.js";
 import {createSaxError} from "./error.js";
 
 export {isSaxError, type SaxError, type SaxErrorCode} from "./error.js";
 
 /**
- * XML Declaration (XMLDecl)
+ * XML Declaration (XMLDecl).
  *
  * ```xml
  * <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
@@ -31,17 +26,16 @@ export {isSaxError, type SaxError, type SaxErrorCode} from "./error.js";
  */
 export interface XmlDeclaration {
   /**
-   * Version declared in the XML Declaration. Generally `1.0` or `1.1`, this
-   * parser does not explicitly support XML `1.1` but differences are minimal
-   * so most documents parse correctly.
+   * Version declared in the XML Declaration. Generally `1.0` or `1.1`.
    *
    * @since 1.0.0
    */
   version: string;
   /**
    * Encoding in the XML Declaration, or `undefined` when unspecified. The
-   * encoding label is in upper case because official names are upper case and
-   * encoding labels should be processed in a case-insensiteve way.
+   * encoding label is converted to lower case to maintain compatibility with
+   * the `encoding` property of `TextDecoder` and encoding labels should be
+   * processed in a case-insensiteve way.
    *
    * The parser does not validate that the encoding labels is one of the
    * officially assigned [IANA Character Sets].
@@ -69,71 +63,71 @@ export interface Doctype {
 }
 
 /**
- * A processing instruction.
- *
- * ```xml
- * <?target content?>
- * ```
- * @since 1.0.0
- */
-export interface Pi {
-  /** Target name of the processing instruction. */
-  target: string;
-  /**
-   * Content of the processing instruction or `undefined` if omitted.
-   *
-   * Empty and omitted content is subtly different:
-   *
-   * ```xml
-   * <?target?><!-- omitted, content = undefined -->
-   * <?target ?><!-- empty, content = "" -->
-   * ```
-   */
-  content: string;
-}
-
-/**
+ * https://www.w3.org/TR/REC-xml/
  * @since 1.0.0
  */
 export interface SaxReader {
-  /**
-   * Returns the replacement text for a given entity name. This is needed for
-   * attribute values, entity references in content are handled by `entityRef`
-   * unless `textOnlyEntities` is enabled.
-   *
-   * @param entity
-   * @returns resolved entity contents or `undefined` if not found.
-   */
-  resolveEntityRef?(entity: string): string | undefined;
-  /**
-   * XML Declaration. Usually not required.
-   * @param declaration
-   */
   xml?(declaration: XmlDeclaration): void;
   /**
-   * A processing instruction `<?target content?>`. To improve performance, if
-   * processing instructions are not required do not define this handler.
-   * @param pi
+   * A processing instruction.
+   *
+   * ```xml
+   * <?target content?>
+   * ```
+   *
+   * Unless processing instructions are required, avoid defining this handler as
+   * that will prevent the parser from buffering the comment contents.
+   * Processing instructions are always checked for well-formedness regardless
+   * of the configuration.
+   *
+   * @param target
+   * @param content
+   *
+   * @since 1.0.0
    */
   pi?(target: string, content: string): void;
   /**
-   * A comment `<!-- text -->`. To improve performance, if comments are not
-   * required do not define this handler.
+   * A comment.
+   *
+   * ```xml
+   * <!-- text -->
+   * ```
+   *
+   * Unless processing comments is required, avoid defining this handler as that
+   * will prevent the parser from buffering the comment contents. Comments are
+   * always checked for well-formedness regardless of the configuration.
+   *
+   * @param text - Comment text, leading or trailing spaces are not removed.
    */
   comment?(text: string): void;
   /**
-   * To improve performance, if processing instructions are not required do not
-   * define this handler.
    * @param doctype
    */
   doctype?(doctype: Doctype): void;
   /**
-   * A general entity reference.
+   * Returns the replacement text for a given entity name.
    *
-   * @param context
+   * **Note**: this is not called for predefined general entity references or
+   * inside text content as those may contain markup, see {@link entityRef}.
+   *
+   * @param entity
+   * @returns Entity replacement text or `undefined` if not recognized
+   */
+  replaceEntityRef?(entity: string): string | undefined;
+  /**
+   * A general entity reference which is not predefined.
+   *
+   * ```xml
+   * &entity;
+   * ```
+   *
+   * **Note**: this is not called for general entity references inside attribute
+   * values as those are replaced immediately by the parser. Attribute values
+   * use {@link replaceEntityRef} instead.
+   *
    * @param entity - referenced entity name
    */
-  entityRef?(entity: string): void;
+  entityRef(entity: string): void;
   /**
    * Start tag.
    *
@@ -141,13 +135,12 @@ export interface SaxReader {
    * <element attr="value">
    * ```
    *
-   * @param context -
    * @param name
    * @param attributes
    */
   start(name: string, attributes: ReadonlyMap<string, string>): void;
   /**
-   * An empty element.
+   * An empty tag.
    *
    * ```xml
    * <element attr="value" />
@@ -158,7 +151,12 @@ export interface SaxReader {
    */
   empty(name: string, attributes: ReadonlyMap<string, string>): void;
   /**
-   * An end tag `</element>`.
+   * An end tag.
+   *
+   * ```xml
+   * </element>
+   * ```
+   *
    * @param name
    */
   end(name: string): void;
@@ -223,7 +221,7 @@ export interface SaxOptions {
   //  * entities which contain markup or escapes, so use with caution!
   //  */
   // textOnlyEntities?: boolean | undefined;
-  processDtd?: "prohibit" | "ignore" | undefined;
+  // processDtd?: "prohibit" | "ignore" | undefined;
   /**
    * To protect against malicious input this can be used to cap the number of
    * characters which can be produced while expanding an entity. If it is not
@@ -232,6 +230,8 @@ export interface SaxOptions {
    *
    * It is recommended to set this to a sensible value when handling potentially
    * malicious input.
+   *
+   * @defaultValue `undefined`
    */
   maxEntityLength?: number | undefined;
   // TODO: maxEntityLength should already be enough to prevent billion laughs
@@ -246,10 +246,9 @@ export interface SaxOptions {
 const enum State {
   INIT,
   XML_DECL,
-  XML_DECL_S,
+  XML_DECL_SPACE,
   XML_DECL_VALUE,
-  XML_DECL_VALUE_S,
-  XML_DECL_VALUE_D,
+  XML_DECL_VALUE_QUOTED,
   XML_DECL_END,
   DOCTYPE_DECL,
   DOCTYPE_NAME_START,
@@ -265,11 +264,10 @@ const enum State {
   DOCTYPE_PUBLIC_ID_D,
   DOCTYPE_PUBLIC_ID_END,
   DOCTYPE_MAYBE_DTD,
-  DOCTYPE_DTD,
-  DOCTYPE_DTD_OPEN_BRACKET,
-  DOCTYPE_DTD_OPEN_BRACKET_BANG,
-  DOCTYPE_DTD_QUOTED_S,
-  DOCTYPE_DTD_QUOTED_D,
+  DTD,
+  DTD_OPEN_ANGLE_BRACKET,
+  DTD_OPEN_ANGLE_BRACKET_BANG,
+  DTD_QUOTED,
   DOCTYPE_END,
   MISC,
   PI_TARGET_START,
@@ -285,23 +283,22 @@ const enum State {
   OPEN_ANGLE_BRACKET_BANG,
   START_TAG_NAME,
   START_TAG,
-  START_TAG_ATTR_START,
+  START_TAG_SPACE,
   START_TAG_ATTR,
   START_TAG_ATTR_EQ,
   START_TAG_ATTR_VALUE,
-  START_TAG_ATTR_VALUE_S,
-  START_TAG_ATTR_VALUE_D,
-  START_TAG_EMPTY,
+  START_TAG_ATTR_VALUE_QUOTED,
+  EMPTY_TAG,
   TEXT_CONTENT,
   REFERENCE,
   ENTITY_REF,
   CHAR_REF,
   CHAR_REF_DEC,
   CHAR_REF_HEX,
+  CDATA_SECTION,
   END_TAG_START,
   END_TAG,
   END_TAG_END,
-  CDATA_SECTION,
 }
 
 // A bit of an abuse of const enum but needed to ensure perf
@@ -323,8 +320,9 @@ const enum Flags {
 
   // Runtime flags:
   CR = 1 << 9,
-  SEEN_DOCTYPE = 1 << 10,
-  SEEN_ROOT = 1 << 11,
+  SINGLE_QUOTE = 1 << 10,
+  SEEN_DOCTYPE = 1 << 11,
+  SEEN_ROOT = 1 << 12,
 }
 
 function debugFlags(flags: Flags) {
@@ -337,7 +335,7 @@ function debugFlags(flags: Flags) {
 }
 
 // Normalize XML line endings.
-function normalize(s: string) {
+function normalizeLineEndings(s: string) {
   return s.replace(/\r\n?/g, "\n");
 }
 
@@ -382,34 +380,9 @@ export function getLocal(name: string): string | undefined {
   return colon === 0 || colon === name.length - 1 ? undefined : local;
 }
 
-export interface SaxContext {
-  /** <?"
-   * Contains the hierarchy of elements opened so far. As start and end tags
-   * are read element names are pushed and popped so that the last element in
-   * the array is always the last start tag and the first is always the root
-   * (unless the parser is still outside of it).
-   *
-   * ```xml
-   * <root>
-   *   <element>
-   *     <!-- Parser is here -->
-   *   </element>
-   * </root>
-   * ```
-   *
-   * In the above situation elements has value:
-   *
-   * ```js
-   * ["root", "element"]
-   * ```
-   */
-  readonly elements: readonly string[];
-}
-
 /**
- * Streaming non-validating XML Parser enforcing well-formedness, it makes no
- * attempt to recover well-formedness errors. If an internal DTD is present it
- * is not parsed or processed in any way.
+ * Streaming non-validating XML Parser, it makes no attempt to recover
+ * well-formedness errors.
  *
  * To optimize for efficiency the parser does not store line information.
  *
@@ -440,8 +413,6 @@ export class SaxParser {
   // @internal
   private index_ = 0;
   // @internal
-  private char_ = 0;
-  // @internal
   private state_ = State.INIT;
   // @internal
   private otherState_ = 0;
@@ -457,18 +428,18 @@ export class SaxParser {
   // Accumulators
 
   // Generic accumulator
-  // Current attribute name (or XML Decl attribute value)
-  // @internal
-  private attributeName_ = "";
-  // Current attribute value (or XML Decl attribute value)
-  // @internal
-  private attributeValue_ = "";
   // Current element name
   // @internal
   private element_ = "";
   // Current text content, contains decoded and normalized content
+  // or current attribute value (or XML Decl attribute value)
   // @internal
   private content_ = "";
+  // Current attribute name (or XML Decl attribute value)
+  // @internal
+  private attribute_ = "";
+  // @internal
+  private entity_ = "";
   // Current attributes, this parser enforces well-formedness so an attribute
   // list cannot be avoided. To improve lookup times it uses a Map instead of a
   // plain object.
@@ -501,7 +472,7 @@ export class SaxParser {
    * @param reader
    * @param options
    */
-  constructor(reader: SaxReader, options?: SaxOptions | undefined) {
+  constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
     this.reader_ = reader;
     // Avoid capturing information that will be ignored
     if (this.reader_.pi != null) {
@@ -537,16 +508,17 @@ export class SaxParser {
       if (this.chunk_.charCodeAt(0) === Chars.LF) {
         this.chunk_ = this.chunk_.slice(1);
       }
-      this.flags_ ^= Flags.CR;
+      this.flags_ &= ~Flags.CR;
     }
     const length = this.chunk_.length;
     while (this.index_ < length) {
       this.parseStep_();
     }
-    if (this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CR) {
+    if (this.chunk_.charCodeAt(length - 1) === Chars.CR) {
       this.flags_ |= Flags.CR;
     }
     this.chunk_ = "";
+    this.index_ = 0;
   }
 
   /**
@@ -566,6 +538,16 @@ export class SaxParser {
         return this.parseInit_();
       case State.XML_DECL:
         return this.parseXmlDecl_();
+      case State.XML_DECL_SPACE:
+        return this.parseXmlDeclSpace_();
+      case State.XML_DECL_VALUE:
+        return this.parseXmlDeclValue_();
+      case State.XML_DECL_VALUE_QUOTED:
+        return this.parseXmlDeclValueQuoted_();
+      case State.XML_DECL_END:
+        return this.parseXmlDeclEnd_();
+      case State.MISC:
+        return this.parseMisc_();
       case State.PI_TARGET_START:
         return this.parsePiTargetStart_();
       case State.PI_TARGET:
@@ -588,35 +570,216 @@ export class SaxParser {
         return this.parseOpenAngleBracket_();
       case State.OPEN_ANGLE_BRACKET_BANG:
         return this.parseOpenAngleBracketBang_();
+      case State.START_TAG_NAME:
+        return this.parseStartTagName_();
+      case State.START_TAG:
+        return this.parseStartTag_();
+      case State.START_TAG_SPACE:
+        return this.parseStartTagSpace_();
+      case State.START_TAG_ATTR:
+        return this.parseStartTagAttr_();
+      case State.START_TAG_ATTR_EQ:
+        return this.parseStartTagAttrEq_();
+      case State.START_TAG_ATTR_VALUE:
+        return this.parseStartTagAttrValue_();
+      case State.START_TAG_ATTR_VALUE_QUOTED:
+        return this.parseStartTagAttrValueQuoted_();
+      case State.EMPTY_TAG:
+        return this.parseEmptyTag_();
       case State.TEXT_CONTENT:
         return this.parseTextContent_();
+      // &amp; &#38; general entity reference or character reference
+      case State.REFERENCE:
+        return this.parseReference_();
+      case State.ENTITY_REF:
+        return this.parseEntityRef_();
+      case State.CHAR_REF:
+        return this.parseCharRef_();
+      // &#38;
+      case State.CHAR_REF_DEC:
+        return this.parseCharRefDec_();
+      // &#x26;
+      case State.CHAR_REF_HEX:
+        return this.parseCharRefHex_();
+    }
+  }
+
+  // XMLDecl and doctypedecl are optimized for size and not for speed since they
+  // are only read once. DTD is only skimmed through as fast as possible for now
+
+  // @internal
+  private parseInit_() {
+    const newChunk = this.chunk_.slice(0, 6 - this.chunk_.length);
+    this.element_ += newChunk;
+    this.index_ += newChunk.length;
+    // XMLDecl is "<?xml" SPACE, not checking for space could false positive on
+    // a PI with a name that happens to start with xml.
+    if (
+      this.element_.slice(0, -1) === "<?xml" &&
+      isWhitespace(this.element_.charCodeAt(5))
+    ) {
+      this.index_ += 6;
+      this.state_ = State.XML_DECL;
+      this.element_ = "";
+    } else if (this.element_.length >= 6) {
+      this.state_ = State.MISC;
+      this.element_ = "";
     }
   }
 
   // @internal
-  private parseInit_() {
-    this.element_ += this.chunk_.slice(0, 6 - this.chunk_.length);
-    if (
-      this.chunk_.slice(this.index_, this.index_ + 5) === "<?xml" &&
-      isWhitespace(this.chunk_.charCodeAt(this.index_ + 5))
-    ) {
-      this.index_ += 6;
-      this.state_ = State.XML_DECL;
+  private readXmlAttribute_() {
+    const index = this.chunk_.indexOf("=", this.index_);
+    let end = index;
+    if (end === -1) {
+      end = this.chunk_.length;
     } else {
-      this.state_ = State.MISC;
+      // Remove whitespace from the end
+      while (isWhitespace(this.chunk_.charCodeAt(--end)));
+      end++;
     }
+    // "standalone" is the longest XMLDecl attribute, if this is longer then
+    // it's not valid, catches invalid XML early and prevents using an excessive
+    // amount of memory for very large values.
+    if (this.attribute_.length + end - this.index_ > 10) {
+      throw createSaxError("INVALID_XML_DECL");
+    }
+    this.attribute_ += this.chunk_.slice(this.index_, end);
+    this.index_ = end + 1;
+    return index !== -1;
   }
 
   // @internal
   private parseXmlDecl_() {
-    if (!this.skipWhitespace_()) {
-      return;
+    if (this.skipWhitespace_()) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      if (codeUnit === Chars.QUESTION) {
+        ++this.index_;
+        this.state_ = State.XML_DECL_END;
+      } else if (this.readXmlAttribute_()) {
+        this.state_ = State.XML_DECL_VALUE;
+      }
     }
-    const char = this.chunk_.charCodeAt(this.index_);
-    if (char === Chars.QUESTION) {
-      this.state_ = State.XML_DECL_END;
+  }
+
+  // @internal
+  private parseXmlDeclSpace_() {
+    if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+      throw createSaxError("INVALID_XML_DECL");
+    }
+    ++this.index_;
+    this.state_ = State.XML_DECL;
+    this.parseXmlDecl_();
+  }
+
+  // @internal
+  private parseXmlDeclValue_() {
+    if (this.skipWhitespace_()) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      switch (codeUnit) {
+        case Chars.APOSTROPHE:
+          this.flags_ |= Flags.SINGLE_QUOTE;
+        // fall-through
+        case Chars.QUOTE:
+          this.state_ = State.XML_DECL_VALUE_QUOTED;
+          ++this.index_;
+          break;
+        default:
+          throw createSaxError("INVALID_XML_DECL");
+      }
+    }
+  }
+
+  // @internal
+  private handleXmlDeclAttribute_() {
+    // Regex are slower but more compact.
+    switch (this.attribute_) {
+      case "version":
+        if (
+          this.version_ !== undefined ||
+          !/^1\.[0-9]$/.test(this.content_)
+        ) {
+          return true;
+        }
+        this.version_ = this.content_;
+        break;
+      case "encoding":
+        // XML standard doesn't define a maximum length for any construct, but
+        // IANA Charsets never go above 45 characters (including aliases).
+        // TODO: it's a good a idea to limit encoding labels as large values
+        //  are very unlikely correct. Is 256 right?
+        if (
+          this.version_ === undefined || this.encoding_ !== undefined ||
+          this.standalone_ !== undefined || this.content_.length > 256 ||
+          !/^[A-Za-z][A-Za-z0-9._-]*$/.test(this.content_)
+        ) {
+          return true;
+        }
+        this.encoding_ = this.content_.toLowerCase();
+        break;
+      case "standalone":
+        if (
+          this.version_ === undefined || this.standalone_ !== undefined ||
+          this.content_ !== "yes" && this.content_ !== "no"
+        ) {
+          return true;
+        }
+        this.standalone_ = this.content_ === "yes";
+        break;
+      default:
+        return true;
+    }
+    this.attribute_ = "";
+    this.content_ = "";
+    return false;
+  }
+
+  // @internal
+  private parseXmlDeclValueQuoted_() {
+    const index = this.chunk_.indexOf(
+      this.flags_ & Flags.SINGLE_QUOTE ? "'" : '"',
+      this.index_,
+    );
+    const end = index === -1 ? this.chunk_.length : index;
+    this.content_ += this.chunk_.slice(this.index_, end);
+    this.index_ = end + 1;
+    if (index !== -1) {
+      this.flags_ &= ~Flags.SINGLE_QUOTE;
+      if (this.handleXmlDeclAttribute_()) {
+        throw createSaxError("INVALID_XML_DECL");
+      }
+      this.state_ = State.XML_DECL;
+    }
+  }
+
+  // @internal
+  private parseXmlDeclEnd_() {
+    if (
+      this.chunk_.charCodeAt(this.index_) === Chars.GT &&
+      this.version_ !== undefined
+    ) {
       ++this.index_;
+      this.state_ = State.MISC;
+      this.reader_.xml?.({
+        version: this.version_,
+        encoding: this.encoding_,
+        standalone: this.standalone_,
+      });
     } else {
+      throw createSaxError("INVALID_XML_DECL");
+    }
+  }
+
+  // @internal
+  private parseMisc_() {
+    if (this.skipWhitespace_()) {
+      if (this.chunk_.charCodeAt(this.index_) === Chars.LT) {
+        ++this.index_;
+        this.state_ = State.OPEN_ANGLE_BRACKET;
+        this.otherState_ = State.MISC;
+      } else {
+        throw createSaxError("INVALID_CDATA");
+      }
     }
   }
 
@@ -666,7 +829,7 @@ export class SaxParser {
   // @internal
   private piEnd_() {
     if (this.flags_ & Flags.CAPTURE_PI) {
-      this.reader_.pi?.(this.element_, normalize(this.content_));
+      this.reader_.pi?.(this.element_, this.content_);
     }
     this.element_ = "";
     this.content_ = "";
@@ -676,8 +839,6 @@ export class SaxParser {
 
   // @internal
   private parsePiContent_() {
-    // Line normalization here is deferred to after having collected the pi
-    // content, since pis are expected to be ignored for the most part.
     // All the searching is done with indexOf, basically a native strstr routine
     // which is much faster than anything that can be written manually in JS.
     const index = this.chunk_.indexOf("?>", this.index_);
@@ -689,7 +850,7 @@ export class SaxParser {
       throw createSaxError("INVALID_CHAR");
     }
     if (this.flags_ & Flags.CAPTURE_PI) {
-      this.content_ += content;
+      this.content_ += normalizeLineEndings(content);
     }
     if (index === -1) {
       this.index_ = this.chunk_.length;
@@ -736,7 +897,7 @@ export class SaxParser {
       throw createSaxError("INVALID_CHAR");
     }
     if (this.flags_ & Flags.CAPTURE_COMMENT) {
-      this.content_ += content;
+      this.content_ += normalizeLineEndings(content);
     }
     if (index === -1) {
       // Chunk is read to completion even on an ending hyphen, it will be
@@ -773,7 +934,7 @@ export class SaxParser {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       ++this.index_;
       if (this.flags_ & Flags.CAPTURE_COMMENT) {
-        this.reader_.comment?.(normalize(this.content_));
+        this.reader_.comment?.(this.content_);
       }
       this.content_ = "";
       this.state_ = this.otherState_;
@@ -829,6 +990,174 @@ export class SaxParser {
       return;
     }
     this.element_ = "";
+  }
+
+  // @internal
+  private startTagEnd_() {
+    this.state_ = State.TEXT_CONTENT;
+    this.reader_.start(this.element_, this.attributes_);
+    this.element_ = "";
+    this.attributes_.clear();
+  }
+
+  // @internal
+  private parseStartTagName_() {
+    this.element_ += this.readNameCharacters_();
+    if (this.index_ < this.chunk_.length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      ++this.index_;
+      if (codeUnit === Chars.GT) {
+        this.startTagEnd_();
+      } else if (isWhitespace(codeUnit)) {
+        this.state_ = State.START_TAG;
+      } else if (codeUnit === Chars.SLASH) {
+        this.state_ = State.EMPTY_TAG;
+      } else {
+        throw createSaxError("INVALID_START_TAG");
+      }
+    }
+  }
+
+  // @internal
+  private parseStartTag_() {
+    if (this.skipWhitespace_()) {
+      const char = this.chunk_.codePointAt(this.index_)!;
+      ++this.index_;
+      if (char > 0xFFFF) {
+        ++this.index_;
+      }
+      if (isNameStartChar(char)) {
+        this.state_ = State.START_TAG_ATTR;
+      } else if (char === Chars.GT) {
+        this.startTagEnd_();
+      } else if (char === Chars.SLASH) {
+        this.state_ = State.EMPTY_TAG;
+      } else {
+        throw createSaxError("INVALID_START_TAG");
+      }
+    }
+  }
+
+  // @internal
+  private parseStartTagSpace_() {
+    const codeUnit = this.chunk_.charCodeAt(this.index_)!;
+    ++this.index_;
+    if (codeUnit === Chars.GT) {
+      this.startTagEnd_();
+    } else if (isWhitespace(codeUnit)) {
+      this.state_ = State.START_TAG;
+      this.parseStartTag_();
+    } else if (codeUnit === Chars.SLASH) {
+      this.state_ = State.EMPTY_TAG;
+    } else {
+      throw createSaxError("INVALID_START_TAG");
+    }
+  }
+
+  // @internal
+  private parseStartTagAttr_() {
+    this.attribute_ += this.readNameCharacters_();
+    if (this.index_ < this.chunk_.length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      if (codeUnit === Chars.EQ) {
+        // Most likely case
+        this.state_ = State.START_TAG_ATTR_VALUE;
+      } else if (isWhitespace(codeUnit)) {
+        this.state_ = State.START_TAG_ATTR_EQ;
+      } else {
+        throw createSaxError("INVALID_START_TAG");
+      }
+    }
+  }
+
+  // @internal
+  private parseStartTagAttrEq_() {
+    if (this.skipWhitespace_()) {
+      if (this.chunk_.charCodeAt(this.index_) === Chars.EQ) {
+        ++this.index_;
+        this.state_ = State.START_TAG_ATTR_VALUE;
+      } else {
+        throw createSaxError("INVALID_START_TAG");
+      }
+    }
+  }
+
+  // @internal
+  private parseStartTagAttrValue_() {
+    if (this.skipWhitespace_()) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      switch (codeUnit) {
+        case Chars.APOSTROPHE:
+          this.flags_ |= Flags.SINGLE_QUOTE;
+        // fall-through
+        case Chars.QUOTE:
+          this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
+          break;
+        default:
+          throw createSaxError("INVALID_START_TAG");
+      }
+    }
+  }
+
+  // @internal
+  private parseStartTagAttrValueQuoted_() {
+    const quote = this.flags_ & Flags.SINGLE_QUOTE
+      ? Chars.APOSTROPHE
+      : Chars.QUOTE;
+    const length = this.chunk_.length;
+    let start = this.index_;
+    loop: while (this.index_ < length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      switch (codeUnit) {
+        case Chars.TAB:
+        case Chars.LF:
+        case Chars.CR:
+          this.content_ += this.chunk_.slice(start, this.index_) + " ";
+          if (
+            codeUnit === Chars.CR &&
+            this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF
+          ) {
+            ++this.index_;
+          }
+          start = this.index_ + 1;
+          break;
+        case Chars.AMPERSAND:
+          // TODO: this should be recursive for non-predefined general entity
+          // references...
+          this.state_ = State.REFERENCE;
+          this.otherState_ = State.START_TAG_ATTR_VALUE_QUOTED;
+          break loop;
+        case quote:
+          this.state_ = State.START_TAG_SPACE;
+          break loop;
+        case Chars.LT:
+          // < is not allowed inside attribute values
+          throw createSaxError("INVALID_ATTRIBUTE_VALUE");
+        default:
+          // Other characters still need to be validated:
+          if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+            throw createSaxError("INVALID_CHAR");
+          }
+      }
+      ++this.index_;
+    }
+    this.content_ += this.chunk_.slice(start, this.index_);
+  }
+
+  // @internal
+  private parseEmptyTag_() {
+    if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
+      ++this.index_;
+      // Empty tag could still be the root element
+      this.state_ = this.elements_.length !== 0
+        ? State.TEXT_CONTENT
+        : State.MISC;
+      this.reader_.empty(this.element_, this.attributes_);
+      this.element_ = "";
+      this.attributes_.clear();
+    } else {
+      throw createSaxError("INVALID_START_TAG");
+    }
   }
 
   // This should ideally be somewhere else so that it can be applied to entities
@@ -900,6 +1229,110 @@ export class SaxParser {
       this.content_ = "";
     }
     ++this.index_;
+  }
+
+  // @internal
+  private parseReference_() {
+    const char = this.chunk_.codePointAt(this.index_)!;
+    ++this.index_;
+    if (char > 0xFFFF) {
+      ++this.index_;
+    }
+    if (isNameStartChar(char)) {
+      this.state_ = State.ENTITY_REF;
+    } else if (char === Chars.HASH) {
+      this.state_ = State.CHAR_REF;
+    } else {
+      throw createSaxError("INVALID_ENTITY_REF");
+    }
+  }
+
+  // @internal
+  private parseEntityRef_() {
+    const index = this.chunk_.indexOf(";", this.index_);
+    const end = index === -1 ? this.chunk_.length : index;
+    this.entity_ += this.chunk_.slice(this.index_, end);
+    this.index_ = end + 1;
+    if (!isName(this.entity_)) {
+      throw createSaxError("INVALID_ENTITY_REF");
+    }
+    if (index !== -1) {
+      const predefValue = getPredefinedEntity(this.entity_);
+      if (predefValue !== undefined) {
+        this.content_ += predefValue;
+      } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
+        throw new Error("unimplemented");
+      } else {
+        this.reader_.entityRef(this.entity_);
+      }
+      this.state_ = this.otherState_;
+      this.otherState_ = 0;
+    }
+  }
+
+  // @internal
+  private parseCharRef_() {
+    if (this.chunk_.charCodeAt(this.index_) === Chars.LOWER_X) {
+      ++this.index_;
+      this.state_ = State.CHAR_REF_HEX;
+    } else {
+      this.state_ = State.CHAR_REF_DEC;
+      this.parseCharRefDec_();
+    }
+  }
+
+  // @internal
+  private handleCharRef_() {
+    // Skip semicolon ;
+    ++this.index_;
+    // TODO: 0 is not allowed so both explicit zero &#0; and zero size number
+    //  &#; end up throwing here, but there's no way to know which one it is now
+    if (!isChar(this.charRef_)) {
+      throw createSaxError("INVALID_CHAR_REF", {char: this.charRef_});
+    }
+    this.content_ += String.fromCodePoint(this.charRef_);
+    this.charRef_ = 0;
+    this.state_ = this.otherState_;
+    this.otherState_ = 0;
+  }
+
+  // @internal
+  private parseCharRefDec_() {
+    const length = this.chunk_.length;
+    while (this.index_ < length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      if (codeUnit === Chars.SEMICOLON) {
+        this.handleCharRef_();
+        break;
+      }
+      const digit = (codeUnit - 0x30) >>> 0;
+      if (digit > 9) {
+        throw createSaxError("INVALID_CHAR_REF", {char: undefined});
+      }
+      this.charRef_ = this.charRef_ * 10 + digit;
+      ++this.index_;
+    }
+  }
+
+  // @internal
+  private parseCharRefHex_() {
+    const length = this.chunk_.length;
+    while (this.index_ < length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      if (codeUnit === Chars.SEMICOLON) {
+        this.handleCharRef_();
+        break;
+      }
+      let digit = (codeUnit - 0x30) >>> 0;
+      if (digit > 9) {
+        digit = ((codeUnit | 0x20) - 0x57) >>> 0;
+        if (digit < 10 || digit > 15) {
+          throw createSaxError("INVALID_CHAR_REF", {char: undefined});
+        }
+      }
+      this.charRef_ = this.charRef_ * 16 + digit;
+      ++this.index_;
+    }
   }
 
   // Internal functions
