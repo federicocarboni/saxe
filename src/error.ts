@@ -4,31 +4,37 @@ const ERRORS = {
     `The "${encoding}" encoding is not supported`,
   ENCODING_INVALID_DATA: ({encoding}: {encoding: string}) =>
     `Encoded data is not valid for encoding "${encoding}"`,
+
   // XMLDecl
-  INVALID_XML_DECL: () => "Invalid XML Declaration",
+  INVALID_XML_DECL: () => "XML Declaration not well-formed",
+  // doctypedecl
+  INVALID_DOCTYPE_DECL: () => "DOCTYPE Declaration not well-formed",
+  INVALID_COMMENT: () => "Comments cannot contain '--'",
   RESERVED_PI: () => "Processing instruction name 'XML' is reserved",
-  INVALID_PI: () => "Invalid processing instruction",
-  INVALID_DOCTYPE: () => "Invalid or missing DOCTYPE declaration",
-  INVALID_ENTITY_REF: () => "Invalid entity",
-  INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
-    `Reference to invalid character: ${char}`,
+  INVALID_PI: () => "Processing instruction not well-formed",
+
+  INVALID_ENTITY_REF: () => "Entity reference not well-formed",
   UNRESOLVED_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" cannot be resolved`,
   RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" directly or indirectly references itself`,
-  INVALID_START_TAG: () => "Invalid start tag",
-  INVALID_ATTRIBUTE_VALUE: () =>
-    "Attribute values cannot contain a literal '<'",
-  DUPLICATE_ATTR: () => "Duplicate attribute",
-  INVALID_END_TAG: () => "Invalid end tag",
-  INVALID_COMMENT: () => "Comments cannot contain --",
-  UNIMPLEMENTED: () => "Parsing not implemented",
-  INVALID_CDEND: () => 'Character data cannot contain "]]>"',
-  INVALID_CDATA: () => "Invalid character data",
-  TRUNCATED: () => "Input appears to be missing data",
   MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
     `Entity "${entity}" expands to very large data`,
-  INVALID_CHAR: () => "Input contains invalid character",
+
+  INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
+    `Character reference to illegal character: ${char}`,
+
+  INVALID_START_TAG: () => "Start tag not well-formed",
+  INVALID_ATTRIBUTE_VALUE: () =>
+    "Attribute values cannot contain a literal '<'",
+  DUPLICATE_ATTR: () => "Attribute appears more than once in the same tag",
+  INVALID_END_TAG: () => "End tag not well-formed or improper nesting",
+
+  INVALID_CHAR: () => "Input contains illegal characters",
+  INVALID_CDEND: () => "Character data cannot contain ']]>'",
+  INVALID_CDATA: () => "Character data cannot appear outside the root element",
+
+  UNEXPECTED_EOF: () => "Unexpected end of file",
 } as const;
 
 type SaxErrorCodes = {
@@ -66,9 +72,9 @@ export interface SaxError extends Error {
 }
 
 /**
- * Returns `true` if the given value is a {@link SaxError}. This is mostly intended for TypeScript
- * users seeking type-safety in `catch` clauses, but can generally be used to distinguish between
- * Saxe errors and general errors.
+ * Returns `true` if the given value is a {@link SaxError}. This is mostly
+ * intended for TypeScript users seeking type-safety in `catch` clauses, but can
+ * generally be used to distinguish between Saxe errors and general errors.
  *
  * @param error
  * @returns

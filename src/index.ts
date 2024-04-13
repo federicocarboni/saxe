@@ -58,8 +58,9 @@ export interface XmlDeclaration {
 
 export interface Doctype {
   name: string;
-  publicId?: string | undefined;
-  systemId?: string | undefined;
+  // TODO: does anyone need these?
+  // publicId?: string | undefined;
+  // systemId?: string | undefined;
 }
 
 /**
@@ -68,6 +69,10 @@ export interface Doctype {
  */
 export interface SaxReader {
   xml?(declaration: XmlDeclaration): void;
+  /**
+   * @param doctype
+   */
+  doctype?(doctype: Doctype): void;
   /**
    * A processing instruction.
    *
@@ -100,10 +105,6 @@ export interface SaxReader {
    * @param text - Comment text, leading or trailing spaces are not removed.
    */
   comment?(text: string): void;
-  /**
-   * @param doctype
-   */
-  doctype?(doctype: Doctype): void;
   /**
    * Returns the replacement text for a given entity name.
    *
@@ -251,24 +252,10 @@ const enum State {
   XML_DECL_VALUE_QUOTED,
   XML_DECL_END,
   DOCTYPE_DECL,
-  DOCTYPE_NAME_START,
   DOCTYPE_NAME,
   DOCTYPE_NAME_END,
-  DOCTYPE_MAYBE_EXTERNAL_ID,
-  DOCTYPE_EXTERNAL_ID,
-  DOCTYPE_SYSTEM_ID,
-  DOCTYPE_SYSTEM_ID_S,
-  DOCTYPE_SYSTEM_ID_D,
-  DOCTYPE_PUBLIC_ID,
-  DOCTYPE_PUBLIC_ID_S,
-  DOCTYPE_PUBLIC_ID_D,
-  DOCTYPE_PUBLIC_ID_END,
-  DOCTYPE_MAYBE_DTD,
-  DTD,
-  DTD_OPEN_ANGLE_BRACKET,
-  DTD_OPEN_ANGLE_BRACKET_BANG,
-  DTD_QUOTED,
-  DOCTYPE_END,
+  DOCTYPE_ANY,
+  DOCTYPE_ANY_QUOTED,
   MISC,
   PI_TARGET_START,
   PI_TARGET,
@@ -296,6 +283,8 @@ const enum State {
   CHAR_REF_DEC,
   CHAR_REF_HEX,
   CDATA_SECTION,
+  CDATA_SECTION_END0,
+  CDATA_SECTION_END,
   END_TAG_START,
   END_TAG,
   END_TAG_END,
@@ -319,10 +308,9 @@ const enum Flags {
   // OPT_TEXT_ONLY_ENTITIES = 1 << 5,
 
   // Runtime flags:
-  CR = 1 << 9,
-  SINGLE_QUOTE = 1 << 10,
-  SEEN_DOCTYPE = 1 << 11,
-  SEEN_ROOT = 1 << 12,
+  SINGLE_QUOTE = 1 << 9,
+  SEEN_DOCTYPE = 1 << 10,
+  SEEN_ROOT = 1 << 11,
 }
 
 function debugFlags(flags: Flags) {
@@ -390,7 +378,7 @@ export function getLocal(name: string): string | undefined {
  */
 export class SaxParser {
   // Private properties and methods of this class are mangled at build time to
-  // reduce bundle size, so they are not accessible from the public API.
+  // reduce bundle size, so they are completely inaccessible to the public API.
   // Reading this code requires knowledge of the XML standard and the JavaScript
   // string representation.
   // Code comments refer to the 16-bit JavaScript character unit as code unit.
@@ -504,20 +492,14 @@ export class SaxParser {
   write(input: string) {
     this.chunk_ += input;
     // Ensure CRLF is handled correctly across chunk boundary
-    if (this.flags_ & Flags.CR && this.chunk_.length !== 0) {
-      if (this.chunk_.charCodeAt(0) === Chars.LF) {
-        this.chunk_ = this.chunk_.slice(1);
-      }
-      this.flags_ &= ~Flags.CR;
+    const cr = this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CR;
+    if (cr) {
+      this.chunk_ = this.chunk_.slice(0, -1);
     }
-    const length = this.chunk_.length;
-    while (this.index_ < length) {
+    while (this.index_ < this.chunk_.length) {
       this.parseStep_();
     }
-    if (this.chunk_.charCodeAt(length - 1) === Chars.CR) {
-      this.flags_ |= Flags.CR;
-    }
-    this.chunk_ = "";
+    this.chunk_ = cr ? "\r" : "";
     this.index_ = 0;
   }
 
@@ -527,6 +509,12 @@ export class SaxParser {
    * @since 1.0.0
    */
   end() {
+    if (this.elements_.length !== 0) {
+      throw createSaxError("INVALID_END_TAG");
+    }
+    if (this.state_ !== State.MISC || !(this.flags_ & Flags.SEEN_ROOT)) {
+      throw createSaxError("UNEXPECTED_EOF");
+    }
   }
 
   // Strings are assumed to be well-formed, meaning they do not contain any
@@ -546,6 +534,16 @@ export class SaxParser {
         return this.parseXmlDeclValueQuoted_();
       case State.XML_DECL_END:
         return this.parseXmlDeclEnd_();
+      case State.DOCTYPE_DECL:
+        return this.parseDoctypeDecl_();
+      case State.DOCTYPE_NAME:
+        return this.parseDoctypeName_();
+      case State.DOCTYPE_NAME_END:
+        return this.parseDoctypeNameEnd_();
+      case State.DOCTYPE_ANY:
+        return this.parseDoctypeAny_();
+      case State.DOCTYPE_ANY_QUOTED:
+        return this.parseDoctypeAnyQuoted_();
       case State.MISC:
         return this.parseMisc_();
       case State.PI_TARGET_START:
@@ -601,6 +599,18 @@ export class SaxParser {
       // &#x26;
       case State.CHAR_REF_HEX:
         return this.parseCharRefHex_();
+      case State.CDATA_SECTION:
+        return this.parseCdataSection_();
+      case State.CDATA_SECTION_END0:
+        return this.parseCdataSectionEnd0_();
+      case State.CDATA_SECTION_END:
+        return this.parseCdataSectionEnd_();
+      case State.END_TAG_START:
+        return this.parseEndTagStart_();
+      case State.END_TAG:
+        return this.parseEndTag_();
+      case State.END_TAG_END:
+        return this.parseEndTagEnd_();
     }
   }
 
@@ -609,7 +619,7 @@ export class SaxParser {
 
   // @internal
   private parseInit_() {
-    const newChunk = this.chunk_.slice(0, 6 - this.chunk_.length);
+    const newChunk = this.chunk_.slice(0, 6 - this.element_.length);
     this.element_ += newChunk;
     this.index_ += newChunk.length;
     // XMLDecl is "<?xml" SPACE, not checking for space could false positive on
@@ -618,10 +628,11 @@ export class SaxParser {
       this.element_.slice(0, -1) === "<?xml" &&
       isWhitespace(this.element_.charCodeAt(5))
     ) {
-      this.index_ += 6;
       this.state_ = State.XML_DECL;
       this.element_ = "";
     } else if (this.element_.length >= 6) {
+      this.chunk_ = this.element_ + this.chunk_.slice(newChunk.length);
+      this.index_ = 0;
       this.state_ = State.MISC;
       this.element_ = "";
     }
@@ -707,7 +718,7 @@ export class SaxParser {
         // XML standard doesn't define a maximum length for any construct, but
         // IANA Charsets never go above 45 characters (including aliases).
         // TODO: it's a good a idea to limit encoding labels as large values
-        //  are very unlikely correct. Is 256 right?
+        //  are very unlikely correct. Is 256 fine?
         if (
           this.version_ === undefined || this.encoding_ !== undefined ||
           this.standalone_ !== undefined || this.content_.length > 256 ||
@@ -770,6 +781,100 @@ export class SaxParser {
     }
   }
 
+  // @internal
+  private parseDoctypeDecl_() {
+    if (!this.skipWhitespace_()) {
+      return;
+    }
+    const char = this.chunk_.codePointAt(this.index_)!;
+    ++this.index_;
+    if (char > 0xFFFF) {
+      ++this.index_;
+    }
+    if (!isNameStartChar(char)) {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
+    }
+    this.element_ = String.fromCodePoint(char);
+    this.state_ = State.DOCTYPE_NAME;
+  }
+
+  // @internal
+  private parseDoctypeName_() {
+    this.element_ += this.readNameCharacters_();
+    if (this.index_ < this.chunk_.length) {
+      this.state_ = State.DOCTYPE_NAME_END;
+      this.parseDoctypeNameEnd_();
+    }
+  }
+
+  // @internal
+  private doctypeEnd_() {
+    ++this.index_;
+    this.reader_.doctype?.({name: this.element_});
+    this.element_ = "";
+    this.state_ = State.MISC;
+  }
+
+  // @internal
+  private parseDoctypeNameEnd_() {
+    if (!this.skipWhitespace_()) {
+      return;
+    }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    if (codeUnit === Chars.GT) {
+      this.doctypeEnd_();
+      return;
+    }
+    this.otherState_ = 0;
+    if (codeUnit === Chars.OPEN_BRACKET) {
+      ++this.index_;
+      ++this.otherState_;
+    }
+    this.state_ = State.DOCTYPE_ANY;
+  }
+
+  // @internal
+  private parseDoctypeAny_() {
+    while (this.index_ < this.chunk_.length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      switch (codeUnit) {
+        case Chars.APOSTROPHE:
+          this.flags_ |= Flags.SINGLE_QUOTE;
+        // fall-through
+        case Chars.QUOTE:
+          ++this.index_;
+          this.state_ = State.DOCTYPE_ANY_QUOTED;
+          return;
+        case Chars.OPEN_BRACKET:
+          ++this.otherState_;
+          break;
+        case Chars.CLOSE_BRACKET:
+          --this.otherState_;
+          break;
+        case Chars.GT:
+          if (this.otherState_ === 0) {
+            this.doctypeEnd_();
+            return;
+          }
+          break;
+      }
+      ++this.index_;
+    }
+  }
+
+  // @internal
+  private parseDoctypeAnyQuoted_() {
+    const index = this.chunk_.indexOf(
+      this.flags_ & Flags.SINGLE_QUOTE ? "'" : '"',
+      this.index_,
+    );
+    if (index === -1) {
+      this.index_ = this.chunk_.length;
+    } else {
+      this.index_ = index + 1;
+      this.state_ = State.DOCTYPE_ANY;
+    }
+  }
   // @internal
   private parseMisc_() {
     if (this.skipWhitespace_()) {
@@ -952,6 +1057,7 @@ export class SaxParser {
       ++this.index_;
     }
     if (isNameStartChar(char)) {
+      this.element_ = String.fromCodePoint(char);
       this.flags_ |= Flags.SEEN_ROOT;
       this.state_ = State.START_TAG_NAME;
     } else if (char === Chars.SLASH) {
@@ -970,21 +1076,27 @@ export class SaxParser {
     // Read up to seven characters
     this.element_ += this.chunk_.slice(
       this.index_,
-      this.index_ + 7 - this.element_.length,
+      this.index_ + 8 - this.element_.length,
     );
     if (this.element_.slice(0, 2) === "--") {
       this.state_ = State.COMMENT;
       this.index_ += 2;
-    } else if (this.element_ === "[CDATA[" && this.elements_.length !== 0) {
+    } else if (
+      this.element_.slice(0, 7) === "[CDATA[" &&
+      this.elements_.length !== 0
+    ) {
       this.state_ = State.CDATA_SECTION;
       this.index_ += 7;
-    } else if (this.element_ === "DOCTYPE") {
-      if (this.flags_ & Flags.SEEN_DOCTYPE || this.flags_ & Flags.SEEN_ROOT) {
-        throw createSaxError("INVALID_DOCTYPE");
+    } else if (this.element_.slice(0, 7) === "DOCTYPE") {
+      if (
+        !isWhitespace(this.element_.charCodeAt(7)) ||
+        this.flags_ & Flags.SEEN_DOCTYPE || this.flags_ & Flags.SEEN_ROOT
+      ) {
+        throw createSaxError("INVALID_DOCTYPE_DECL");
       }
       this.state_ = State.DOCTYPE_DECL;
-      this.index_ += 7;
-    } else if (this.element_.length === 7) {
+      this.index_ += 8;
+    } else if (this.element_.length === 8) {
       throw createSaxError("INVALID_CDATA");
     } else {
       return;
@@ -996,6 +1108,7 @@ export class SaxParser {
   private startTagEnd_() {
     this.state_ = State.TEXT_CONTENT;
     this.reader_.start(this.element_, this.attributes_);
+    this.elements_.push(this.element_);
     this.element_ = "";
     this.attributes_.clear();
   }
@@ -1028,6 +1141,7 @@ export class SaxParser {
       }
       if (isNameStartChar(char)) {
         this.state_ = State.START_TAG_ATTR;
+        this.attribute_ = String.fromCodePoint(char);
       } else if (char === Chars.GT) {
         this.startTagEnd_();
       } else if (char === Chars.SLASH) {
@@ -1059,6 +1173,7 @@ export class SaxParser {
     this.attribute_ += this.readNameCharacters_();
     if (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
+      ++this.index_;
       if (codeUnit === Chars.EQ) {
         // Most likely case
         this.state_ = State.START_TAG_ATTR_VALUE;
@@ -1089,8 +1204,9 @@ export class SaxParser {
       switch (codeUnit) {
         case Chars.APOSTROPHE:
           this.flags_ |= Flags.SINGLE_QUOTE;
-        // fall-through
+          // fall-through
         case Chars.QUOTE:
+          ++this.index_;
           this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
           break;
         default:
@@ -1104,9 +1220,8 @@ export class SaxParser {
     const quote = this.flags_ & Flags.SINGLE_QUOTE
       ? Chars.APOSTROPHE
       : Chars.QUOTE;
-    const length = this.chunk_.length;
     let start = this.index_;
-    loop: while (this.index_ < length) {
+    loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case Chars.TAB:
@@ -1128,8 +1243,13 @@ export class SaxParser {
           this.otherState_ = State.START_TAG_ATTR_VALUE_QUOTED;
           break loop;
         case quote:
+          this.content_ += this.chunk_.slice(start, this.index_);
+          ++this.index_;
           this.state_ = State.START_TAG_SPACE;
-          break loop;
+          this.attributes_.set(this.attribute_, this.content_);
+          this.attribute_ = "";
+          this.content_ = "";
+          return;
         case Chars.LT:
           // < is not allowed inside attribute values
           throw createSaxError("INVALID_ATTRIBUTE_VALUE");
@@ -1142,6 +1262,7 @@ export class SaxParser {
       ++this.index_;
     }
     this.content_ += this.chunk_.slice(start, this.index_);
+    ++this.index_;
   }
 
   // @internal
@@ -1165,11 +1286,10 @@ export class SaxParser {
   // content.
   // @internal
   private parseTextContent_() {
-    const length = this.chunk_.length;
     let start = this.index_;
     // Due to having multiple exit points and error conditions, text content
     // can't be parsed using indexOf + regex validation.
-    loop: while (this.index_ < length) {
+    loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case Chars.TAB:
@@ -1239,6 +1359,7 @@ export class SaxParser {
       ++this.index_;
     }
     if (isNameStartChar(char)) {
+      this.entity_ = String.fromCodePoint(char);
       this.state_ = State.ENTITY_REF;
     } else if (char === Chars.HASH) {
       this.state_ = State.CHAR_REF;
@@ -1261,12 +1382,14 @@ export class SaxParser {
       if (predefValue !== undefined) {
         this.content_ += predefValue;
       } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
-        throw new Error("unimplemented");
+        const value = this.reader_.replaceEntityRef?.(this.entity_);
+        // throw new Error("unimplemented");
       } else {
         this.reader_.entityRef(this.entity_);
       }
       this.state_ = this.otherState_;
       this.otherState_ = 0;
+      this.entity_ = "";
     }
   }
 
@@ -1298,8 +1421,7 @@ export class SaxParser {
 
   // @internal
   private parseCharRefDec_() {
-    const length = this.chunk_.length;
-    while (this.index_ < length) {
+    while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       if (codeUnit === Chars.SEMICOLON) {
         this.handleCharRef_();
@@ -1316,8 +1438,7 @@ export class SaxParser {
 
   // @internal
   private parseCharRefHex_() {
-    const length = this.chunk_.length;
-    while (this.index_ < length) {
+    while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       if (codeUnit === Chars.SEMICOLON) {
         this.handleCharRef_();
@@ -1335,17 +1456,110 @@ export class SaxParser {
     }
   }
 
+  // @internal
+  private parseCdataSection_() {
+    // Same rationale behind parsePi_
+    const index = this.chunk_.indexOf("]]>", this.index_);
+    const content = this.chunk_.slice(
+      this.index_,
+      index === -1 ? undefined : index,
+    );
+    if (hasInvalidChar(content)) {
+      throw createSaxError("INVALID_CHAR");
+    }
+    this.content_ += normalizeLineEndings(content);
+    if (index === -1) {
+      // Chunk is read to completion even on an ending hyphen, it will be
+      // removed after the fact if the comment is ending.
+      this.index_ = this.chunk_.length;
+      // This chunk doesn't contain the end of this comment but it may contain
+      // a trailing hyphen that has to be handled on the next chunk.
+      if (
+        this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CLOSE_BRACKET
+      ) {
+        this.state_ = State.CDATA_SECTION_END0;
+      }
+    } else {
+      this.index_ = index + 2;
+      this.state_ = State.CDATA_SECTION_END;
+    }
+  }
+
+  // @internal
+  private parseCdataSectionEnd0_() {
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    ++this.index_;
+    if (codeUnit === Chars.CLOSE_BRACKET) {
+      this.state_ = State.CDATA_SECTION_END;
+    } else {
+      this.content_ += String.fromCharCode(codeUnit);
+      this.state_ = State.CDATA_SECTION;
+    }
+  }
+
+  // @internal
+  private parseCdataSectionEnd_() {
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    ++this.index_;
+    if (codeUnit === Chars.GT) {
+      this.state_ = State.TEXT_CONTENT;
+    } else {
+      this.content_ += String.fromCharCode(codeUnit);
+      this.state_ = State.CDATA_SECTION;
+    }
+  }
+
+  // @internal
+  private parseEndTagStart_() {
+    const char = this.chunk_.codePointAt(this.index_)!;
+    ++this.index_;
+    if (char > 0xFFFF) {
+      ++this.index_;
+    }
+    if (isNameStartChar(char)) {
+      this.state_ = State.END_TAG;
+      this.element_ = String.fromCodePoint(char);
+      // this.parseEndTag_();
+    } else {
+      throw createSaxError("INVALID_END_TAG");
+    }
+  }
+
+  // @internal
+  private parseEndTag_() {
+    this.element_ += this.readNameCharacters_();
+    if (this.index_ < this.chunk_.length) {
+      this.state_ = State.END_TAG_END;
+      this.parseEndTagEnd_();
+    }
+  }
+
+  // @internal
+  private parseEndTagEnd_() {
+    if (this.skipWhitespace_()) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      if (codeUnit !== Chars.GT || this.elements_.pop() !== this.element_) {
+        throw createSaxError("INVALID_END_TAG");
+      }
+      ++this.index_;
+      this.state_ = this.elements_.length === 0
+        ? State.MISC
+        : State.TEXT_CONTENT;
+      this.reader_.end(this.element_);
+      this.element_ = "";
+    }
+  }
+
   // Internal functions
 
   // @internal
   private readNameCharacters_() {
-    const length = this.chunk_.length;
     let start = this.index_;
-    while (this.index_ < length) {
-      let char = this.chunk_.charCodeAt(this.index_);
+    while (this.index_ < this.chunk_.length) {
+      let char = this.chunk_.charCodeAt(this.index_)!;
       if (0xD800 <= char && char <= 0xDBFF) {
         char = 0x10000 + (char - 0xD800) * 0x400 +
-          this.chunk_.charCodeAt(++this.index_) - 0xDC00;
+          this.chunk_.charCodeAt(++this.index_);
       }
       if (!isNameChar(char)) {
         break;
@@ -1357,13 +1571,12 @@ export class SaxParser {
 
   // @internal
   private skipWhitespace_() {
-    const length = this.chunk_.length;
-    while (this.index_ < length) {
+    while (this.index_ < this.chunk_.length) {
       if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
         break;
       }
       ++this.index_;
     }
-    return this.index_ !== length;
+    return this.index_ !== this.chunk_.length;
   }
 }

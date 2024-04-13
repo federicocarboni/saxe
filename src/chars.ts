@@ -132,7 +132,7 @@ const NAME_START_CHAR_CLASS =
 const NAME_CHAR_CLASS = NAME_START_CHAR_CLASS +
   "-.0-9\xB7\u0300-\u036F\u203F-\u2040";
 
-const NAME_REGEX = new RegExp(
+const NAME_REGEX = /* @__PURE__ */ new RegExp(
   `^[${NAME_START_CHAR_CLASS}][${NAME_CHAR_CLASS}]*$`,
   "u",
 );
