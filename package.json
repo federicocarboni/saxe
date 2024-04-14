@@ -3,33 +3,31 @@
   "name": "saxe",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
   "scripts": {
     "build": "tsc && esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=_\\$ --sourcemap",
-    "build-cjs": "esbuild src/index.ts --outdir=lib/ --out-extension:.js=.cjs --bundle --format=cjs --target=es2017 --mangle-props=\\^_ --sourcemap",
     "test": "mocha test/*.test.ts"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": {
+    "name": "Federico Carboni"
+  },
+  "license": "Apache-2.0",
   "devDependencies": {
-    "@microsoft/api-documenter": "^7.24.1",
-    "@microsoft/api-extractor": "^7.43.0",
+    "@types/chai": "^4.3.14",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.12.7",
-    "dprint": "^0.45.0",
+    "chai": "^5.1.0",
+    "dprint": "^0.45.1",
     "esbuild": "^0.20.2",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-tsdoc": "^0.2.17",
-    "jsfuzz": "^1.0.15",
-    "mocha": "^10.3.0",
-    "sax-wasm": "^2.2.4",
-    "saxes": "^6.0.0",
-    "streamspeed": "^2.0.1",
-    "ts-node": "^10.9.2",
+    "mocha": "^10.4.0",
     "tsm": "^2.3.0",
-    "typedoc": "^0.25.12",
-    "typescript-eslint": "^7.3.1"
+    "typedoc": "^0.25.13",
+    "typescript-eslint": "^7.6.0"
   }
 }
