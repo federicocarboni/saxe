@@ -143,13 +143,11 @@ export function isName(s: string) {
   return NAME_REGEX.test(s);
 }
 
-// Astral characters are not considered because enabling Unicode support on
-// regexes is a performance hit and we assume strings are well-formed.
-const INVALID_CHAR_REGEX = /[^\t\n\r\x20-\uFFFD]/g;
-
 // @internal
 export function hasInvalidChar(s: string) {
-  return INVALID_CHAR_REGEX.test(s);
+  // Astral characters are not considered because enabling Unicode support on
+  // regexes is a performance hit and we assume strings are well-formed.
+  return /[^\t\n\r\x20-\uFFFD]/g.test(s);
 }
 
 export function isNotChar2(s: string) {
