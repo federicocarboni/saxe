@@ -1,2 +1,18 @@
-node_modules/
-lib/
+logs
+*.log
+.pnpm-debug.log*
+
+# Coverage directory used by istanbul
+coverage
+
+# nyc test and fuzz coverage
+.nyc_output
+
+# Fuzz corpus directory
+corpus
+
+# Dependency directory
+node_modules
+
+# Build output
+lib
