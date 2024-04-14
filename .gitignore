@@ -16,3 +16,6 @@ node_modules
 
 # Build output
 lib
+
+# W3C conformance suite
+test/xmlts
