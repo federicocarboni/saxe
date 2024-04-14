@@ -10,10 +10,10 @@ import {
   isNameChar,
   isNameStartChar,
   isWhitespace,
-} from "./chars.js";
-import {createSaxError} from "./error.js";
+} from "./chars.ts";
+import {createSaxError} from "./error.ts";
 
-export {isSaxError, type SaxError, type SaxErrorCode} from "./error.js";
+export {isSaxError, type SaxError, type SaxErrorCode} from "./error.ts";
 
 /**
  * XML Declaration (XMLDecl).
@@ -313,14 +313,14 @@ const enum Flags {
   SEEN_ROOT = 1 << 11,
 }
 
-function debugFlags(flags: Flags) {
-  return {
-    isCapturePi: !!(flags & Flags.CAPTURE_PI),
-    isCaptureComment: !!(flags & Flags.CAPTURE_COMMENT),
-    isIncompleteTextNodes: !!(flags & Flags.OPT_INCOMPLETE_TEXT_NODES),
-    // isTextOnlyEntities: !!(flags & Flags.OPT_TEXT_ONLY_ENTITIES),
-  };
-}
+// function debugFlags(flags: Flags) {
+//   return {
+//     isCapturePi: !!(flags & Flags.CAPTURE_PI),
+//     isCaptureComment: !!(flags & Flags.CAPTURE_COMMENT),
+//     isIncompleteTextNodes: !!(flags & Flags.OPT_INCOMPLETE_TEXT_NODES),
+//     // isTextOnlyEntities: !!(flags & Flags.OPT_TEXT_ONLY_ENTITIES),
+//   };
+// }
 
 // Normalize XML line endings.
 function normalizeLineEndings(s: string) {
@@ -473,6 +473,7 @@ export class SaxParser {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
     this.maxEntityLength_ = options?.maxEntityLength ?? undefined;
+    this.maxEntityLength_;
   }
 
   /**
@@ -1382,7 +1383,7 @@ export class SaxParser {
       if (predefValue !== undefined) {
         this.content_ += predefValue;
       } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
-        const value = this.reader_.replaceEntityRef?.(this.entity_);
+        // const _value = this.reader_.replaceEntityRef?.(this.entity_);
         // throw new Error("unimplemented");
       } else {
         this.reader_.entityRef(this.entity_);
