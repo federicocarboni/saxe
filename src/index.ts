@@ -251,6 +251,7 @@ const enum State {
   XML_DECL_VALUE,
   XML_DECL_VALUE_QUOTED,
   XML_DECL_END,
+  DOCTYPE_DECL_START,
   DOCTYPE_DECL,
   DOCTYPE_NAME,
   DOCTYPE_NAME_END,
@@ -263,6 +264,7 @@ const enum State {
   PI_CONTENT,
   PI_CONTENT_END,
   PI_END,
+  COMMENT_START,
   COMMENT,
   COMMENT_HYPHEN,
   COMMENT_END,
@@ -282,6 +284,7 @@ const enum State {
   CHAR_REF,
   CHAR_REF_DEC,
   CHAR_REF_HEX,
+  CDATA_SECTION_START,
   CDATA_SECTION,
   CDATA_SECTION_END0,
   CDATA_SECTION_END,
@@ -535,6 +538,8 @@ export class SaxParser {
         return this.parseXmlDeclValueQuoted_();
       case State.XML_DECL_END:
         return this.parseXmlDeclEnd_();
+      case State.DOCTYPE_DECL_START:
+        return this.parseDoctypeDeclStart_();
       case State.DOCTYPE_DECL:
         return this.parseDoctypeDecl_();
       case State.DOCTYPE_NAME:
@@ -559,6 +564,8 @@ export class SaxParser {
         return this.parsePiContentEnd_();
       case State.PI_END:
         return this.parsePiEnd_();
+      case State.COMMENT_START:
+        return this.parseCommentStart_();
       case State.COMMENT:
         return this.parseComment_();
       case State.COMMENT_HYPHEN:
@@ -600,6 +607,8 @@ export class SaxParser {
       // &#x26;
       case State.CHAR_REF_HEX:
         return this.parseCharRefHex_();
+      case State.CDATA_SECTION_START:
+        return this.parseCdataSectionStart_();
       case State.CDATA_SECTION:
         return this.parseCdataSection_();
       case State.CDATA_SECTION_END0:
@@ -779,6 +788,24 @@ export class SaxParser {
       });
     } else {
       throw createSaxError("INVALID_XML_DECL");
+    }
+  }
+
+  // @internal
+  private parseDoctypeDeclStart_() {
+    // No need to backtrack here, we know it's either DOCTYPE or fatal error
+    const start = this.index_;
+    this.index_ += 7 - this.element_.length;
+    this.element_ += this.chunk_.slice(start, this.index_);
+    this.index_ += 7 - this.element_.length;
+    if (
+      this.element_.slice(0, 6) === "OCTYPE" &&
+      isWhitespace(this.element_.charCodeAt(6))
+    ) {
+      this.state_ = State.DOCTYPE_DECL;
+      this.element_ = "";
+    } else if (this.element_.length === 7) {
+      throw createSaxError("INVALID_CDATA");
     }
   }
 
@@ -992,6 +1019,15 @@ export class SaxParser {
   }
 
   // @internal
+  private parseCommentStart_() {
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.HYPHEN) {
+      throw createSaxError("INVALID_CDATA");
+    }
+    ++this.index_;
+    this.state_ = State.COMMENT;
+  }
+
+  // @internal
   private parseComment_() {
     // Same rationale behind parsePi_
     const index = this.chunk_.indexOf("--", this.index_);
@@ -1078,35 +1114,20 @@ export class SaxParser {
 
   // @internal
   private parseOpenAngleBracketBang_() {
-    // Read up to seven characters
-    this.element_ += this.chunk_.slice(
-      this.index_,
-      this.index_ + 8 - this.element_.length,
-    );
-    if (this.element_.slice(0, 2) === "--") {
-      this.state_ = State.COMMENT;
-      this.index_ += 2;
-    } else if (
-      this.element_.slice(0, 7) === "[CDATA[" &&
-      this.elements_.length !== 0
-    ) {
-      this.state_ = State.CDATA_SECTION;
-      this.index_ += 7;
-    } else if (this.element_.slice(0, 7) === "DOCTYPE") {
-      if (
-        !isWhitespace(this.element_.charCodeAt(7)) ||
-        this.flags_ & Flags.SEEN_DOCTYPE || this.flags_ & Flags.SEEN_ROOT
-      ) {
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    ++this.index_;
+    if (codeUnit === Chars.HYPHEN) {
+      this.state_ = State.COMMENT_START;
+    } else if (codeUnit === Chars.OPEN_BRACKET && this.elements_.length !== 0) {
+      this.state_ = State.CDATA_SECTION_START;
+    } else if (codeUnit === 0x44 /* D */) {
+      if (this.flags_ & Flags.SEEN_DOCTYPE || this.flags_ & Flags.SEEN_ROOT) {
         throw createSaxError("INVALID_DOCTYPE_DECL");
       }
-      this.state_ = State.DOCTYPE_DECL;
-      this.index_ += 8;
-    } else if (this.element_.length === 8) {
-      throw createSaxError("INVALID_CDATA");
+      this.state_ = State.DOCTYPE_DECL_START;
     } else {
-      return;
+      throw createSaxError("INVALID_CDATA");
     }
-    this.element_ = "";
   }
 
   // @internal
@@ -1465,6 +1486,19 @@ export class SaxParser {
   }
 
   // @internal
+  private parseCdataSectionStart_() {
+    const start = this.index_;
+    this.index_ += 6 - this.element_.length;
+    this.element_ += this.chunk_.slice(start, this.index_);
+    if (this.element_ === "CDATA[") {
+      this.state_ = State.CDATA_SECTION;
+      this.element_ = "";
+    } else if (this.element_.length === 6) {
+      throw createSaxError("INVALID_CDATA");
+    }
+  }
+
+  // @internal
   private parseCdataSection_() {
     // Same rationale behind parsePi_
     const index = this.chunk_.indexOf("]]>", this.index_);
@@ -1510,7 +1544,10 @@ export class SaxParser {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     ++this.index_;
     if (codeUnit === Chars.GT) {
+      this.content_ = this.content_.slice(0, -1);
       this.state_ = State.TEXT_CONTENT;
+    } else if (codeUnit === Chars.CLOSE_BRACKET) {
+      this.content_ += "]";
     } else {
       this.content_ += String.fromCharCode(codeUnit);
       this.state_ = State.CDATA_SECTION;
