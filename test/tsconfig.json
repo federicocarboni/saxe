@@ -1,8 +1,10 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
+    "module": "NodeNext",
     "rootDir": "../",
-    "types": ["mocha"]
+    "types": ["mocha", "@types/chai", "@types/node"],
+    "moduleResolution": "NodeNext"
   },
-  "include": ["**/*"]
+  "include": ["**/*"],
 }
