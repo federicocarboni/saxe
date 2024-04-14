@@ -657,7 +657,7 @@ export class SaxParser {
       throw createSaxError("INVALID_XML_DECL");
     }
     this.attribute_ += this.chunk_.slice(this.index_, end);
-    this.index_ = end + 1;
+    this.index_ = index === -1 ? this.chunk_.length : index + 1;
     return index !== -1;
   }
 
@@ -676,10 +676,10 @@ export class SaxParser {
 
   // @internal
   private parseXmlDeclSpace_() {
-    if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    if (!isWhitespace(codeUnit) && codeUnit !== Chars.QUESTION) {
       throw createSaxError("INVALID_XML_DECL");
     }
-    ++this.index_;
     this.state_ = State.XML_DECL;
     this.parseXmlDecl_();
   }
@@ -760,7 +760,7 @@ export class SaxParser {
       if (this.handleXmlDeclAttribute_()) {
         throw createSaxError("INVALID_XML_DECL");
       }
-      this.state_ = State.XML_DECL;
+      this.state_ = State.XML_DECL_SPACE;
     }
   }
 
