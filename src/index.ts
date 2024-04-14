@@ -1059,6 +1059,10 @@ export class SaxParser {
     }
     if (isNameStartChar(char)) {
       this.element_ = String.fromCodePoint(char);
+      // Cannot have two root elements
+      if (this.elements_.length === 0 && this.flags_ & Flags.SEEN_ROOT) {
+        throw createSaxError("INVALID_START_TAG");
+      }
       this.flags_ |= Flags.SEEN_ROOT;
       this.state_ = State.START_TAG_NAME;
     } else if (char === Chars.SLASH) {
@@ -1247,6 +1251,9 @@ export class SaxParser {
           this.content_ += this.chunk_.slice(start, this.index_);
           ++this.index_;
           this.state_ = State.START_TAG_SPACE;
+          if (this.attributes_.has(this.attribute_)) {
+            throw createSaxError("DUPLICATE_ATTR");
+          }
           this.attributes_.set(this.attribute_, this.content_);
           this.attribute_ = "";
           this.content_ = "";
