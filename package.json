@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc && esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=_\\$ --sourcemap",
+    "fuzz": "jsfuzz fuzz/target.ts corpus -- --loader tsm",
     "test": "mocha test/*.test.ts"
   },
   "keywords": [],
