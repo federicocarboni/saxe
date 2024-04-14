@@ -16,6 +16,7 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
+    "@gitlab-org/jsfuzz": "github:federicocarboni/jsfuzz#node-options",
     "@types/chai": "^4.3.14",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.12.7",
