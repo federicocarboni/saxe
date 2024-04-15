@@ -151,6 +151,35 @@ parser.end();
 
 const testCases = testCaseReader.testCases;
 
+function testCaseRunner(
+  testContent: string,
+  outputContent?: string,
+  charByChar?: boolean,
+) {
+  return function() {
+    const writer = new CanonicalXmlWriter();
+    let isError = false;
+    try {
+      const parser = new SaxParser(writer);
+      if (charByChar) {
+        for (const c of testContent) {
+          parser.write(c);
+        }
+      } else {
+        parser.write(testContent);
+      }
+      parser.end();
+    } catch {
+      isError = true;
+    }
+    if (outputContent) {
+      expect(writer.output).equals(outputContent);
+    } else {
+      expect(isError).to.be.true;
+    }
+  };
+}
+
 for (const [typ, tests] of testCases) {
   tests.sort(({id: a}, {id: b}) => a < b ? -1 : 1);
   describe(typ, function() {
@@ -166,27 +195,14 @@ for (const [typ, tests] of testCases) {
           "utf-8",
         )
         : undefined;
-      it(testCase.id, function() {
-        if (testCase.id === "not-wf-sa-049") {
-          console.log('x')
-        }
-        const writer = new CanonicalXmlWriter();
-        let isError = false;
-        try {
-          const parser = new SaxParser(writer);
-          for (const c of testContent) {
-            parser.write(c);
-          }
-          parser.end();
-        } catch {
-          isError = true;
-        }
-        if (outputContent) {
-          expect(writer.output).equals(outputContent);
-        } else {
-          expect(isError).to.be.true;
-        }
-      });
+      it(
+        testCase.id + ": char by char",
+        testCaseRunner(testContent, outputContent, true),
+      );
+      it(
+        testCase.id + ": large chunk",
+        testCaseRunner(testContent, outputContent, false),
+      );
     }
   });
 }
