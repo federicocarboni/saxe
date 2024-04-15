@@ -1145,6 +1145,7 @@ export class SaxParser {
   // @internal
   private startTagEnd_() {
     this.state_ = State.TEXT_CONTENT;
+    this.otherState_ = 0;
     this.reader_.start(this.element_, this.attributes_);
     this.elements_.push(this.element_);
     this.element_ = "";
@@ -1314,6 +1315,7 @@ export class SaxParser {
       this.state_ = this.elements_.length !== 0
         ? State.TEXT_CONTENT
         : State.MISC;
+      this.otherState_ = 0;
       this.reader_.empty(this.element_, this.attributes_);
       this.element_ = "";
       this.attributes_.clear();
@@ -1562,6 +1564,7 @@ export class SaxParser {
     ++this.index_;
     if (codeUnit === Chars.GT) {
       this.state_ = State.TEXT_CONTENT;
+      this.otherState_ = 0;
     } else if (codeUnit === Chars.CLOSE_BRACKET) {
       this.content_ += "]";
     } else {
@@ -1606,6 +1609,7 @@ export class SaxParser {
       this.state_ = this.elements_.length === 0
         ? State.MISC
         : State.TEXT_CONTENT;
+      this.otherState_ = 0;
       this.reader_.end(this.element_);
       this.element_ = "";
     }
