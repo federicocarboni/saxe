@@ -180,29 +180,31 @@ function testCaseRunner(
   };
 }
 
-for (const [typ, tests] of testCases) {
-  tests.sort(({id: a}, {id: b}) => a < b ? -1 : 1);
-  describe(typ, function() {
-    for (const testCase of tests) {
-      if (IGNORED_TEST_CASES.indexOf(testCase.id) !== -1) {
-        continue;
+describe("W3C XML Conformance Test Suite", function() {
+  for (const [typ, tests] of testCases) {
+    tests.sort(({id: a}, {id: b}) => a < b ? -1 : 1);
+    describe(typ, function() {
+      for (const testCase of tests) {
+        if (IGNORED_TEST_CASES.indexOf(testCase.id) !== -1) {
+          continue;
+        }
+        const testPath = path.join("test/xmlts/xmltest", testCase.uri);
+        const testContent = readFileSync(testPath, "utf-8");
+        const outputContent = testCase.output
+          ? readFileSync(
+            path.join("test/xmlts/xmltest", testCase.output),
+            "utf-8",
+          )
+          : undefined;
+        it(
+          testCase.id + ": char by char",
+          testCaseRunner(testContent, outputContent, true),
+        );
+        it(
+          testCase.id + ": large chunk",
+          testCaseRunner(testContent, outputContent, false),
+        );
       }
-      const testPath = path.join("test/xmlts/xmltest", testCase.uri);
-      const testContent = readFileSync(testPath, "utf-8");
-      const outputContent = testCase.output
-        ? readFileSync(
-          path.join("test/xmlts/xmltest", testCase.output),
-          "utf-8",
-        )
-        : undefined;
-      it(
-        testCase.id + ": char by char",
-        testCaseRunner(testContent, outputContent, true),
-      );
-      it(
-        testCase.id + ": large chunk",
-        testCaseRunner(testContent, outputContent, false),
-      );
-    }
-  });
-}
+    });
+  }
+});
