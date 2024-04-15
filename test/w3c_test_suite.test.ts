@@ -7,7 +7,7 @@ import path from "path";
 import {expect} from "chai";
 
 import {SaxParser, SaxReader} from "../src/index.ts";
-import {IGNORED_TEST_CASES} from "./ignoredTestCases.ts";
+import {IGNORED_TEST_CASES} from "./ignored_test_cases.ts";
 
 function dataChar(value: string) {
   return value.replace(/[&<>"\t\n\r]/g, (val) => {
