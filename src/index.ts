@@ -33,9 +33,9 @@ export interface XmlDeclaration {
   version: string;
   /**
    * Encoding in the XML Declaration, or `undefined` when unspecified. The
-   * encoding label is converted to lower case to maintain compatibility with
-   * the `encoding` property of `TextDecoder` and encoding labels should be
-   * processed in a case-insensiteve way.
+   * encoding label is converted to lower case to be consistent with the
+   * `encoding` property of `TextDecoder`, and ensures encoding labels are
+   * processed in a case-insensitive way.
    *
    * The parser does not validate that the encoding labels is one of the
    * officially assigned [IANA Character Sets].
