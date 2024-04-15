@@ -9,7 +9,8 @@
   "scripts": {
     "build": "tsc && esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=_\\$ --sourcemap",
     "fuzz": "jsfuzz fuzz/target.ts corpus -- --require tsm",
-    "test": "mocha test/*.test.ts"
+    "test": "c8 mocha test/*.test.ts",
+    "format": "dprint fmt"
   },
   "keywords": [],
   "author": {
@@ -21,6 +22,7 @@
     "@types/chai": "^4.3.14",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.12.7",
+    "c8": "^9.1.0",
     "chai": "^5.1.0",
     "dprint": "^0.45.1",
     "esbuild": "^0.20.2",
