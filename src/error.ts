@@ -37,20 +37,12 @@ const ERRORS = {
   UNEXPECTED_EOF: () => "Unexpected end of file",
 } as const;
 
-type SaxErrorCodes = {
-  [Code in keyof typeof ERRORS]: {
-    name: "SaxError";
-    /** A string representing a specific error. */
-    code: Code;
-  } & (Parameters<typeof ERRORS[Code]> extends [infer U] ? U : {});
-};
-
 /**
  * Identifies a parsing or decoding error in an XML Document or Entity.
  *
  * @since 1.0.0
  */
-export type SaxErrorCode = keyof SaxErrorCodes;
+export type SaxErrorCode = keyof typeof ERRORS;
 
 /**
  * A parsing or decoding error in an XML Document.
