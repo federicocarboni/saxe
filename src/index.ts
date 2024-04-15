@@ -1520,6 +1520,7 @@ export class SaxParser {
         this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CLOSE_BRACKET
       ) {
         this.state_ = State.CDATA_SECTION_END0;
+        this.content_ = this.content_.slice(0, -1);
       }
     } else {
       this.index_ = index + 2;
@@ -1534,7 +1535,7 @@ export class SaxParser {
     if (codeUnit === Chars.CLOSE_BRACKET) {
       this.state_ = State.CDATA_SECTION_END;
     } else {
-      this.content_ += String.fromCharCode(codeUnit);
+      this.content_ += "]" + String.fromCharCode(codeUnit);
       this.state_ = State.CDATA_SECTION;
     }
   }
@@ -1544,12 +1545,11 @@ export class SaxParser {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     ++this.index_;
     if (codeUnit === Chars.GT) {
-      this.content_ = this.content_.slice(0, -1);
       this.state_ = State.TEXT_CONTENT;
     } else if (codeUnit === Chars.CLOSE_BRACKET) {
       this.content_ += "]";
     } else {
-      this.content_ += String.fromCharCode(codeUnit);
+      this.content_ += "]" + String.fromCharCode(codeUnit);
       this.state_ = State.CDATA_SECTION;
     }
   }
