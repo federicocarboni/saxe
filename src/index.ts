@@ -81,7 +81,7 @@ export interface SaxReader {
    * ```
    *
    * Unless processing instructions are required, avoid defining this handler as
-   * that will prevent the parser from buffering the comment contents.
+   * that will prevent the parser from buffering their content.
    * Processing instructions are always checked for well-formedness regardless
    * of the configuration.
    *
