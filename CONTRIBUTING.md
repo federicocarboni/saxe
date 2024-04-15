@@ -1,23 +1,26 @@
 # Contributing to Saxe
 
-Saxe uses the Google JavaScript style guide, but uses double quotes `"` instead
-of single quotes `'` for normal strings.
+Saxe uses the [Google JavaScript Style Guide], except it uses double quotes `"`
+instead of single quotes `'` for regular strings.
 
 That guide was intended for code targeting the Google Closure Compiler so ignore
-anything which is not relevant for TypeScript.
+anything which is not relevant for TypeScript or plain JavaScript.
+
+[Google JavaScript Style Guide]:
+https://google.github.io/styleguide/jsguide.html
 
 ## Private properties and methods
 
 Hash-prefixed properties and methods `#prop` are not used, so TypeScript
 `private` is used instead, to reduce bundle size all private properties and
-methods should be suffixed with `_` so that they can be mangled by the build
-tool.
+methods should be suffixed with `_` so that identifiers can be mangled by the
+build tool.
 
 E.g.
 
 ```ts
 class MyClass {
-  /** @internal */
+  // @internal
   private doSomething_() {
     // ...
   }
@@ -26,7 +29,7 @@ class MyClass {
 
 ## Style guide in short
 
-- Always UTF-8.
+- All source files MUST be in UTF-8.
 - `UpperCamelCase` for types and classes.
 - `camelCase` for functions, methods, properties and variables, even when those
   are constructors.
@@ -40,13 +43,17 @@ class MyClass {
   not a good fit for JavaScript APIs.
 - Only use `undefined` instead of `null` internally but assume they are
   interchangeable when receiving values from the user, similar to the behavior
-  of the optional chaining operator. Types SHOULD NOT declare `null`.
+  of the optional chaining operator, which accepts `null` and `undefined` but
+  produces `undefined` and not `null`.
 
 ## Compatibility
 
-This library targets modern JavaScript runtimes with support for ES2017 and the
-`TextDecoder` DOM API. Additionally any functionality which is difficult to
-polyfill or reproduce should be avoided when possible. For example `null`
-prototype object are banned together with any weird prototype hacks (`__proto__`
-and `Object.{set,get}PrototypeOf()`) and any non portable runtime specific
-functionality.
+This library targets modern JavaScript runtimes with support for ES2017 and
+(optionally the `TextDecoder` DOM API). Additionally any functionality which is
+difficult to polyfill or reproduce should be avoided when possible. For example
+`null` prototype object are banned together with any prototype hacks,
+`__proto__`, `Object.{set,get}PrototypeOf()` and any non portable runtime
+specific functionality.
+
+Avoid using modern features for the sake of modern features, just choose the
+simplest path to solving the problem.
