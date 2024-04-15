@@ -6,7 +6,6 @@ import path from "path";
 
 import {expect} from "chai";
 
-import {hasInvalidChar} from "../src/chars.ts";
 import {SaxParser, SaxReader} from "../src/index.ts";
 import {IGNORED_TEST_CASES} from "./ignoredTestCases.ts";
 
