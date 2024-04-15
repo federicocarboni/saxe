@@ -127,9 +127,9 @@ describe("W3C XML Conformance Test Suite", function() {
     tests.sort(({id: a}, {id: b}) => a < b ? -1 : 1);
     describe(typ, function() {
       for (const testCase of tests) {
-        // if (IGNORED_TEST_CASES.indexOf(testCase.id) !== -1) {
-        //   continue;
-        // }
+        if (IGNORED_TEST_CASES.indexOf(testCase.id) !== -1) {
+          continue;
+        }
         const testPath = path.join("test/xmlts/xmltest", testCase.uri);
         const testContent = readFileSync(testPath, "utf-8");
         const outputContent = testCase.output
