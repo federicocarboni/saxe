@@ -193,7 +193,7 @@ export interface SaxOptions {
    * predictable even when chunks are unevenly sized. This option makes it so
    * the parser emits `text` every time a chunk is received, reducing memory
    * usage for large text nodes but making the parser's `text` calls potentially
-   * non deterministic.
+   * erratic.
    *
    * E.g. if the parser receives the following chunks:
    *
@@ -211,26 +211,28 @@ export interface SaxOptions {
    * For `incompleteTextNodes: true`, the parser will instead call `text` twice,
    * once with `some content` and the next with `some other content`.
    *
-   * The same concept is also applied to CDATA sections.
+   * The same concept is also applied to CDATA sections because they are
+   * considered just part of document text.
+   *
+   * **Note**: while this can speed up documents with large chunks of text that
+   * will be ignored it can have a negative impact on documents with many short
+   * text nodes.
    */
   incompleteTextNodes?: boolean | undefined;
-  // /**
-  //  * Entity expansion is not implemented (yet?) for markup content, so any
-  //  * entity reference in XML content must be handled in `entityRef` or, this
-  //  * option should be enabled to simply append the result of `resolveEntityRef`
-  //  * to the content without any processing. This behavior is not standard for
-  //  * entities which contain markup or escapes, so use with caution!
-  //  */
-  // textOnlyEntities?: boolean | undefined;
-  // processDtd?: "prohibit" | "ignore" | undefined;
   /**
    * To protect against malicious input this can be used to cap the number of
    * characters which can be produced while expanding an entity. If it is not
-   * specified or set to `undefined` entity expansion is uncapped. By number of
-   * characters
+   * specified or set to `undefined` entity expansion is uncapped.
    *
    * It is recommended to set this to a sensible value when handling potentially
    * malicious input.
+   *
+   * **Technical note**: *the number of characters* is actually the number of
+   * UCS-2 code units that make up the expanded string, and not the number of
+   * Unicode code points (meaning astral plane characters like emojis count for
+   * 2 towards this limit). Probably not relevant for most use cases as this
+   * option is intended to impose limits on memory and not the human perceived
+   * text length.
    *
    * @defaultValue `undefined`
    */
@@ -242,6 +244,16 @@ export interface SaxOptions {
   // maxAttributes?: number | undefined;
   // maxAttributeLength?: number | undefined;
   // maxTextLength?: number | undefined;
+  // TODO: textOnlyEntities is probably completely unnecessary.
+  // /**
+  //  * Entity expansion is not implemented (yet?) for markup content, so any
+  //  * entity reference in XML content must be handled in `entityRef` or, this
+  //  * option should be enabled to simply append the result of `resolveEntityRef`
+  //  * to the content without any processing. This behavior is not standard for
+  //  * entities which contain markup or escapes, so use with caution!
+  //  */
+  // textOnlyEntities?: boolean | undefined;
+  // processDtd?: "prohibit" | "ignore" | undefined;
 }
 
 const enum State {
@@ -1521,6 +1533,10 @@ export class SaxParser {
       ) {
         this.state_ = State.CDATA_SECTION_END0;
         this.content_ = this.content_.slice(0, -1);
+      }
+      if (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES) {
+        this.reader_.text(this.content_);
+        this.content_ = "";
       }
     } else {
       this.index_ = index + 2;
