@@ -10,7 +10,7 @@ const ERRORS = {
   // doctypedecl
   INVALID_DOCTYPE_DECL: () => "DOCTYPE Declaration not well-formed",
   INVALID_COMMENT: () => "Comments cannot contain '--'",
-  RESERVED_PI: () => "Processing instruction name 'XML' is reserved",
+  RESERVED_PI: () => "Processing instruction target 'XML' is reserved",
   INVALID_PI: () => "Processing instruction not well-formed",
 
   INVALID_ENTITY_REF: () => "Entity reference not well-formed",
@@ -19,7 +19,7 @@ const ERRORS = {
   RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" directly or indirectly references itself`,
   MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
-    `Entity "${entity}" expands to very large data`,
+    `Entity "${entity}" expansion exceeds limit`,
 
   INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
     `Character reference to illegal character: ${char}`,
@@ -38,7 +38,32 @@ const ERRORS = {
 } as const;
 
 /**
- * Identifies a parsing or decoding error in an XML Document or Entity.
+ * A string that identifies a parsing or decoding error in an XML Document or
+ * Entity. Error codes may be added in the future so it's not expected to match
+ * exhaustively against all possible values.
+ *
+ * A comprehensive list of all error codes and their meaning as of 1.0.0:
+ *
+ * - `INVALID_XML_DECL`: XML Declaration not well-formed
+ * - `INVALID_DOCTYPE_DECL`: DOCTYPE Declaration not well-formed
+ * - `INVALID_COMMENT`: Comments cannot contain '--'
+ * - `RESERVED_PI`: Processing instruction target 'XML' is reserved
+ * - `INVALID_PI`: Processing instruction not well-formed
+ * - `INVALID_ENTITY_REF`: Entity reference not well-formed
+ * - `UNRESOLVED_ENTITY`: Entity cannot be resolved
+ *
+ *   Define the `replaceEntityRef` and `entityRef` to handle entity references
+ * - `RECURSIVE_ENTITY`: Entity directly or indirectly references itself
+ * - `MAX_ENTITY_LENGTH_EXCEEDED`: Entity expansion exceeds `maxEntityLength`
+ * - `INVALID_CHAR_REF`: Character reference to illegal character
+ * - `INVALID_START_TAG`: Start tag not well-formed
+ * - `INVALID_ATTRIBUTE_VALUE`: Attribute values cannot contain a literal '<'
+ * - `DUPLICATE_ATTR`: Attribute appears more than once in the same tag
+ * - `INVALID_END_TAG`: End tag not well-formed or improper nesting
+ * - `INVALID_CHAR`: Input contains illegal characters
+ * - `INVALID_CDEND`: Character data cannot contain ']]>'
+ * - `INVALID_CDATA`: Character data cannot appear outside the root element
+ * - `UNEXPECTED_EOF`: Unexpected end of file
  *
  * @since 1.0.0
  */
@@ -47,15 +72,22 @@ export type SaxErrorCode = keyof typeof ERRORS;
 /**
  * A parsing or decoding error in an XML Document.
  *
- * Since this error type is intended to be recoverable (handled by the user of
- * the library) it provides a `code` string property, making it easy to
- * distinguish different errors.
+ * The parser cannot resume after an error as it represents a fatal error in the
+ * XML specification. It means that the document is not well-formed and contains
+ * syntax errors.
+ *
+ * Since this error type is intended to be handled by the user of the library it
+ * provides a {@link code} string property to distinguish different errors.
  *
  * @since 1.0.0
  */
 export interface SaxError extends Error {
   name: "SaxError";
-  /** A string representing a specific error. */
+  /**
+   * A string representing a specific error.
+   *
+   * @see {@link SaxErrorCode}
+   */
   code: SaxErrorCode;
   // TODO: add the offset character that originated the error?
   //  Tracking lines and columns is not possible with the current design but
