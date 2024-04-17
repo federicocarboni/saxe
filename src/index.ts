@@ -106,17 +106,24 @@ export interface SaxReader {
    */
   comment?(text: string): void;
   /**
-   * Returns the replacement text for a given entity name.
+   * Implementations should return the expanded value for the given entity.
+   * Entities may contain character references and other entity references, the
+   * parser assumes this has already been done by the user and appends the
+   * returned string to the attribute value.
+   *
+   * If an entity is not recognized by the implementation it should just return
+   * `undefined`.
    *
    * **Note**: this is not called for predefined general entity references or
    * inside text content as those may contain markup, see {@link entityRef}.
    *
    * @param entity
-   * @returns Entity replacement text or `undefined` if not recognized
+   * @returns Entity value or `undefined` if not recognized
    */
   replaceEntityRef?(entity: string): string | undefined;
   /**
-   * A general entity reference which is not predefined.
+   * A general entity reference which is not predefined; `&amp;`, `&lt;`, `&gt`,
+   * `&apos;` and `&quot;` are recognized by the parser and replaced .
    *
    * ```xml
    * &entity;
@@ -316,14 +323,12 @@ const enum Flags {
   CAPTURE_PI = 1 << 0,
   // Capture Comments or ignore them.
   CAPTURE_COMMENT = 1 << 1,
-  RESERVED_ = 1 << 2,
+  _RESERVED = 1 << 2,
   // These are boolean properties in SaxOptions
-  OPT_STRICT_CHAR = 1 << 3,
-  OPT_INCOMPLETE_TEXT_NODES = 1 << 4,
-  // OPT_TEXT_ONLY_ENTITIES = 1 << 5,
+  OPT_INCOMPLETE_TEXT_NODES = 1 << 3,
+  // OPT_TEXT_ONLY_ENTITIES = 1 << 4,
 
   // Runtime flags:
-  SINGLE_QUOTE = 1 << 9,
   SEEN_DOCTYPE = 1 << 10,
   SEEN_ROOT = 1 << 11,
 }
@@ -407,8 +412,7 @@ export class SaxParser {
   private reader_: SaxReader;
 
   // Options
-  // @internal
-  private maxEntityLength_: number | undefined;
+  // nothing here yet
 
   // State
   // @internal
@@ -424,6 +428,8 @@ export class SaxParser {
   private flags_ = Flags.INIT;
   // @internal
   private charRef_ = 0;
+  // @internal
+  private quote_ = -1;
 
   // @internal
   private elements_: string[] = [];
@@ -487,8 +493,6 @@ export class SaxParser {
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
-    this.maxEntityLength_ = options?.maxEntityLength ?? undefined;
-    this.maxEntityLength_;
   }
 
   /**
@@ -652,7 +656,7 @@ export class SaxParser {
     ) {
       this.state_ = State.XML_DECL;
       this.element_ = "";
-    } else if (this.element_.length >= 6) {
+    } else if (this.element_.length === 6) {
       this.chunk_ = this.element_ + this.chunk_.slice(newChunk.length);
       this.index_ = 0;
       this.state_ = State.MISC;
@@ -711,9 +715,8 @@ export class SaxParser {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case Chars.APOSTROPHE:
-          this.flags_ |= Flags.SINGLE_QUOTE;
-        // fall-through
         case Chars.QUOTE:
+          this.quote_ = codeUnit;
           this.state_ = State.XML_DECL_VALUE_QUOTED;
           ++this.index_;
           break;
@@ -770,14 +773,14 @@ export class SaxParser {
   // @internal
   private parseXmlDeclValueQuoted_() {
     const index = this.chunk_.indexOf(
-      this.flags_ & Flags.SINGLE_QUOTE ? "'" : '"',
+      this.quote_ === Chars.APOSTROPHE ? "'" : '"',
       this.index_,
     );
     const end = index === -1 ? this.chunk_.length : index;
     this.content_ += this.chunk_.slice(this.index_, end);
     this.index_ = end + 1;
     if (index !== -1) {
-      this.flags_ &= ~Flags.SINGLE_QUOTE;
+      this.quote_ = -1;
       if (this.handleXmlDeclAttribute_()) {
         throw createSaxError("INVALID_XML_DECL");
       }
@@ -879,9 +882,8 @@ export class SaxParser {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case Chars.APOSTROPHE:
-          this.flags_ |= Flags.SINGLE_QUOTE;
-        // fall-through
         case Chars.QUOTE:
+          this.quote_ = codeUnit;
           ++this.index_;
           this.state_ = State.DOCTYPE_ANY_QUOTED;
           return;
@@ -905,7 +907,7 @@ export class SaxParser {
   // @internal
   private parseDoctypeAnyQuoted_() {
     const index = this.chunk_.indexOf(
-      this.flags_ & Flags.SINGLE_QUOTE ? "'" : '"',
+      this.quote_ === Chars.APOSTROPHE ? "'" : '"',
       this.index_,
     );
     if (index === -1) {
@@ -1242,9 +1244,8 @@ export class SaxParser {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case Chars.APOSTROPHE:
-          this.flags_ |= Flags.SINGLE_QUOTE;
-          // fall-through
         case Chars.QUOTE:
+          this.quote_ = codeUnit;
           ++this.index_;
           this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
           break;
@@ -1256,9 +1257,7 @@ export class SaxParser {
 
   // @internal
   private parseStartTagAttrValueQuoted_() {
-    const quote = this.flags_ & Flags.SINGLE_QUOTE
-      ? Chars.APOSTROPHE
-      : Chars.QUOTE;
+    const quote = this.quote_;
     let start = this.index_;
     loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
@@ -1421,12 +1420,15 @@ export class SaxParser {
       throw createSaxError("INVALID_ENTITY_REF");
     }
     if (index !== -1) {
-      const predefValue = getPredefinedEntity(this.entity_);
-      if (predefValue !== undefined) {
-        this.content_ += predefValue;
+      const predefinedValue = getPredefinedEntity(this.entity_);
+      if (predefinedValue !== undefined) {
+        this.content_ += predefinedValue;
       } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
-        // const _value = this.reader_.replaceEntityRef?.(this.entity_);
-        // throw new Error("unimplemented");
+        const entityValue = this.reader_.replaceEntityRef?.(this.entity_);
+        if (entityValue == null) {
+          throw createSaxError("UNRESOLVED_ENTITY", {entity: this.entity_});
+        }
+        this.content_ += entityValue;
       } else {
         this.reader_.entityRef(this.entity_);
       }
