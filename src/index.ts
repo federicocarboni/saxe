@@ -348,24 +348,16 @@ function normalizeLineEndings(s: string) {
 }
 
 // Even if predefined entities are declared somewhere in a DTD they MUST
-// have replacement text equal to the predefined ones, so we can have fast
-// cases for these.
+// have replacement text that produces text exactly equal to the predefined
+// ones, so we can have treat them essentially the same as a char reference.
 // https://www.w3.org/TR/REC-xml/#sec-predefined-ent
-function getPredefinedEntity(entityName: string) {
-  switch (entityName) {
-    case "amp":
-      return "&";
-    case "lt":
-      return "<";
-    case "gt":
-      return ">";
-    case "apos":
-      return "'";
-    case "quot":
-      return '"';
-  }
-  return undefined;
-}
+const PREDEFINED_ENTITIES = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  apos: "'",
+  quot: '"',
+} as const;
 
 // These are internal until we can define how namespace support will work.
 // @internal
@@ -1420,9 +1412,9 @@ export class SaxParser {
       throw createSaxError("INVALID_ENTITY_REF");
     }
     if (index !== -1) {
-      const predefinedValue = getPredefinedEntity(this.entity_);
-      if (predefinedValue !== undefined) {
-        this.content_ += predefinedValue;
+      if (PREDEFINED_ENTITIES.hasOwnProperty(this.entity_)) {
+        this.content_ +=
+          PREDEFINED_ENTITIES[this.entity_ as keyof typeof PREDEFINED_ENTITIES];
       } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
         const entityValue = this.reader_.replaceEntityRef?.(this.entity_);
         if (entityValue == null) {
