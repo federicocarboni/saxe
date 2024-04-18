@@ -47,6 +47,9 @@ devDependencies:
   typedoc:
     specifier: ^0.25.13
     version: 0.25.13(typescript@5.4.5)
+  typescript:
+    specifier: ^5.4.5
+    version: 5.4.5
   typescript-eslint:
     specifier: ^7.6.0
     version: 7.6.0(eslint@8.57.0)(typescript@5.4.5)

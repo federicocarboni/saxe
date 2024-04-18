@@ -1,11 +1,12 @@
 {
-  "type": "module",
   "name": "saxe",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.1.0",
+  "description": "SAX style push streaming XML parser",
+  "type": "module",
   "exports": {
     ".": "./lib/index.js"
   },
+  "types": "./lib/index.d.ts",
   "scripts": {
     "build": "tsc && esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=_\\$ --sourcemap",
     "fuzz": "jsfuzz fuzz/target.ts corpus -- --require tsm",
@@ -32,6 +33,7 @@
     "mocha": "^10.4.0",
     "tsm": "^2.3.0",
     "typedoc": "^0.25.13",
+    "typescript": "^5.4.5",
     "typescript-eslint": "^7.6.0"
   }
 }
