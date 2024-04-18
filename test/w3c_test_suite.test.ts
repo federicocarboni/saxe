@@ -18,12 +18,12 @@ interface TestCase {
 }
 
 class TestCaseReader implements SaxReader {
-  testCases = new Map<string, TestCase[]>();
   private currentType: string | undefined = undefined;
   private currentUri: string | undefined = undefined;
   private currentId: string | undefined = undefined;
   private description = "";
   private output: string | undefined = undefined;
+  constructor(public testCases = new Map<string, TestCase[]>()) {}
   entityRef(entity: string): void {
     void entity;
   }
@@ -98,7 +98,7 @@ function testCaseRunner(
     const writer = new CanonicalXmlWriter();
     let isError = false;
     try {
-      const parser = new SaxParser(writer);
+      const parser = new SaxParser(writer, {incompleteTextNodes: true});
       if (charByChar) {
         for (const c of testContent) {
           parser.write(c);
@@ -108,10 +108,6 @@ function testCaseRunner(
       }
       parser.end();
     } catch (error) {
-      if (error.message === "Entities are not supported") {
-        console.log(testId)
-        return
-      }
       isError = true;
     }
     if (outputContent) {
