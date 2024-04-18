@@ -4,7 +4,7 @@
 // a good SaxReader example and may be used as a practical reference on how to
 // use SaxParser.
 
-import {SaxReader} from "../src/index.ts";
+import {Doctype, SaxReader} from "../src/index.ts";
 
 function escapeDataChars(value: string) {
   return value.replace(/[&<>"\t\n\r]/g, (val) => {
@@ -34,16 +34,14 @@ export class CanonicalXmlWriter implements SaxReader {
   // xml?(declaration: XmlDeclaration): void {
   //   throw new Error("Method not implemented.");
   // }
-  // doctype?(doctype: Doctype): void {
-  //   throw new Error("Method not implemented.");
-  // }
+  doctype?(doctype: Doctype): void {
+  }
   pi(target: string, content: string): void {
     this.output += `<?${target} ${content}?>`;
   }
   // There are no comments in Canonical XML
-  // comment(text: string): void {
-  //   throw new Error("Method not implemented.");
-  // }
+  comment(text: string): void {
+  }
   // Parser will throw if it finds a non-predefined entity in an attribute value
   replaceEntityRef?(entity: string): string | undefined {
     throw new Error("Entities are not supported");
