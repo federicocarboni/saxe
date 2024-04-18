@@ -1,36 +1,73 @@
+import {expect} from "chai";
+import {SaxParser} from "../lib/index.js";
 import {Doctype, SaxReader, XmlDeclaration} from "../src/index.ts";
 
 class DoctypeDeclReader implements SaxReader {
-  xml?(declaration: XmlDeclaration): void {
+  public doctypeDecl: Doctype | undefined;
+  xml(): void {
     throw new Error("Method not implemented.");
   }
   doctype(doctype: Doctype): void {
+    this.doctypeDecl = doctype;
+  }
+  pi(): void {
     throw new Error("Method not implemented.");
   }
-  pi?(target: string, content: string): void {
+  comment(): void {
     throw new Error("Method not implemented.");
   }
-  comment?(text: string): void {
+  replaceEntityRef(): string | undefined {
     throw new Error("Method not implemented.");
   }
-  replaceEntityRef?(entity: string): string | undefined {
+  entityRef(): void {
     throw new Error("Method not implemented.");
   }
-  entityRef(entity: string): void {
+  start(): void {
     throw new Error("Method not implemented.");
   }
-  start(name: string, attributes: ReadonlyMap<string, string>): void {
+  empty(): void {
     throw new Error("Method not implemented.");
   }
-  empty(name: string, attributes: ReadonlyMap<string, string>): void {
+  end(): void {
     throw new Error("Method not implemented.");
   }
-  end(name: string): void {
-    throw new Error("Method not implemented.");
-  }
-  text(text: string): void {
+  text(): void {
     throw new Error("Method not implemented.");
   }
 }
 
+function getDoctypeDecl(input: string | string[]) {
+  const docReader = new DoctypeDeclReader();
+  const parser = new SaxParser(docReader);
+  const inputs = typeof input === "string" ? [input] : input;
+  for (const inp of inputs) {
+    parser.write(inp);
+  }
+  return docReader.doctypeDecl;
+}
 
+describe("doctypedecl", function() {
+  it("wf: doctypedecl without ExternalID or intSubset", function() {
+    expect(getDoctypeDecl("<!DOCTYPE doctypeName >"))
+      .to.have.property("name", "doctypeName");
+  });
+  it("wf: doctypedecl with ExternalID and no intSubset", function() {
+    expect(
+      getDoctypeDecl('<!DOCTYPE doctypeName SYSTEM "-//DTD/something" >'),
+    )
+      .to.have.property("name", "doctypeName");
+  });
+  it("wf: doctypedecl with intSubset and no ExternalID", function() {
+    expect(getDoctypeDecl(
+      "<!DOCTYPE doctypeName [ <![IGNORE[  ]]> ] >",
+    ))
+      .to.have.property("name", "doctypeName");
+  });
+  it("wf: doctype with intSubset and ExternalID", function() {
+    expect(
+      getDoctypeDecl(
+        '<!DOCTYPE doctypeName PUBLIC "/public/dtd" "-//DTD/something" [ <![IGNORE[  ]]> ] >',
+      ),
+    ).to.have.property("name", "doctypeName");
+  });
+});
