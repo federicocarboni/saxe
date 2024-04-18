@@ -1,30 +1,22 @@
 import {expect} from "chai";
-import {Doctype, SaxParser, SaxReader, XmlDeclaration} from "../src/index.ts";
+import {SaxParser, SaxReader, XmlDeclaration} from "../src/index.ts";
 
 class XmlDeclReader implements SaxReader {
   declaration: XmlDeclaration | undefined = undefined;
   xml?(declaration: XmlDeclaration): void {
     this.declaration = declaration;
   }
-  doctype?(doctype: Doctype): void {
-  }
-  pi?(target: string, content: string): void {
-  }
-  comment?(text: string): void {
-  }
-  replaceEntityRef?(entity: string): string | undefined {
+  doctype?(): void {}
+  pi?(): void {}
+  comment?(): void {}
+  replaceEntityRef?(): string | undefined {
     return undefined;
   }
-  entityRef(entity: string): void {
-  }
-  start(name: string, attributes: ReadonlyMap<string, string>): void {
-  }
-  empty(name: string, attributes: ReadonlyMap<string, string>): void {
-  }
-  end(name: string): void {
-  }
-  text(text: string): void {
-  }
+  entityRef(): void {}
+  start(): void {}
+  empty(): void {}
+  end(): void {}
+  text(): void {}
 }
 
 function getXmlDecl(xml: string | string[]) {
