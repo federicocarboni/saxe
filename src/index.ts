@@ -214,41 +214,6 @@ export interface SaxOptions {
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
-  /**
-   * To protect against malicious input this can be used to cap the number of
-   * characters which can be produced while expanding an entity. If it is not
-   * specified or set to `undefined` entity expansion is uncapped.
-   *
-   * It is recommended to set this to a sensible value when handling potentially
-   * malicious input.
-   *
-   * **Technical note**: *the number of characters* is actually the number of
-   * UCS-2 code units that make up the expanded string, and not the number of
-   * Unicode code points (meaning astral plane characters like emojis count for
-   * 2 towards this limit). Probably not relevant for most use cases as this
-   * option is intended to impose limits on memory and not the human perceived
-   * text length.
-   *
-   * @default undefined
-   */
-  maxEntityLength?: number | undefined;
-  // TODO: maxEntityLength should already be enough to prevent billion laughs
-  //  attack and mitigate some other XML bomb exploits, is anything else needed?
-  //  Possible other limits:
-  // maxNestedEntities?: number | undefined;
-  // maxAttributes?: number | undefined;
-  // maxAttributeLength?: number | undefined;
-  // maxTextLength?: number | undefined;
-  // TODO: textOnlyEntities is probably completely unnecessary.
-  // /**
-  //  * Entity expansion is not implemented (yet?) for markup content, so any
-  //  * entity reference in XML content must be handled in `entityRef` or, this
-  //  * option should be enabled to simply append the result of `resolveEntityRef`
-  //  * to the content without any processing. This behavior is not standard for
-  //  * entities which contain markup or escapes, so use with caution!
-  //  */
-  // textOnlyEntities?: boolean | undefined;
-  // processDtd?: "prohibit" | "ignore" | undefined;
 }
 
 const enum State {
