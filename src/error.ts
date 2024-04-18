@@ -48,17 +48,16 @@ const ERRORS = {
  * - `INVALID_ENTITY_REF`: Entity reference not well-formed
  * - `UNRESOLVED_ENTITY`: Entity cannot be resolved
  *
- *   Define the `replaceEntityRef` and `entityRef` to handle entity references
+ * Define the `replaceEntityRef` and `entityRef` to handle entity references
  * - `INVALID_CHAR_REF`: Character reference to illegal character
  * - `INVALID_START_TAG`: Start tag not well-formed
- * - `INVALID_ATTRIBUTE_VALUE`: Attribute values cannot contain a literal '<'
+ * - `INVALID_ATTRIBUTE_VALUE`: Attribute values cannot contain a literal '\<'
  * - `DUPLICATE_ATTR`: Attribute appears more than once in the same tag
  * - `INVALID_END_TAG`: End tag not well-formed or improper nesting
  * - `INVALID_CHAR`: Input contains illegal characters
- * - `INVALID_CDEND`: Character data cannot contain ']]>'
+ * - `INVALID_CDEND`: Character data cannot contain ']]\>'
  * - `INVALID_CDATA`: Character data cannot appear outside the root element
  * - `UNEXPECTED_EOF`: Unexpected end of file
- *
  * @since 1.0.0
  */
 export type SaxErrorCode = keyof typeof ERRORS;
@@ -72,14 +71,12 @@ export type SaxErrorCode = keyof typeof ERRORS;
  *
  * Since this error type is intended to be handled by the user of the library it
  * provides a {@link code} string property to distinguish different errors.
- *
  * @since 1.0.0
  */
 export interface SaxError extends Error {
   name: "SaxError";
   /**
    * A string representing a specific error.
-   *
    * @see {@link SaxErrorCode}
    */
   code: SaxErrorCode;
@@ -93,10 +90,8 @@ export interface SaxError extends Error {
  * Returns `true` if the given value is a {@link SaxError}. This is mostly
  * intended for TypeScript users seeking type-safety in `catch` clauses, but can
  * generally be used to distinguish between Saxe errors and general errors.
- *
- * @param error
+ * @param error -
  * @returns
- *
  * @since 1.0.0
  */
 export function isSaxError(error: unknown): error is SaxError {
@@ -116,7 +111,14 @@ export function createSaxError<T extends SaxErrorCode>(
   code: T,
   ...args: Parameters<typeof ERRORS[T]>
 ): SaxError;
-export function createSaxError(code: SaxErrorCode, info?: any): SaxError {
+/**
+ *
+ * @param code
+ * @param info
+ */
+export function createSaxError(code: SaxErrorCode, info?: unknown): SaxError {
+  // @ts-expect-error -- TypeScript is not able to prove that T is actually a
+  // single value and not a union so it can't infer args correctly.
   const message = ERRORS[code](info);
   // Avoid classes, prototype inheritance and other BS, just extend a regular
   // error object. This is better because classes in general (even more so when

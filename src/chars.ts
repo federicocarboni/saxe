@@ -25,21 +25,17 @@ export const enum Chars {
 
 // https://www.w3.org/TR/REC-xml/#NT-S
 // § White Space
-/** @internal */
+// @internal
 export function isWhitespace(c: number) {
   return c === Chars.SP || c === Chars.TAB || c === Chars.LF || c === Chars.CR;
 }
 
-export function isWhitespaceNonSP(c: number) {
-  return c === Chars.TAB || c === Chars.LF || c === Chars.CR;
-}
-
-/** @internal */
+// @internal
 export function isAsciiDigit(c: number) {
   return 0x30 <= c && c <= 0x39;
 }
 
-/** @internal */
+// @internal
 export function isAsciiHexAlpha(c: number) {
   return (
     (0x61 /* a */ <= c && c <= 0x66) /* f */ ||
@@ -47,50 +43,9 @@ export function isAsciiHexAlpha(c: number) {
   );
 }
 
-/** @internal */
-export function isAlpha(c: number) {
-  return (
-    (0x61 /* a */ <= c && c <= 0x7A) /* z */ ||
-    (0x41 /* A */ <= c && c <= 0x5A) /* Z */
-  );
-}
-
-/** @internal */
-export function parseDecCharRef(dec: string): number | undefined {
-  let n = 0;
-  const length = dec.length;
-  if (length === 0) { return undefined; }
-  for (let i = 0; i < length; i++) {
-    const digit = (dec.charCodeAt(i) - 0x30) >>> 0;
-    if (digit > 9) { return undefined; }
-    n = n * 10 + digit;
-  }
-  return n;
-}
-
-/** @internal */
-export function parseHex(dec: string): number | undefined {
-  let n = 0;
-  const length = dec.length;
-  if (length === 0) { return undefined; }
-  for (let i = 0; i < length; i++) {
-    const c = dec.charCodeAt(i);
-    let digit;
-    if (isAsciiDigit(c)) {
-      digit = c - 0x30;
-    } else if (isAsciiHexAlpha(c)) {
-      digit = (c | 0x20) - 0x57;
-    } else {
-      return undefined;
-    }
-    n = n * 16 + digit;
-  }
-  return n;
-}
-
 // https://www.w3.org/TR/REC-xml/#NT-Char
 // § Character Range
-/** @internal */
+// @internal
 export function isChar(c: number) {
   return (
     c === 0x9 ||
@@ -103,10 +58,12 @@ export function isChar(c: number) {
 }
 
 // https://www.w3.org/TR/REC-xml/#NT-NameStartChar
-/** @internal */
+// @internal
 export function isNameStartChar(c: number) {
   return (
-    isAlpha(c) || c === 0x3A /* : */ || c === 0x5F /* _ */ ||
+    0x61 /* a */ <= c && c <= 0x7A /* z */ ||
+    0x41 /* A */ <= c && c <= 0x5A /* Z */ ||
+    c === 0x3A /* : */ || c === 0x5F /* _ */ ||
     0xC0 <= c && c <= 0xD6 || 0xD8 <= c && c <= 0xF6 ||
     0xF8 <= c && c <= 0x2FF || 0x370 <= c && c <= 0x37D ||
     0x37F <= c && c <= 0x1FFF || 0x200C <= c && c <= 0x200D ||
@@ -117,7 +74,7 @@ export function isNameStartChar(c: number) {
 }
 
 // https://www.w3.org/TR/REC-xml/#NT-NameChar
-/** @internal */
+// @internal
 export function isNameChar(c: number) {
   return (
     isNameStartChar(c) || c === 0x2D /* - */ || c === 0x2E /* . */ ||
@@ -148,38 +105,4 @@ export function hasInvalidChar(s: string) {
   // Astral characters are not considered because enabling Unicode support on
   // regexes is a performance hit and we assume strings are well-formed.
   return /[^\t\n\r\x20-\uFFFD]/.test(s);
-}
-
-export function isNotChar2(s: string) {
-  const length = s.length;
-  let index = 0;
-  let char;
-  while (index < length) {
-    char = s.charCodeAt(index);
-    if (char < 0xD800) {
-      if (
-        char < 0x20 && char !== Chars.CR && char !== Chars.LF &&
-        char !== Chars.TAB
-      ) {
-        return true;
-      }
-    } else if (char > 0xDBFF) {
-      // This is a specialized version of isChar10 that takes into account
-      // that in this context char > 0xDBFF and char <= 0xFFFF. So it does not
-      // test cases that don't need testing.
-      if (!(char >= 0xE000 && char <= 0xFFFD)) {
-        return true;
-      }
-    } else {
-      const achar = 0x10000 + ((char - 0xD800) * 0x400) +
-        (s.charCodeAt(index + 1) - 0xDC00);
-      index++;
-      if (achar > 0x10FFFF) {
-        return true;
-      }
-    }
-
-    index++;
-  }
-  return false;
 }
