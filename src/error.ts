@@ -16,10 +16,6 @@ const ERRORS = {
   INVALID_ENTITY_REF: () => "Entity reference not well-formed",
   UNRESOLVED_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" cannot be resolved`,
-  RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
-    `Entity "${entity}" directly or indirectly references itself`,
-  MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
-    `Entity "${entity}" expansion exceeds limit`,
 
   INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
     `Character reference to illegal character: ${char}`,
@@ -53,8 +49,6 @@ const ERRORS = {
  * - `UNRESOLVED_ENTITY`: Entity cannot be resolved
  *
  *   Define the `replaceEntityRef` and `entityRef` to handle entity references
- * - `RECURSIVE_ENTITY`: Entity directly or indirectly references itself
- * - `MAX_ENTITY_LENGTH_EXCEEDED`: Entity expansion exceeds `maxEntityLength`
  * - `INVALID_CHAR_REF`: Character reference to illegal character
  * - `INVALID_START_TAG`: Start tag not well-formed
  * - `INVALID_ATTRIBUTE_VALUE`: Attribute values cannot contain a literal '<'
