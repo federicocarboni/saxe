@@ -1,6 +1,5 @@
 import {expect} from "chai";
-import {SaxParser} from "../lib/index.js";
-import {Doctype, SaxReader, XmlDeclaration} from "../src/index.ts";
+import {Doctype, SaxReader, SaxParser} from "../src/index.ts";
 
 class DoctypeDeclReader implements SaxReader {
   public doctypeDecl: Doctype | undefined;

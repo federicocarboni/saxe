@@ -4,25 +4,25 @@
 // a good SaxReader example and may be used as a practical reference on how to
 // use SaxParser.
 
-import {Doctype, SaxReader} from "../src/index.ts";
+import {SaxReader} from "../src/index.ts";
 
 function escapeDataChars(value: string) {
   return value.replace(/[&<>"\t\n\r]/g, (val) => {
     switch (val) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      case "\t":
-        return "&#9;";
-      case "\n":
-        return "&#10;";
-      case "\r":
-        return "&#13;";
+    case "&":
+      return "&amp;";
+    case "<":
+      return "&lt;";
+    case ">":
+      return "&gt;";
+    case '"':
+      return "&quot;";
+    case "\t":
+      return "&#9;";
+    case "\n":
+      return "&#10;";
+    case "\r":
+      return "&#13;";
     }
     return "";
   });
@@ -34,20 +34,20 @@ export class CanonicalXmlWriter implements SaxReader {
   // xml?(declaration: XmlDeclaration): void {
   //   throw new Error("Method not implemented.");
   // }
-  doctype?(doctype: Doctype): void {
+  doctype(): void {
   }
   pi(target: string, content: string): void {
     this.output += `<?${target} ${content}?>`;
   }
   // There are no comments in Canonical XML
-  comment(text: string): void {
+  comment(): void {
   }
   // Parser will throw if it finds a non-predefined entity in an attribute value
-  replaceEntityRef?(entity: string): string | undefined {
+  replaceEntityRef(): string | undefined {
     throw new Error("Entities are not supported");
   }
   // Cannot read entities from DTD so can't do anything with them
-  entityRef(_entity: string): void {
+  entityRef(): void {
     throw new Error("Entities are not supported");
   }
   start(name: string, attributes: ReadonlyMap<string, string>): void {
