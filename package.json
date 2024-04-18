@@ -12,7 +12,7 @@
     "fuzz": "jsfuzz fuzz/target.ts corpus -- --require tsm",
     "test": "c8 mocha test/*.test.ts",
     "format": "dprint fmt",
-    "lint": "eslint"
+    "lint": "eslint ."
   },
   "keywords": [],
   "author": {
