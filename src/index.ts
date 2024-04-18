@@ -6,7 +6,6 @@ import {
   Chars,
   hasInvalidChar,
   isChar,
-  isName,
   isNameChar,
   isNameStartChar,
   isWhitespace,
@@ -1399,14 +1398,11 @@ export class SaxParser {
 
   // @internal
   private parseEntityRef_() {
-    const index = this.chunk_.indexOf(";", this.index_);
-    const end = index === -1 ? this.chunk_.length : index;
-    this.entity_ += this.chunk_.slice(this.index_, end);
-    this.index_ = end + 1;
-    if (!isName(this.entity_)) {
-      throw createSaxError("INVALID_ENTITY_REF");
-    }
-    if (index !== -1) {
+    this.entity_ += this.readNameCharacters_();
+    if (this.index_ < this.chunk_.length) {
+      if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
+        throw createSaxError("INVALID_ENTITY_REF");
+      }
       if (PREDEFINED_ENTITIES.hasOwnProperty(this.entity_)) {
         this.content_ +=
           PREDEFINED_ENTITIES[this.entity_ as keyof typeof PREDEFINED_ENTITIES];
@@ -1419,6 +1415,7 @@ export class SaxParser {
       } else {
         this.reader_.entityRef(this.entity_);
       }
+      ++this.index_;
       this.state_ = this.otherState_;
       this.otherState_ = 0;
       this.entity_ = "";

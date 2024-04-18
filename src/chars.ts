@@ -83,23 +83,6 @@ export function isNameChar(c: number) {
   );
 }
 
-const NAME_START_CHAR_CLASS =
-  ":A-Z_a-z\xC0-\xD6\xD8-\xF6\xF8-\u02FF\u0370-\u037D\u037F-\u1FFF\u200C-\u200D\u2070-\u218F\u2C00-\u2FEF\u3001-\uD7FF\uF900-\uFDCF\uFDF0-\uFFFD\u{10000}-\u{EFFFF}";
-
-const NAME_CHAR_CLASS = NAME_START_CHAR_CLASS +
-  "-.0-9\xB7\u0300-\u036F\u203F-\u2040";
-
-const NAME_REGEX = /* @__PURE__ */ new RegExp(
-  `^[${NAME_START_CHAR_CLASS}][${NAME_CHAR_CLASS}]*$`,
-  "u",
-);
-
-// Entity references check isName using this regex
-// @internal
-export function isName(s: string) {
-  return NAME_REGEX.test(s);
-}
-
 // @internal
 export function hasInvalidChar(s: string) {
   // Astral characters are not considered because enabling Unicode support on
