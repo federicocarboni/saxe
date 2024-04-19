@@ -36,11 +36,6 @@ const config = {
     }],
   },
   ignorePatterns: ["lib", "coverage"],
-  overrides: [{
-    files: "**/*.ts",
-    rules: {
-    },
-  }],
 };
 
 module.exports = config;
