@@ -111,11 +111,6 @@ export function createSaxError<T extends SaxErrorCode>(
   code: T,
   ...args: Parameters<typeof ERRORS[T]>
 ): SaxError;
-/**
- *
- * @param code
- * @param info
- */
 export function createSaxError(code: SaxErrorCode, info?: unknown): SaxError {
   // @ts-expect-error -- TypeScript is not able to prove that T is actually a
   // single value and not a union so it can't infer args correctly.

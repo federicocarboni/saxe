@@ -156,7 +156,7 @@ export interface SaxReader {
    */
   end(name: string): void;
   /**
-   * Text content of an element.
+   * Text and character data of the document.
    *
    * ```xml
    * <element>text &amp; content</element>
@@ -286,15 +286,6 @@ const enum Flags {
   SEEN_ROOT = 1 << 11,
 }
 
-// function debugFlags(flags: Flags) {
-//   return {
-//     isCapturePi: !!(flags & Flags.CAPTURE_PI),
-//     isCaptureComment: !!(flags & Flags.CAPTURE_COMMENT),
-//     isIncompleteTextNodes: !!(flags & Flags.OPT_INCOMPLETE_TEXT_NODES),
-//     // isTextOnlyEntities: !!(flags & Flags.OPT_TEXT_ONLY_ENTITIES),
-//   };
-// }
-
 // Normalize XML line endings.
 function normalizeLineEndings(s: string) {
   return s.replace(/\r\n?/g, "\n");
@@ -315,7 +306,6 @@ const PREDEFINED_ENTITIES = {
 // These are internal until we can define how namespace support will work.
 // @internal
 /**
- *
  * @param name
  */
 export function getPrefix(name: string): string | undefined {
@@ -329,7 +319,6 @@ export function getPrefix(name: string): string | undefined {
 
 // @internal
 /**
- *
  * @param name
  */
 export function getLocal(name: string): string | undefined {
@@ -493,101 +482,101 @@ export class SaxParser {
   // @internal
   private parseStep_() {
     switch (this.state_) {
-    case State.INIT:
-      return this.parseInit_();
-    case State.XML_DECL:
-      return this.parseXmlDecl_();
-    case State.XML_DECL_SPACE:
-      return this.parseXmlDeclSpace_();
-    case State.XML_DECL_VALUE:
-      return this.parseXmlDeclValue_();
-    case State.XML_DECL_VALUE_QUOTED:
-      return this.parseXmlDeclValueQuoted_();
-    case State.XML_DECL_END:
-      return this.parseXmlDeclEnd_();
-    case State.DOCTYPE_DECL_START:
-      return this.parseDoctypeDeclStart_();
-    case State.DOCTYPE_DECL:
-      return this.parseDoctypeDecl_();
-    case State.DOCTYPE_NAME:
-      return this.parseDoctypeName_();
-    case State.DOCTYPE_NAME_END:
-      return this.parseDoctypeNameEnd_();
-    case State.DOCTYPE_ANY:
-      return this.parseDoctypeAny_();
-    case State.DOCTYPE_ANY_QUOTED:
-      return this.parseDoctypeAnyQuoted_();
-    case State.MISC:
-      return this.parseMisc_();
-    case State.PI_TARGET_START:
-      return this.parsePiTargetStart_();
-    case State.PI_TARGET:
-      return this.parsePiTarget_();
-    case State.PI_CONTENT_START:
-      return this.parsePiContentStart_();
-    case State.PI_CONTENT:
-      return this.parsePiContent_();
-    case State.PI_CONTENT_END:
-      return this.parsePiContentEnd_();
-    case State.PI_END:
-      return this.parsePiEnd_();
-    case State.COMMENT_START:
-      return this.parseCommentStart_();
-    case State.COMMENT:
-      return this.parseComment_();
-    case State.COMMENT_HYPHEN:
-      return this.parseCommentHyphen_();
-    case State.COMMENT_END:
-      return this.parseCommentEnd_();
-    case State.OPEN_ANGLE_BRACKET:
-      return this.parseOpenAngleBracket_();
-    case State.OPEN_ANGLE_BRACKET_BANG:
-      return this.parseOpenAngleBracketBang_();
-    case State.START_TAG_NAME:
-      return this.parseStartTagName_();
-    case State.START_TAG:
-      return this.parseStartTag_();
-    case State.START_TAG_SPACE:
-      return this.parseStartTagSpace_();
-    case State.START_TAG_ATTR:
-      return this.parseStartTagAttr_();
-    case State.START_TAG_ATTR_EQ:
-      return this.parseStartTagAttrEq_();
-    case State.START_TAG_ATTR_VALUE:
-      return this.parseStartTagAttrValue_();
-    case State.START_TAG_ATTR_VALUE_QUOTED:
-      return this.parseStartTagAttrValueQuoted_();
-    case State.EMPTY_TAG:
-      return this.parseEmptyTag_();
-    case State.TEXT_CONTENT:
-      return this.parseTextContent_();
-      // &amp; &#38; general entity reference or character reference
-    case State.REFERENCE:
-      return this.parseReference_();
-    case State.ENTITY_REF:
-      return this.parseEntityRef_();
-    case State.CHAR_REF:
-      return this.parseCharRef_();
-      // &#38;
-    case State.CHAR_REF_DEC:
-      return this.parseCharRefDec_();
-      // &#x26;
-    case State.CHAR_REF_HEX:
-      return this.parseCharRefHex_();
-    case State.CDATA_SECTION_START:
-      return this.parseCdataSectionStart_();
-    case State.CDATA_SECTION:
-      return this.parseCdataSection_();
-    case State.CDATA_SECTION_END0:
-      return this.parseCdataSectionEnd0_();
-    case State.CDATA_SECTION_END:
-      return this.parseCdataSectionEnd_();
-    case State.END_TAG_START:
-      return this.parseEndTagStart_();
-    case State.END_TAG:
-      return this.parseEndTag_();
-    case State.END_TAG_END:
-      return this.parseEndTagEnd_();
+      case State.INIT:
+        return this.parseInit_();
+      case State.XML_DECL:
+        return this.parseXmlDecl_();
+      case State.XML_DECL_SPACE:
+        return this.parseXmlDeclSpace_();
+      case State.XML_DECL_VALUE:
+        return this.parseXmlDeclValue_();
+      case State.XML_DECL_VALUE_QUOTED:
+        return this.parseXmlDeclValueQuoted_();
+      case State.XML_DECL_END:
+        return this.parseXmlDeclEnd_();
+      case State.DOCTYPE_DECL_START:
+        return this.parseDoctypeDeclStart_();
+      case State.DOCTYPE_DECL:
+        return this.parseDoctypeDecl_();
+      case State.DOCTYPE_NAME:
+        return this.parseDoctypeName_();
+      case State.DOCTYPE_NAME_END:
+        return this.parseDoctypeNameEnd_();
+      case State.DOCTYPE_ANY:
+        return this.parseDoctypeAny_();
+      case State.DOCTYPE_ANY_QUOTED:
+        return this.parseDoctypeAnyQuoted_();
+      case State.MISC:
+        return this.parseMisc_();
+      case State.PI_TARGET_START:
+        return this.parsePiTargetStart_();
+      case State.PI_TARGET:
+        return this.parsePiTarget_();
+      case State.PI_CONTENT_START:
+        return this.parsePiContentStart_();
+      case State.PI_CONTENT:
+        return this.parsePiContent_();
+      case State.PI_CONTENT_END:
+        return this.parsePiContentEnd_();
+      case State.PI_END:
+        return this.parsePiEnd_();
+      case State.COMMENT_START:
+        return this.parseCommentStart_();
+      case State.COMMENT:
+        return this.parseComment_();
+      case State.COMMENT_HYPHEN:
+        return this.parseCommentHyphen_();
+      case State.COMMENT_END:
+        return this.parseCommentEnd_();
+      case State.OPEN_ANGLE_BRACKET:
+        return this.parseOpenAngleBracket_();
+      case State.OPEN_ANGLE_BRACKET_BANG:
+        return this.parseOpenAngleBracketBang_();
+      case State.START_TAG_NAME:
+        return this.parseStartTagName_();
+      case State.START_TAG:
+        return this.parseStartTag_();
+      case State.START_TAG_SPACE:
+        return this.parseStartTagSpace_();
+      case State.START_TAG_ATTR:
+        return this.parseStartTagAttr_();
+      case State.START_TAG_ATTR_EQ:
+        return this.parseStartTagAttrEq_();
+      case State.START_TAG_ATTR_VALUE:
+        return this.parseStartTagAttrValue_();
+      case State.START_TAG_ATTR_VALUE_QUOTED:
+        return this.parseStartTagAttrValueQuoted_();
+      case State.EMPTY_TAG:
+        return this.parseEmptyTag_();
+      case State.TEXT_CONTENT:
+        return this.parseTextContent_();
+        // &amp; &#38; general entity reference or character reference
+      case State.REFERENCE:
+        return this.parseReference_();
+      case State.ENTITY_REF:
+        return this.parseEntityRef_();
+      case State.CHAR_REF:
+        return this.parseCharRef_();
+        // &#38;
+      case State.CHAR_REF_DEC:
+        return this.parseCharRefDec_();
+        // &#x26;
+      case State.CHAR_REF_HEX:
+        return this.parseCharRefHex_();
+      case State.CDATA_SECTION_START:
+        return this.parseCdataSectionStart_();
+      case State.CDATA_SECTION:
+        return this.parseCdataSection_();
+      case State.CDATA_SECTION_END0:
+        return this.parseCdataSectionEnd0_();
+      case State.CDATA_SECTION_END:
+        return this.parseCdataSectionEnd_();
+      case State.END_TAG_START:
+        return this.parseEndTagStart_();
+      case State.END_TAG:
+        return this.parseEndTag_();
+      case State.END_TAG_END:
+        return this.parseEndTagEnd_();
     }
   }
 
@@ -665,14 +654,14 @@ export class SaxParser {
     if (this.skipWhitespace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
-      case Chars.APOSTROPHE:
-      case Chars.QUOTE:
-        this.quote_ = codeUnit;
-        this.state_ = State.XML_DECL_VALUE_QUOTED;
-        ++this.index_;
-        break;
-      default:
-        throw createSaxError("INVALID_XML_DECL");
+        case Chars.APOSTROPHE:
+        case Chars.QUOTE:
+          this.quote_ = codeUnit;
+          this.state_ = State.XML_DECL_VALUE_QUOTED;
+          ++this.index_;
+          break;
+        default:
+          throw createSaxError("INVALID_XML_DECL");
       }
     }
   }
@@ -681,40 +670,37 @@ export class SaxParser {
   private handleXmlDeclAttribute_() {
     // Regex are slower but more compact.
     switch (this.attribute_) {
-    case "version":
-      if (
-        this.version_ !== undefined ||
-          !/^1\.[0-9]$/.test(this.content_)
-      ) {
-        return true;
-      }
-      this.version_ = this.content_;
-      break;
-    case "encoding":
-      // XML standard doesn't define a maximum length for any construct, but
-      // IANA Charsets never go above 45 characters (including aliases).
-      // TODO: it's a good a idea to limit encoding labels as large values
-      //  are very unlikely correct. Is 256 fine?
-      if (
-        this.version_ === undefined || this.encoding_ !== undefined ||
+      case "version":
+        if (this.version_ !== undefined || !/^1\.[0-9]$/.test(this.content_)) {
+          return true;
+        }
+        this.version_ = this.content_;
+        break;
+      case "encoding":
+        // XML standard doesn't define a maximum length for any construct, but
+        // IANA Charsets never go above 45 characters (including aliases).
+        // TODO: it's a good a idea to limit encoding labels as large values
+        //  are very unlikely correct. Is 256 fine?
+        if (
+          this.version_ === undefined || this.encoding_ !== undefined ||
           this.standalone_ !== undefined || this.content_.length > 256 ||
           !/^[A-Za-z][A-Za-z0-9._-]*$/.test(this.content_)
-      ) {
-        return true;
-      }
-      this.encoding_ = this.content_.toLowerCase();
-      break;
-    case "standalone":
-      if (
-        this.version_ === undefined || this.standalone_ !== undefined ||
+        ) {
+          return true;
+        }
+        this.encoding_ = this.content_.toLowerCase();
+        break;
+      case "standalone":
+        if (
+          this.version_ === undefined || this.standalone_ !== undefined ||
           this.content_ !== "yes" && this.content_ !== "no"
-      ) {
+        ) {
+          return true;
+        }
+        this.standalone_ = this.content_ === "yes";
+        break;
+      default:
         return true;
-      }
-      this.standalone_ = this.content_ === "yes";
-      break;
-    default:
-      return true;
     }
     this.attribute_ = "";
     this.content_ = "";
@@ -832,24 +818,24 @@ export class SaxParser {
     while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
-      case Chars.APOSTROPHE:
-      case Chars.QUOTE:
-        this.quote_ = codeUnit;
-        ++this.index_;
-        this.state_ = State.DOCTYPE_ANY_QUOTED;
-        return;
-      case Chars.OPEN_BRACKET:
-        ++this.otherState_;
-        break;
-      case Chars.CLOSE_BRACKET:
-        --this.otherState_;
-        break;
-      case Chars.GT:
-        if (this.otherState_ === 0) {
-          this.doctypeEnd_();
+        case Chars.APOSTROPHE:
+        case Chars.QUOTE:
+          this.quote_ = codeUnit;
+          ++this.index_;
+          this.state_ = State.DOCTYPE_ANY_QUOTED;
           return;
-        }
-        break;
+        case Chars.OPEN_BRACKET:
+          ++this.otherState_;
+          break;
+        case Chars.CLOSE_BRACKET:
+          --this.otherState_;
+          break;
+        case Chars.GT:
+          if (this.otherState_ === 0) {
+            this.doctypeEnd_();
+            return;
+          }
+          break;
       }
       ++this.index_;
     }
@@ -1194,14 +1180,14 @@ export class SaxParser {
     if (this.skipWhitespace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
-      case Chars.APOSTROPHE:
-      case Chars.QUOTE:
-        this.quote_ = codeUnit;
-        ++this.index_;
-        this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
-        break;
-      default:
-        throw createSaxError("INVALID_START_TAG");
+        case Chars.APOSTROPHE:
+        case Chars.QUOTE:
+          this.quote_ = codeUnit;
+          ++this.index_;
+          this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
+          break;
+        default:
+          throw createSaxError("INVALID_START_TAG");
       }
     }
   }
@@ -1213,43 +1199,43 @@ export class SaxParser {
     loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
-      case Chars.TAB:
-      case Chars.LF:
-      case Chars.CR:
-        this.content_ += this.chunk_.slice(start, this.index_) + " ";
-        if (
-          codeUnit === Chars.CR &&
+        case Chars.TAB:
+        case Chars.LF:
+        case Chars.CR:
+          this.content_ += this.chunk_.slice(start, this.index_) + " ";
+          if (
+            codeUnit === Chars.CR &&
             this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF
-        ) {
+          ) {
+            ++this.index_;
+          }
+          start = this.index_ + 1;
+          break;
+        case Chars.AMPERSAND:
+          // TODO: this should be recursive for non-predefined general entity
+          // references...
+          this.state_ = State.REFERENCE;
+          this.otherState_ = State.START_TAG_ATTR_VALUE_QUOTED;
+          break loop;
+        case quote:
+          this.content_ += this.chunk_.slice(start, this.index_);
           ++this.index_;
-        }
-        start = this.index_ + 1;
-        break;
-      case Chars.AMPERSAND:
-        // TODO: this should be recursive for non-predefined general entity
-        // references...
-        this.state_ = State.REFERENCE;
-        this.otherState_ = State.START_TAG_ATTR_VALUE_QUOTED;
-        break loop;
-      case quote:
-        this.content_ += this.chunk_.slice(start, this.index_);
-        ++this.index_;
-        this.state_ = State.START_TAG_SPACE;
-        if (this.attributes_.has(this.attribute_)) {
-          throw createSaxError("DUPLICATE_ATTR");
-        }
-        this.attributes_.set(this.attribute_, this.content_);
-        this.attribute_ = "";
-        this.content_ = "";
-        return;
-      case Chars.LT:
-        // < is not allowed inside attribute values
-        throw createSaxError("INVALID_ATTRIBUTE_VALUE");
-      default:
-        // Other characters still need to be validated:
-        if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
-          throw createSaxError("INVALID_CHAR");
-        }
+          this.state_ = State.START_TAG_SPACE;
+          if (this.attributes_.has(this.attribute_)) {
+            throw createSaxError("DUPLICATE_ATTR");
+          }
+          this.attributes_.set(this.attribute_, this.content_);
+          this.attribute_ = "";
+          this.content_ = "";
+          return;
+        case Chars.LT:
+          // < is not allowed inside attribute values
+          throw createSaxError("INVALID_ATTRIBUTE_VALUE");
+        default:
+          // Other characters still need to be validated:
+          if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+            throw createSaxError("INVALID_CHAR");
+          }
       }
       ++this.index_;
     }
@@ -1285,43 +1271,43 @@ export class SaxParser {
     loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
-      case Chars.TAB:
-      case Chars.LF:
-        // TAB and LF are valid and since they are common, it's faster to
-        // handle them here than in the default case
-        // TODO: add significant whitespace handler?
-        break;
-      case Chars.CR:
-        // Carriage return requires new-line normalization
-        this.content_ += this.chunk_.slice(start, this.index_) + "\n";
-        if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF) {
-          ++this.index_;
-        }
-        start = this.index_ + 1;
-        break;
-        // State changing conditions:
-      case Chars.AMPERSAND:
-        // It was considered to handle references inline but they are not
-        // common enough to justify doing more work here
-        this.state_ = State.REFERENCE;
-        this.otherState_ = State.TEXT_CONTENT;
-        break loop;
-      case Chars.LT:
-        this.state_ = State.OPEN_ANGLE_BRACKET;
-        this.otherState_ = State.TEXT_CONTENT;
-        break loop;
-      case Chars.GT:
-        // Catch ]]>, this.otherState_ just stores the number of consecutive
-        // brackets found.
-        if (this.otherState_ > 1) {
-          throw createSaxError("INVALID_CDEND");
-        }
-        break;
-      default:
-        // Other characters still need to be validated:
-        if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
-          throw createSaxError("INVALID_CHAR");
-        }
+        case Chars.TAB:
+        case Chars.LF:
+          // TAB and LF are valid and since they are common, it's faster to
+          // handle them here than in the default case
+          // TODO: add significant whitespace handler?
+          break;
+        case Chars.CR:
+          // Carriage return requires new-line normalization
+          this.content_ += this.chunk_.slice(start, this.index_) + "\n";
+          if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF) {
+            ++this.index_;
+          }
+          start = this.index_ + 1;
+          break;
+          // State changing conditions:
+        case Chars.AMPERSAND:
+          // It was considered to handle references inline but they are not
+          // common enough to justify doing more work here
+          this.state_ = State.REFERENCE;
+          this.otherState_ = State.TEXT_CONTENT;
+          break loop;
+        case Chars.LT:
+          this.state_ = State.OPEN_ANGLE_BRACKET;
+          this.otherState_ = State.TEXT_CONTENT;
+          break loop;
+        case Chars.GT:
+          // Catch ]]>, this.otherState_ just stores the number of consecutive
+          // brackets found.
+          if (this.otherState_ > 1) {
+            throw createSaxError("INVALID_CDEND");
+          }
+          break;
+        default:
+          // Other characters still need to be validated:
+          if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+            throw createSaxError("INVALID_CHAR");
+          }
       }
       if (codeUnit === Chars.CLOSE_BRACKET) {
         ++this.otherState_;
