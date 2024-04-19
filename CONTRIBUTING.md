@@ -2,7 +2,7 @@
 
 First, a word of thanks for taking the time to contribute.
 
-All contributions are encouraged and valued, use the following guide lines to
+All contributions are encouraged and valued, use the following guidelines to
 make the process is as smooth as possible.
 
 ## Reporting Bugs
@@ -22,7 +22,7 @@ A good bug report should have:
 
 Code contributions are handled through GitHub Pull Requests.
 
-The following guide lines will help you be consistent with the rest of the
+The following guidelines will help you be consistent with the rest of the
 project.
 
 ### Testing
@@ -104,5 +104,7 @@ class MyClass {
 
 ## License
 
-Any contributions you make will be under the same Apache-2.0 license that covers
-the entire project.
+Any contributions you make will be under the same [Apache-2.0 license] that
+covers the entire project.
+
+[Apache-2.0 license]: https://www.apache.org/licenses/LICENSE-2.0
