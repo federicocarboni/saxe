@@ -3,36 +3,14 @@ import {Doctype, SaxParser, SaxReader} from "../src/index.ts";
 
 class DoctypeDeclReader implements SaxReader {
   public doctypeDecl: Doctype | undefined;
-  xml(): void {
-    throw new Error("Method not implemented.");
-  }
   doctype(doctype: Doctype): void {
     this.doctypeDecl = doctype;
   }
-  pi(): void {
-    throw new Error("Method not implemented.");
-  }
-  comment(): void {
-    throw new Error("Method not implemented.");
-  }
-  replaceEntityRef(): string | undefined {
-    throw new Error("Method not implemented.");
-  }
-  entityRef(): void {
-    throw new Error("Method not implemented.");
-  }
-  start(): void {
-    throw new Error("Method not implemented.");
-  }
-  empty(): void {
-    throw new Error("Method not implemented.");
-  }
-  end(): void {
-    throw new Error("Method not implemented.");
-  }
-  text(): void {
-    throw new Error("Method not implemented.");
-  }
+  entityRef() {}
+  start() {}
+  empty() {}
+  end() {}
+  text() {}
 }
 
 function getDoctypeDecl(...chunks: string[]) {
@@ -97,5 +75,15 @@ describe("doctypedecl", function() {
   it("not-wf: doctypedecl with invalid start", function() {
     expect(() => getDoctypeDecl("<!DOCTYP doctypName >"))
       .to.throw().and.have.property("code", "INVALID_CDATA");
+  });
+  it("not-wf: more than one doctypedecl", function() {
+    expect(() =>
+      getDoctypeDecl("<!DOCTYPE doctypeName ><!DOCTYPE doctypeName >")
+    )
+      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+  });
+  it("not-wf: doctypedecl after root element", function() {
+    expect(() => getDoctypeDecl("<root/><!DOCTYPE doctypeName >"))
+      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
   });
 });
