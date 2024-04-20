@@ -30,19 +30,6 @@ export function isWhitespace(c: number) {
   return c === Chars.SP || c === Chars.TAB || c === Chars.LF || c === Chars.CR;
 }
 
-// @internal
-export function isAsciiDigit(c: number) {
-  return 0x30 <= c && c <= 0x39;
-}
-
-// @internal
-export function isAsciiHexAlpha(c: number) {
-  return (
-    (0x61 /* a */ <= c && c <= 0x66) /* f */ ||
-    (0x41 /* A */ <= c && c <= 0x46) /* F */
-  );
-}
-
 // https://www.w3.org/TR/REC-xml/#NT-Char
 // § Character Range
 // @internal
@@ -78,7 +65,7 @@ export function isNameStartChar(c: number) {
 export function isNameChar(c: number) {
   return (
     isNameStartChar(c) || c === 0x2D /* - */ || c === 0x2E /* . */ ||
-    isAsciiDigit(c) || c === 0xB7 || 0x0300 <= c && c <= 0x036F ||
+    0x30 <= c && c <= 0x39 || c === 0xB7 || 0x0300 <= c && c <= 0x036F ||
     0x203F <= c && c <= 0x2040
   );
 }
