@@ -754,6 +754,7 @@ export class SaxParser {
       this.element_.slice(0, 6) === "OCTYPE" &&
       isWhitespace(this.element_.charCodeAt(6))
     ) {
+      this.flags_ |= Flags.SEEN_DOCTYPE;
       this.state_ = State.DOCTYPE_DECL;
       this.element_ = "";
     } else if (this.element_.length === 7) {
