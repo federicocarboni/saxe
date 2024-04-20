@@ -19,11 +19,10 @@ class XmlDeclReader implements SaxReader {
   text(): void {}
 }
 
-function getXmlDecl(xml: string | string[]) {
+function getXmlDecl(...chunks: string[]) {
   const reader = new XmlDeclReader();
   const parser = new SaxParser(reader);
-  const xmls = typeof xml === "string" ? [xml] : xml;
-  for (const chunk of xmls) {
+  for (const chunk of chunks) {
     parser.write(chunk);
   }
   parser.end();
@@ -166,5 +165,13 @@ describe("XML Declaration", function() {
   it("not-wf: XMLDecl ends at '?>' not '>'", function() {
     expect(() => getXmlDecl('<?xml version="1.0" >'))
       .to.throw().and.have.property("code", "UNEXPECTED_EOF");
+  });
+  it("wf: XMLDecl with value split across chunks", function() {
+    expect(getXmlDecl('<?xml version="', "1.0", '"?><root/>'))
+      .deep.equals({
+        version: "1.0",
+        encoding: undefined,
+        standalone: undefined,
+      });
   });
 });
