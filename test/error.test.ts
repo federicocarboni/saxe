@@ -1,6 +1,6 @@
 import {expect} from "chai";
-import {isSaxError} from "../src/index.ts";
 import {createSaxError} from "../src/error.ts";
+import {isSaxError} from "../src/index.ts";
 
 describe("SaxError", function() {
   it("isSaxError returns true for SaxErrors", function() {

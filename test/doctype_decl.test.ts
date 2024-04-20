@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {Doctype, SaxReader, SaxParser} from "../src/index.ts";
+import {Doctype, SaxParser, SaxReader} from "../src/index.ts";
 
 class DoctypeDeclReader implements SaxReader {
   public doctypeDecl: Doctype | undefined;

@@ -9,20 +9,20 @@ import {SaxReader} from "../src/index.ts";
 function escapeDataChars(value: string) {
   return value.replace(/[&<>"\t\n\r]/g, (val) => {
     switch (val) {
-    case "&":
-      return "&amp;";
-    case "<":
-      return "&lt;";
-    case ">":
-      return "&gt;";
-    case '"':
-      return "&quot;";
-    case "\t":
-      return "&#9;";
-    case "\n":
-      return "&#10;";
-    case "\r":
-      return "&#13;";
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "\t":
+        return "&#9;";
+      case "\n":
+        return "&#10;";
+      case "\r":
+        return "&#13;";
     }
     return "";
   });

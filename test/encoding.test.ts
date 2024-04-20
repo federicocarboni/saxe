@@ -1,9 +1,7 @@
 import {expect} from "chai";
-import {Chars} from "../src/chars.ts";
 import {SaxDecoder} from "../src/encoding.ts";
 import {SaxParser} from "../src/index.ts";
 import {CanonicalXmlWriter} from "./canonical_xml.ts";
-import {toCanonical} from "./template";
 
 const SHIFT_JIS_CONTENT = Buffer.from(
   "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iU2hpZnRfSklTIj8+Cjxyb290PoNug42BW4FFg4+BW4OLg2g8L3Jvb3Q+Cg==",
