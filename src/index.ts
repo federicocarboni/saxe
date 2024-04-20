@@ -303,33 +303,6 @@ const PREDEFINED_ENTITIES = {
   quot: '"',
 } as const;
 
-// These are internal until we can define how namespace support will work.
-// @internal
-/**
- * @param name
- */
-export function getPrefix(name: string): string | undefined {
-  const colon = name.indexOf(":");
-  if (colon === -1) {
-    return name;
-  }
-  const prefix = name.slice(0, colon);
-  return colon === 0 || colon === name.length - 1 ? undefined : prefix;
-}
-
-// @internal
-/**
- * @param name
- */
-export function getLocal(name: string): string | undefined {
-  const colon = name.indexOf(":");
-  if (colon === -1) {
-    return name;
-  }
-  const local = name.slice(colon + 1);
-  return colon === 0 || colon === name.length - 1 ? undefined : local;
-}
-
 /**
  * Streaming non-validating XML Parser, it makes no attempt to recover
  * well-formedness errors.
