@@ -1444,8 +1444,15 @@ export class SaxParser {
       if (
         this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CLOSE_BRACKET
       ) {
-        this.state_ = State.CDATA_SECTION_END0;
-        this.content_ = this.content_.slice(0, -1);
+        if (
+          this.chunk_.charCodeAt(this.chunk_.length - 2) === Chars.CLOSE_BRACKET
+        ) {
+          this.state_ = State.CDATA_SECTION_END;
+          this.content_ = this.content_.slice(0, -2);
+        } else {
+          this.state_ = State.CDATA_SECTION_END0;
+          this.content_ = this.content_.slice(0, -1);
+        }
       }
       if (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES) {
         this.reader_.text(this.content_);
@@ -1479,7 +1486,7 @@ export class SaxParser {
     } else if (codeUnit === Chars.CLOSE_BRACKET) {
       this.content_ += "]";
     } else {
-      this.content_ += "]" + String.fromCharCode(codeUnit);
+      this.content_ += "]]" + String.fromCharCode(codeUnit);
       this.state_ = State.CDATA_SECTION;
     }
   }
