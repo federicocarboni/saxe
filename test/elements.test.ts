@@ -19,3 +19,14 @@ describe("text content", function() {
     );
   });
 });
+
+describe("CDATA sections", function() {
+  it("wf: CDATA section containing multiple brackets", function() {
+    expect(toCanonical("<root><![CDATA[ [[[[[[[[]]]]]]]]]]></root>"))
+      .equals("<root> [[[[[[[[]]]]]]]]</root>");
+  });
+  it("wf: CDATA section split across multiple chunks", function() {
+    expect(toCanonical("<root><![CDATA[", "]", "]", "content", "]]", "]]>", "content]", "]", "</root>"))
+      .equals("<root>]]content]]content]]</root>");
+  });
+});

@@ -1,11 +1,11 @@
-import {SaxOptions, SaxParser} from "../src/index.ts";
+import {SaxParser} from "../src/index.ts";
 import {CanonicalXmlWriter} from "./canonical_xml.ts";
 
-export function toCanonical(xml: string, options?: SaxOptions) {
+export function toCanonical(...chunks: string[]) {
   const reader = new CanonicalXmlWriter();
-  const parser = new SaxParser(reader, options);
-  for (const c of xml) {
-    parser.write(c);
+  const parser = new SaxParser(reader);
+  for (const chunk of chunks) {
+    parser.write(chunk);
   }
   parser.end();
   return reader.output;
