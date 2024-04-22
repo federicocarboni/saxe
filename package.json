@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc && esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=_\\$ --sourcemap",
     "fuzz": "jsfuzz fuzz/target.ts corpus -- --require tsm",
+    "install": "npm run build",
     "test": "c8 mocha test/*.test.ts",
     "lint": "dprint fmt && eslint ."
   },
