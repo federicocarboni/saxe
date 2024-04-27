@@ -51,11 +51,33 @@ export interface XmlDeclaration {
   standalone?: boolean | undefined;
 }
 
+/**
+ * Document type declaration.
+ *
+ * @since 1.0.0
+ */
 export interface Doctype {
+  /**
+   * Name in the document type declaration.
+   *
+   * [VC: Root Element Type]
+   * The Name in the document type declaration MUST match the element type of
+   * the root element.
+   */
   name: string;
-  // TODO: does anyone need these?
-  // publicId?: string | undefined;
-  // systemId?: string | undefined;
+  /**
+   * Public identifier in the document type declaration, if present.
+   *
+   * ```text
+   * [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"
+   * [13] PubidChar	::= #x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]
+   * ```
+   */
+  publicId?: string | undefined;
+  /**
+   * System identifier in the document type declaration, if present.
+   */
+  systemId?: string | undefined;
 }
 
 /**
@@ -68,6 +90,8 @@ export interface SaxReader {
    * @param doctype -
    */
   doctype?(doctype: Doctype): void;
+
+  getParameterEntity?(entity: string): void;
   /**
    * A processing instruction.
    *
@@ -227,6 +251,10 @@ const enum State {
   DOCTYPE_DECL,
   DOCTYPE_NAME,
   DOCTYPE_NAME_END,
+  DOCTYPE_EXTERNAL_ID,
+  DOCTYPE_SYSTEM_SPACE,
+  DOCTYPE_EXTERNAL_ID_QUOTED_START,
+  DOCTYPE_EXTERNAL_ID_QUOTED,
   DOCTYPE_ANY,
   DOCTYPE_ANY_QUOTED,
   MISC,
@@ -284,6 +312,8 @@ const enum Flags {
   // Runtime flags:
   SEEN_DOCTYPE = 1 << 10,
   SEEN_ROOT = 1 << 11,
+  DOCTYPE_PUBLIC = 1 << 12,
+  DOCTYPE_SYSTEM = 1 << 13,
 }
 
 // Normalize XML line endings.
@@ -475,6 +505,14 @@ export class SaxParser {
         return this.parseDoctypeName_();
       case State.DOCTYPE_NAME_END:
         return this.parseDoctypeNameEnd_();
+      case State.DOCTYPE_EXTERNAL_ID:
+        return this.parseDoctypeExternalId_();
+      case State.DOCTYPE_EXTERNAL_ID_QUOTED_START:
+        return this.parseDoctypeExternalIdQuotedStart_();
+      case State.DOCTYPE_EXTERNAL_ID_QUOTED:
+        return this.parseDoctypeExternalIdQuoted_();
+      case State.DOCTYPE_SYSTEM_SPACE:
+        return this.parseDoctypeSystemSpace_();
       case State.DOCTYPE_ANY:
         return this.parseDoctypeAny_();
       case State.DOCTYPE_ANY_QUOTED:
@@ -764,8 +802,28 @@ export class SaxParser {
   // @internal
   private doctypeEnd_() {
     ++this.index_;
-    this.reader_.doctype?.({name: this.element_});
+    const systemId = this.flags_ & Flags.DOCTYPE_SYSTEM
+      ? this.content_
+      : undefined;
+    const publicId = this.flags_ & Flags.DOCTYPE_PUBLIC
+      ? this.attribute_
+      : undefined;
+    // [11] SystemLiteral	::= ('"' [^"]* '"') | ("'" [^']* "'")
+    // [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'
+    // [13] PubidChar	::= #x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]
+    // SystemLiteral is constrained by the Char production
+    // PubidLiteral has further constraints imposed by PubidChar
+    if (
+      systemId !== undefined && hasInvalidChar(systemId) ||
+      publicId !== undefined &&
+        /[^ \r\na-zA-Z0-9-'()+,./:=?;!*#@$_%]/.test(publicId)
+    ) {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
+    }
+    this.reader_.doctype?.({name: this.element_, publicId, systemId});
     this.element_ = "";
+    this.content_ = "";
+    this.attribute_ = "";
     this.state_ = State.MISC;
   }
 
@@ -783,8 +841,79 @@ export class SaxParser {
     if (codeUnit === Chars.OPEN_BRACKET) {
       ++this.index_;
       ++this.otherState_;
+      this.state_ = State.DOCTYPE_ANY;
+    } else {
+      this.state_ = State.DOCTYPE_EXTERNAL_ID;
     }
-    this.state_ = State.DOCTYPE_ANY;
+  }
+
+  // @internal
+  private parseDoctypeExternalId_() {
+    const start = this.index_;
+    this.index_ += 7 - this.content_.length;
+    this.content_ += this.chunk_.slice(start, this.index_);
+    this.index_ += 7 - this.content_.length;
+    const externalId = this.content_.slice(0, 6);
+    const isS = isWhitespace(this.content_.charCodeAt(6));
+    if (externalId === "PUBLIC" && isS) {
+      this.flags_ |= Flags.DOCTYPE_PUBLIC;
+      this.flags_ |= Flags.DOCTYPE_SYSTEM;
+      this.otherState_ = State.DOCTYPE_SYSTEM_SPACE;
+      this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
+      this.content_ = "";
+    } else if (externalId === "SYSTEM" && isS) {
+      this.flags_ |= Flags.DOCTYPE_SYSTEM;
+      this.otherState_ = State.DOCTYPE_ANY;
+      this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
+      this.content_ = "";
+    } else if (this.content_.length === 7) {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
+    }
+  }
+
+  // @internal
+  private parseDoctypeSystemSpace_() {
+    this.attribute_ = this.content_;
+    this.content_ = "";
+    if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
+    }
+    ++this.index_;
+    this.otherState_ = State.DOCTYPE_ANY;
+    this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
+  }
+
+  // @internal
+  private parseDoctypeExternalIdQuotedStart_() {
+    if (!this.skipWhitespace_()) {
+      return;
+    }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    ++this.index_;
+    if (codeUnit !== Chars.QUOTE && codeUnit !== Chars.APOSTROPHE) {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
+    }
+    this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED;
+    this.quote_ = codeUnit;
+  }
+
+  // @internal
+  private parseDoctypeExternalIdQuoted_() {
+    const index = this.chunk_.indexOf(
+      this.quote_ === Chars.APOSTROPHE ? "'" : '"',
+      this.index_,
+    );
+    this.content_ += this.chunk_.slice(
+      this.index_,
+      index === -1 ? undefined : index,
+    );
+    if (index === -1) {
+      this.index_ = this.chunk_.length;
+    } else {
+      this.index_ = index + 1;
+      this.state_ = this.otherState_;
+      this.otherState_ = 0;
+    }
   }
 
   // @internal
