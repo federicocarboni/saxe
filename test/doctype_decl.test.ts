@@ -30,8 +30,11 @@ describe("doctypedecl", function() {
   it("wf: doctypedecl with ExternalID and no intSubset", function() {
     expect(
       getDoctypeDecl('<!DOCTYPE doctypeName SYSTEM "-//DTD/something" >'),
-    )
-      .to.have.property("name", "doctypeName");
+    ).deep.equals({
+      name: "doctypeName",
+      publicId: undefined,
+      systemId: "-//DTD/something",
+    });
   });
   it("wf: doctypedecl with intSubset and no ExternalID", function() {
     expect(getDoctypeDecl(
@@ -44,14 +47,22 @@ describe("doctypedecl", function() {
       getDoctypeDecl(
         '<!DOCTYPE doctypeName PUBLIC "/public/dtd" "-//DTD/something" [ <![IGNORE[  ]]> ] >',
       ),
-    ).to.have.property("name", "doctypeName");
+    ).deep.equals({
+      name: "doctypeName",
+      publicId: "/public/dtd",
+      systemId: "-//DTD/something",
+    });
   });
   it("wf: doctypedecl with intSubset and ExternalID quoted with apostrophes", function() {
     expect(
       getDoctypeDecl(
         "<!DOCTYPE doctypeName PUBLIC \"/public/dtd\" '-//DTD/something' [ <![IGNORE[  ]]> ] >",
       ),
-    ).to.have.property("name", "doctypeName");
+    ).deep.equals({
+      name: "doctypeName",
+      publicId: "/public/dtd",
+      systemId: "-//DTD/something",
+    });
   });
   it("wf: doctypedecl with an astral character name", function() {
     expect(getDoctypeDecl("<!DOCTYPE \u{1F000}\u{1F001}\u{1F002}>"))
@@ -60,13 +71,20 @@ describe("doctypedecl", function() {
   it("wf: doctypedecl with values split across chunks", function() {
     expect(
       getDoctypeDecl(
-        "<!DOCTYPE  ",
+        "<!DOC",
+        "TYPE  ",
         "doctyp",
         "eName ",
-        ' PUBLIC "/public',
-        '/dtd" "-//DTD/something" [ <![IGNORE[  ]]> ] >',
+        " PUB",
+        'LIC "/public',
+        '/dtd"  ',
+        ' "-//DTD/something" [ <![IGNORE[  ]]> ] >',
       ),
-    ).to.have.property("name", "doctypeName");
+    ).deep.equals({
+      name: "doctypeName",
+      publicId: "/public/dtd",
+      systemId: "-//DTD/something",
+    });
   });
   it("not-wf: doctypedecl with no name", function() {
     expect(() => getDoctypeDecl("<!DOCTYPE  >"))
@@ -84,6 +102,22 @@ describe("doctypedecl", function() {
   });
   it("not-wf: doctypedecl after root element", function() {
     expect(() => getDoctypeDecl("<root/><!DOCTYPE doctypeName >"))
+      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+  });
+  it("not-wf: doctypedecl with unquoted ExternalID", function() {
+    expect(() => getDoctypeDecl("<!DOCTYPE doctypeName PUBLIC pubid><root/>"))
+      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+  });
+  it("not-wf: doctypedecl with no space after Pubid", function() {
+    expect(() => getDoctypeDecl('<!DOCTYPE doctypeName PUBLIC "pubid""system"><root/>'))
+      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+  });
+  it("not-wf: doctypedecl with invalid PubidChar", function() {
+    expect(() => getDoctypeDecl('<!DOCTYPE doctypeName PUBLIC "{{pubid}}" "system"><root/>'))
+      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+  });
+  it("not-wf: doctypedecl with malformed ExternalID", function() {
+    expect(() => getDoctypeDecl('<!DOCTYPE doctypeName PUBLIK "pubid" "system"><root/>'))
       .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
   });
 });
