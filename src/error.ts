@@ -9,6 +9,7 @@ const ERRORS = {
   INVALID_XML_DECL: () => "XML Declaration not well-formed",
   // doctypedecl
   INVALID_DOCTYPE_DECL: () => "DOCTYPE Declaration not well-formed",
+  INVALID_INTERNAL_SUBSET: () => "Internal subset not well-formed",
   INVALID_COMMENT: () => "Comments cannot contain '--'",
   RESERVED_PI: () => "Processing instruction target 'XML' is reserved",
   INVALID_PI: () => "Processing instruction not well-formed",

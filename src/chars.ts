@@ -1,4 +1,4 @@
-/** @internal */
+// @internal
 export const enum Chars {
   TAB = 0x9,
   LF = 0xA,
@@ -9,6 +9,7 @@ export const enum Chars {
   BANG = 0x21,
   QUOTE = 0x22,
   HASH = 0x23,
+  PERCENT = 0x25,
   HYPHEN = 0x2D,
   SLASH = 0x2F,
   SEMICOLON = 0x3B,
@@ -16,6 +17,10 @@ export const enum Chars {
   EQ = 0x3D,
   GT = 0x3E,
   QUESTION = 0x3F,
+  UPPER_A = 0x41,
+  UPPER_E = 0x45,
+  UPPER_L = 0x4C,
+  UPPER_N = 0x4E,
   OPEN_BRACKET = 0x5B,
   CLOSE_BRACKET = 0x5D,
   LOWER_L = 0x6C,

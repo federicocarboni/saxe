@@ -255,8 +255,13 @@ const enum State {
   DOCTYPE_SYSTEM_SPACE,
   DOCTYPE_EXTERNAL_ID_QUOTED_START,
   DOCTYPE_EXTERNAL_ID_QUOTED,
-  DOCTYPE_ANY,
-  DOCTYPE_ANY_QUOTED,
+  DOCTYPE_MAYBE_INTERNAL_SUBSET,
+  INTERNAL_SUBSET,
+  INTERNAL_SUBSET_OPEN_ANGLE,
+  INTERNAL_SUBSET_OPEN_ANGLE_BANG,
+  INTERNAL_SUBSET_DECL,
+  INTERNAL_SUBSET_DECL_QUOTED,
+  DOCTYPE_END,
   MISC,
   PI_TARGET_START,
   PI_TARGET,
@@ -513,10 +518,20 @@ export class SaxParser {
         return this.parseDoctypeExternalIdQuoted_();
       case State.DOCTYPE_SYSTEM_SPACE:
         return this.parseDoctypeSystemSpace_();
-      case State.DOCTYPE_ANY:
-        return this.parseDoctypeAny_();
-      case State.DOCTYPE_ANY_QUOTED:
-        return this.parseDoctypeAnyQuoted_();
+      case State.DOCTYPE_MAYBE_INTERNAL_SUBSET:
+        return this.parseDoctypeMaybeInternalSubset_();
+      case State.INTERNAL_SUBSET:
+        return this.parseInternalSubset_();
+      case State.INTERNAL_SUBSET_OPEN_ANGLE:
+        return this.parseInternalSubsetOpenAngle_();
+      case State.INTERNAL_SUBSET_OPEN_ANGLE_BANG:
+        return this.parseInternalSubsetOpenAngleBang_();
+      case State.INTERNAL_SUBSET_DECL:
+        return this.parseInternalSubsetDecl_();
+      case State.INTERNAL_SUBSET_DECL_QUOTED:
+        return this.parseInternalSubsetDeclQuoted_();
+      case State.DOCTYPE_END:
+        return this.parseDoctypeEnd_();
       case State.MISC:
         return this.parseMisc_();
       case State.PI_TARGET_START:
@@ -841,7 +856,7 @@ export class SaxParser {
     if (codeUnit === Chars.OPEN_BRACKET) {
       ++this.index_;
       ++this.otherState_;
-      this.state_ = State.DOCTYPE_ANY;
+      this.state_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
     } else {
       this.state_ = State.DOCTYPE_EXTERNAL_ID;
     }
@@ -863,7 +878,7 @@ export class SaxParser {
       this.content_ = "";
     } else if (externalId === "SYSTEM" && isS) {
       this.flags_ |= Flags.DOCTYPE_SYSTEM;
-      this.otherState_ = State.DOCTYPE_ANY;
+      this.otherState_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
       this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
       this.content_ = "";
     } else if (this.content_.length === 7) {
@@ -879,7 +894,7 @@ export class SaxParser {
       throw createSaxError("INVALID_DOCTYPE_DECL");
     }
     ++this.index_;
-    this.otherState_ = State.DOCTYPE_ANY;
+    this.otherState_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
     this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
   }
 
@@ -917,46 +932,116 @@ export class SaxParser {
   }
 
   // @internal
-  private parseDoctypeAny_() {
-    while (this.index_ < this.chunk_.length) {
+  private parseDoctypeMaybeInternalSubset_() {
+    if (this.skipWhitespace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
-      switch (codeUnit) {
-        case Chars.APOSTROPHE:
-        case Chars.QUOTE:
-          this.quote_ = codeUnit;
-          ++this.index_;
-          this.state_ = State.DOCTYPE_ANY_QUOTED;
-          return;
-        case Chars.OPEN_BRACKET:
-          ++this.otherState_;
-          break;
-        case Chars.CLOSE_BRACKET:
-          --this.otherState_;
-          break;
-        case Chars.GT:
-          if (this.otherState_ === 0) {
-            this.doctypeEnd_();
-            return;
-          }
-          break;
+      if (codeUnit === Chars.OPEN_BRACKET) {
+        this.state_ = State.INTERNAL_SUBSET;
+      } else if (codeUnit === Chars.GT) {
+        this.doctypeEnd_();
+      } else {
+        throw createSaxError("INVALID_DOCTYPE_DECL");
       }
-      ++this.index_;
     }
   }
 
   // @internal
-  private parseDoctypeAnyQuoted_() {
+  private parseInternalSubset_() {
+    const start = this.index_;
+    loop: while (this.index_ < this.chunk_.length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      ++this.index_;
+      switch (codeUnit) {
+        case Chars.LT:
+          this.state_ = State.INTERNAL_SUBSET_OPEN_ANGLE;
+          break loop;
+        case Chars.CLOSE_BRACKET:
+          this.state_ = State.DOCTYPE_END;
+          break loop;
+        default:
+          if (!isWhitespace(codeUnit)) {
+            throw createSaxError("INVALID_DOCTYPE_DECL");
+          }
+      }
+    }
+    if (this.index_ < this.chunk_.length) {
+      this.content_ += this.chunk_.slice(start, this.index_);
+    }
+  }
+
+  // @internal
+  private parseInternalSubsetOpenAngle_() {
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    ++this.index_;
+    if (codeUnit === Chars.BANG) {
+      this.state_ = State.INTERNAL_SUBSET_OPEN_ANGLE_BANG;
+    } else if (codeUnit === Chars.QUESTION) {
+      this.otherState_ = State.INTERNAL_SUBSET;
+      this.state_ = State.PI_TARGET_START;
+    } else {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
+    }
+  }
+
+  // @internal
+  private parseInternalSubsetOpenAngleBang_() {
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    if (codeUnit === Chars.HYPHEN) {
+      ++this.index_;
+      this.otherState_ = State.INTERNAL_SUBSET;
+      this.state_ = State.COMMENT_START;
+    } else {
+      this.content_ += "<!";
+      this.state_ = State.INTERNAL_SUBSET_DECL;
+    }
+  }
+
+  // @internal
+  private parseInternalSubsetDecl_() {
+    const start = this.index_;
+    while (this.index_ < this.chunk_.length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      ++this.index_;
+      switch (codeUnit) {
+        case Chars.APOSTROPHE:
+        case Chars.QUOTE:
+          this.quote_ = codeUnit;
+          this.state_ = State.INTERNAL_SUBSET_DECL_QUOTED;
+          break;
+        case Chars.GT:
+          this.state_ = State.INTERNAL_SUBSET;
+          return;
+      }
+    }
+    this.content_ += this.chunk_.slice(start, this.index_);
+  }
+
+  // @internal
+  private parseInternalSubsetDeclQuoted_() {
     const index = this.chunk_.indexOf(
       this.quote_ === Chars.APOSTROPHE ? "'" : '"',
       this.index_,
     );
-    if (index === -1) {
-      this.index_ = this.chunk_.length;
-    } else {
+    if (index !== -1) {
       this.index_ = index + 1;
-      this.state_ = State.DOCTYPE_ANY;
+      this.state_ = State.INTERNAL_SUBSET_DECL;
+    } else {
+      this.content_ += this.chunk_.slice(this.index_);
+      this.index_ = this.chunk_.length;
     }
   }
+
+  // @internal
+  private parseDoctypeEnd_() {
+    if (!this.skipWhitespace_()) {
+      return;
+    }
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
+    }
+    this.doctypeEnd_();
+  }
+
   // @internal
   private parseMisc_() {
     if (this.skipWhitespace_()) {
