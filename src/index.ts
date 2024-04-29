@@ -85,13 +85,15 @@ export interface Doctype {
  * @since 1.0.0
  */
 export interface SaxReader {
+  /**
+   * XML Declaration of the document.
+   * @param declaration -
+   */
   xml?(declaration: XmlDeclaration): void;
   /**
    * @param doctype -
    */
   doctype?(doctype: Doctype): void;
-
-  getParameterEntity?(entity: string): void;
   /**
    * A processing instruction.
    *
@@ -105,7 +107,6 @@ export interface SaxReader {
    * of the configuration.
    * @param target -
    * @param content -
-   * @since 1.0.0
    */
   pi?(target: string, content: string): void;
   /**
@@ -122,34 +123,21 @@ export interface SaxReader {
    */
   comment?(text: string): void;
   /**
-   * Implementations should return the expanded value for the given entity.
-   * Entities may contain character references and other entity references, the
-   * parser assumes this has already been done by the user and appends the
-   * returned string to the attribute value.
-   *
-   * If an entity is not recognized by the implementation it should just return
-   * `undefined`.
-   *
-   * **Note**: this is not called for predefined general entity references or
-   * inside text content as those may contain markup, see {@link entityRef}.
-   * @param entity -
-   * @returns Entity value or `undefined` if not recognized
+   * @param entity
    */
-  replaceEntityRef?(entity: string): string | undefined;
+  getGeneralEntity?(entity: string): string | undefined;
   /**
-   * A general entity reference which is not predefined; `&amp;`, `&lt;`, `&gt`,
-   * `&apos;` and `&quot;` are recognized by the parser and replaced .
+   * A general entity reference.
    *
    * ```xml
+   * <root>
    * &entity;
+   * </root>
    * ```
    *
-   * **Note**: this is not called for general entity references inside attribute
-   * values as those are replaced immediately by the parser. Attribute values
-   * use {@link replaceEntityRef} instead.
-   * @param entity - referenced entity name
+   * @param entity
    */
-  entityRef(entity: string): void;
+  entityRef?(entity: string): void;
   /**
    * Start tag.
    *
@@ -238,6 +226,10 @@ export interface SaxOptions {
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
+  /**
+   * @default "default"
+   */
+  internalSubset?: "default" | "ignore" | undefined;
 }
 
 const enum State {
@@ -251,10 +243,10 @@ const enum State {
   DOCTYPE_DECL,
   DOCTYPE_NAME,
   DOCTYPE_NAME_END,
-  DOCTYPE_EXTERNAL_ID,
-  DOCTYPE_SYSTEM_SPACE,
-  DOCTYPE_EXTERNAL_ID_QUOTED_START,
-  DOCTYPE_EXTERNAL_ID_QUOTED,
+  EXTERNAL_ID,
+  EXTERNAL_ID_SYSTEM_SPACE,
+  EXTERNAL_ID_QUOTED_START,
+  EXTERNAL_ID_QUOTED,
   DOCTYPE_MAYBE_INTERNAL_SUBSET,
   INTERNAL_SUBSET,
   INTERNAL_SUBSET_OPEN_ANGLE,
@@ -326,9 +318,43 @@ function normalizeLineEndings(s: string) {
   return s.replace(/\r\n?/g, "\n");
 }
 
-// Even if predefined entities are declared somewhere in a DTD they MUST
-// have replacement text that produces text exactly equal to the predefined
-// ones, so we can have treat them essentially the same as a char reference.
+// @internal
+interface AttDef {
+  // Default value for the attribute
+  default_: string | undefined;
+  // true if the attribute is TokenizedType or EnumeratedType,
+  // requiring extra normalization steps
+  isTokenized_: boolean;
+}
+
+// https://www.w3.org/TR/REC-xml/#AVNormalize
+function normalizeAttributeValue(s: string) {
+  // If the attribute type is not CDATA, then the XML processor
+  // MUST further process the normalized attribute value by
+  // discarding any leading and trailing space (#x20) characters,
+  // and by replacing sequences of space (#x20) characters by
+  // a single space (#x20) character.
+  // Using a regex here saves a lot of space and is decently
+  // fast.
+  return s.replace(/^ +| +$| +(?= )/g, "");
+}
+
+const ATT_TYPES = [
+  "CDATA",
+  "ID",
+  "IDREF",
+  "IDREFS",
+  "ENTITY",
+  "ENTITIES",
+  "NMTOKEN",
+  "NMTOKENS",
+  "NOTATION",
+];
+
+// Even if predefined entities are declared somewhere in a DTD
+// they MUST have replacement text that produces text exactly
+// equal to the predefined ones, so we can have treat them essentially
+// the same as a char reference.
 // https://www.w3.org/TR/REC-xml/#sec-predefined-ent
 const PREDEFINED_ENTITIES = {
   amp: "&",
@@ -382,6 +408,13 @@ export class SaxParser {
 
   // @internal
   private elements_: string[] = [];
+
+  // Internal entities declared in the internal subset.
+  // @internal
+  private entities_ = new Map<string, string>();
+  // Attlists declared in the internal subset.
+  // @internal
+  private attlists_ = new Map<string, Map<string, AttDef>>();
 
   // Accumulators
 
@@ -442,6 +475,7 @@ export class SaxParser {
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
+    this.attlists_;
   }
 
   /**
@@ -510,14 +544,14 @@ export class SaxParser {
         return this.parseDoctypeName_();
       case State.DOCTYPE_NAME_END:
         return this.parseDoctypeNameEnd_();
-      case State.DOCTYPE_EXTERNAL_ID:
+      case State.EXTERNAL_ID:
         return this.parseDoctypeExternalId_();
-      case State.DOCTYPE_EXTERNAL_ID_QUOTED_START:
-        return this.parseDoctypeExternalIdQuotedStart_();
-      case State.DOCTYPE_EXTERNAL_ID_QUOTED:
-        return this.parseDoctypeExternalIdQuoted_();
-      case State.DOCTYPE_SYSTEM_SPACE:
+      case State.EXTERNAL_ID_SYSTEM_SPACE:
         return this.parseDoctypeSystemSpace_();
+      case State.EXTERNAL_ID_QUOTED_START:
+        return this.parseDoctypeExternalIdQuotedStart_();
+      case State.EXTERNAL_ID_QUOTED:
+        return this.parseDoctypeExternalIdQuoted_();
       case State.DOCTYPE_MAYBE_INTERNAL_SUBSET:
         return this.parseDoctypeMaybeInternalSubset_();
       case State.INTERNAL_SUBSET:
@@ -856,30 +890,32 @@ export class SaxParser {
     if (codeUnit === Chars.OPEN_BRACKET) {
       ++this.index_;
       ++this.otherState_;
-      this.state_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
+      this.state_ = State.INTERNAL_SUBSET;
     } else {
-      this.state_ = State.DOCTYPE_EXTERNAL_ID;
+      this.state_ = State.EXTERNAL_ID;
     }
   }
 
   // @internal
   private parseDoctypeExternalId_() {
-    const start = this.index_;
-    this.index_ += 7 - this.content_.length;
-    this.content_ += this.chunk_.slice(start, this.index_);
-    this.index_ += 7 - this.content_.length;
+    const newChunk = this.chunk_.slice(
+      this.index_,
+      this.index_ + 7 - this.content_.length,
+    );
+    this.index_ += newChunk.length;
+    this.content_ += newChunk;
     const externalId = this.content_.slice(0, 6);
     const isS = isWhitespace(this.content_.charCodeAt(6));
     if (externalId === "PUBLIC" && isS) {
       this.flags_ |= Flags.DOCTYPE_PUBLIC;
       this.flags_ |= Flags.DOCTYPE_SYSTEM;
-      this.otherState_ = State.DOCTYPE_SYSTEM_SPACE;
-      this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
+      this.otherState_ = State.EXTERNAL_ID_SYSTEM_SPACE;
+      this.state_ = State.EXTERNAL_ID_QUOTED_START;
       this.content_ = "";
     } else if (externalId === "SYSTEM" && isS) {
       this.flags_ |= Flags.DOCTYPE_SYSTEM;
       this.otherState_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
-      this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
+      this.state_ = State.EXTERNAL_ID_QUOTED_START;
       this.content_ = "";
     } else if (this.content_.length === 7) {
       throw createSaxError("INVALID_DOCTYPE_DECL");
@@ -895,7 +931,7 @@ export class SaxParser {
     }
     ++this.index_;
     this.otherState_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
-    this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED_START;
+    this.state_ = State.EXTERNAL_ID_QUOTED_START;
   }
 
   // @internal
@@ -908,7 +944,7 @@ export class SaxParser {
     if (codeUnit !== Chars.QUOTE && codeUnit !== Chars.APOSTROPHE) {
       throw createSaxError("INVALID_DOCTYPE_DECL");
     }
-    this.state_ = State.DOCTYPE_EXTERNAL_ID_QUOTED;
+    this.state_ = State.EXTERNAL_ID_QUOTED;
     this.quote_ = codeUnit;
   }
 
@@ -947,7 +983,6 @@ export class SaxParser {
 
   // @internal
   private parseInternalSubset_() {
-    const start = this.index_;
     loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
@@ -964,9 +999,6 @@ export class SaxParser {
           }
       }
     }
-    if (this.index_ < this.chunk_.length) {
-      this.content_ += this.chunk_.slice(start, this.index_);
-    }
   }
 
   // @internal
@@ -979,7 +1011,7 @@ export class SaxParser {
       this.otherState_ = State.INTERNAL_SUBSET;
       this.state_ = State.PI_TARGET_START;
     } else {
-      throw createSaxError("INVALID_DOCTYPE_DECL");
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
   }
 
@@ -991,15 +1023,194 @@ export class SaxParser {
       this.otherState_ = State.INTERNAL_SUBSET;
       this.state_ = State.COMMENT_START;
     } else {
-      this.content_ += "<!";
       this.state_ = State.INTERNAL_SUBSET_DECL;
     }
   }
 
   // @internal
+  private readName_() {
+    if (!isNameStartChar(this.chunk_.codePointAt(this.index_)!)) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    return this.readNameCharacters_();
+  }
+
+  // @internal
+  private readEntityDecl_() {
+    this.index_ += 7;
+    this.skipWhitespace_();
+    const isParameter = this.chunk_.charCodeAt(this.index_) === Chars.PERCENT;
+    if (isParameter) {
+      ++this.index_;
+      this.skipWhitespace_();
+    }
+    const entityName = this.readName_();
+    if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    this.skipWhitespace_();
+    const quote = this.chunk_.charCodeAt(this.index_);
+    ++this.index_;
+    let external = false;
+    let replacementText = "";
+    if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
+      const start = this.index_;
+      loop: while (this.index_ < this.chunk_.length) {
+        const codeUnit = this.chunk_.charCodeAt(this.index_);
+        switch (codeUnit) {
+          case quote:
+            replacementText += this.chunk_.slice(start, this.index_);
+            break loop;
+          case Chars.PERCENT:
+            external = true;
+          // fallthrough
+          case Chars.AMPERSAND:
+            this.readName_();
+            if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
+              throw createSaxError("INVALID_INTERNAL_SUBSET");
+            }
+            ++this.index_;
+            break;
+          default:
+            // Other characters still need to be validated:
+            if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+              throw createSaxError("INVALID_CHAR");
+            }
+        }
+        ++this.index_;
+      }
+      if (this.chunk_.charCodeAt(this.index_) !== quote) {
+        throw createSaxError("INVALID_INTERNAL_SUBSET");
+      }
+      ++this.index_;
+    } else {
+      // TODO: external entities
+      this.index_ = this.chunk_.length - 1;
+    }
+    this.skipWhitespace_();
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    if (!external && !this.entities_.has(entityName)) {
+      this.entities_.set(entityName, replacementText);
+    }
+  }
+
+  // @internal
+  private readAttlistDecl_() {
+    this.index_ += 8;
+    this.skipWhitespace_();
+    const element = this.readName_();
+    let attlist = this.attlists_.get(element);
+    if (attlist === undefined) {
+      attlist = new Map();
+      this.attlists_.set(element, attlist);
+    }
+    while (true) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      if (!isWhitespace(codeUnit) && codeUnit !== Chars.GT) {
+        throw createSaxError("INVALID_INTERNAL_SUBSET");
+      }
+      this.skipWhitespace_();
+      if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
+        break;
+      }
+      const attribute = this.readName_();
+      if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+        throw createSaxError("INVALID_INTERNAL_SUBSET");
+      }
+      this.skipWhitespace_();
+      let isTokenized_ = false;
+      if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
+        const start = this.index_;
+        while (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+          ++this.index_;
+        }
+        const attType = this.chunk_.slice(start, this.index_);
+        if (ATT_TYPES.indexOf(attType) === -1) {
+          throw createSaxError("INVALID_INTERNAL_SUBSET");
+        }
+        if (attType !== "CDATA") {
+          isTokenized_ = true;
+        }
+        if (attType === "NOTATION") {
+          this.skipWhitespace_();
+          this.index_ = this.chunk_.indexOf(")", this.index_) + 1;
+        }
+      } else {
+        this.index_ = this.chunk_.indexOf(")", this.index_) + 1;
+      }
+      if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+        throw createSaxError("INVALID_INTERNAL_SUBSET");
+      }
+      this.skipWhitespace_();
+      const hash = this.chunk_.charCodeAt(this.index_);
+      if (hash === Chars.HASH) {
+        const start = this.index_;
+        let codeUnit;
+        while (
+          !isWhitespace(codeUnit = this.chunk_.charCodeAt(this.index_)) &&
+          codeUnit !== Chars.GT
+        ) {
+          ++this.index_;
+        }
+        const defaultDecl = this.chunk_.slice(start, this.index_);
+        if (
+          ["#REQUIRED", "#IMPLIED", "#FIXED"]
+            .indexOf(defaultDecl) === -1
+        ) {
+          throw createSaxError("INVALID_INTERNAL_SUBSET");
+        }
+        if (defaultDecl !== "#FIXED") {
+          continue;
+        }
+      }
+      this.skipWhitespace_();
+      let default_;
+      const quote = this.chunk_.charCodeAt(this.index_);
+      if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
+        ++this.index_;
+        const index = this.chunk_.indexOf(
+          quote === Chars.APOSTROPHE ? "'" : '"',
+          this.index_,
+        );
+        if (index === -1) {
+          throw createSaxError("INVALID_INTERNAL_SUBSET");
+        }
+        default_ = this.chunk_.slice(this.index_, index);
+        this.index_ = index + 1;
+      }
+      attlist.set(attribute, {default_, isTokenized_});
+    }
+    this.skipWhitespace_();
+  }
+
+  // @internal
+  private readInternalSubsetDecl_() {
+    const index = this.index_;
+    const chunk = this.chunk_;
+    this.index_ = 0;
+    this.chunk_ = this.content_;
+    this.content_ = "";
+    if (
+      this.chunk_.slice(0, 6) === "ENTITY" &&
+      isWhitespace(this.chunk_.charCodeAt(6))
+    ) {
+      this.readEntityDecl_();
+    } else if (
+      this.chunk_.slice(0, 7) === "ATTLIST" &&
+      isWhitespace(this.chunk_.charCodeAt(7))
+    ) {
+      this.readAttlistDecl_();
+    }
+    this.index_ = index;
+    this.chunk_ = chunk;
+  }
+
+  // @internal
   private parseInternalSubsetDecl_() {
     const start = this.index_;
-    while (this.index_ < this.chunk_.length) {
+    loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
       switch (codeUnit) {
@@ -1010,10 +1221,13 @@ export class SaxParser {
           break;
         case Chars.GT:
           this.state_ = State.INTERNAL_SUBSET;
-          return;
+          break loop;
       }
     }
     this.content_ += this.chunk_.slice(start, this.index_);
+    if (this.state_ === State.INTERNAL_SUBSET) {
+      this.readInternalSubsetDecl_();
+    }
   }
 
   // @internal
@@ -1405,17 +1619,25 @@ export class SaxParser {
           this.state_ = State.REFERENCE;
           this.otherState_ = State.START_TAG_ATTR_VALUE_QUOTED;
           break loop;
-        case quote:
+        case quote: {
           this.content_ += this.chunk_.slice(start, this.index_);
           ++this.index_;
           this.state_ = State.START_TAG_SPACE;
           if (this.attributes_.has(this.attribute_)) {
             throw createSaxError("DUPLICATE_ATTR");
           }
-          this.attributes_.set(this.attribute_, this.content_);
+          const attlists = this.attlists_.get(this.element_);
+          const attlist = attlists !== undefined
+            ? attlists.get(this.attribute_)
+            : undefined;
+          const value = attlist !== undefined && attlist.isTokenized_
+            ? normalizeAttributeValue(this.content_)
+            : this.content_;
+          this.attributes_.set(this.attribute_, value);
           this.attribute_ = "";
           this.content_ = "";
           return;
+        }
         case Chars.LT:
           // < is not allowed inside attribute values
           throw createSaxError("INVALID_ATTRIBUTE_VALUE");
@@ -1546,13 +1768,13 @@ export class SaxParser {
         this.content_ +=
           PREDEFINED_ENTITIES[this.entity_ as keyof typeof PREDEFINED_ENTITIES];
       } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
-        const entityValue = this.reader_.replaceEntityRef?.(this.entity_);
-        if (entityValue == null) {
-          throw createSaxError("UNRESOLVED_ENTITY", {entity: this.entity_});
-        }
-        this.content_ += entityValue;
+        // const entityValue = this.reader_.replaceEntityRef?.(this.entity_);
+        // if (entityValue == null) {
+        //   throw createSaxError("UNRESOLVED_ENTITY", {entity: this.entity_});
+        // }
+        // this.content_ += entityValue;
       } else {
-        this.reader_.entityRef(this.entity_);
+        this.reader_.entityRef?.(this.entity_);
       }
       ++this.index_;
       this.state_ = this.otherState_;

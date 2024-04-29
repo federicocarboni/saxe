@@ -38,14 +38,14 @@ describe("doctypedecl", function() {
   });
   it("wf: doctypedecl with intSubset and no ExternalID", function() {
     expect(getDoctypeDecl(
-      "<!DOCTYPE doctypeName [ <![IGNORE[  ]]> ] >",
+      "<!DOCTYPE doctypeName [  <!ENTITY name 'value'> ] >",
     ))
       .to.have.property("name", "doctypeName");
   });
   it("wf: doctypedecl with intSubset and ExternalID", function() {
     expect(
       getDoctypeDecl(
-        '<!DOCTYPE doctypeName PUBLIC "/public/dtd" "-//DTD/something" [ <![IGNORE[  ]]> ] >',
+        '<!DOCTYPE doctypeName PUBLIC "/public/dtd" "-//DTD/something" [ <!ENTITY name "value"> ] >',
       ),
     ).deep.equals({
       name: "doctypeName",
@@ -56,7 +56,7 @@ describe("doctypedecl", function() {
   it("wf: doctypedecl with intSubset and ExternalID quoted with apostrophes", function() {
     expect(
       getDoctypeDecl(
-        "<!DOCTYPE doctypeName PUBLIC \"/public/dtd\" '-//DTD/something' [ <![IGNORE[  ]]> ] >",
+        "<!DOCTYPE doctypeName PUBLIC \"/public/dtd\" '-//DTD/something' [ <!ENTITY name 'value'> ] >",
       ),
     ).deep.equals({
       name: "doctypeName",
@@ -78,7 +78,7 @@ describe("doctypedecl", function() {
         " PUB",
         'LIC "/public',
         '/dtd"  ',
-        ' "-//DTD/something" [ <![IGNORE[  ]]> ] >',
+        ' "-//DTD/something" [ <!ENTITY name "value"> ] >',
       ),
     ).deep.equals({
       name: "doctypeName",
@@ -109,15 +109,23 @@ describe("doctypedecl", function() {
       .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
   });
   it("not-wf: doctypedecl with no space after Pubid", function() {
-    expect(() => getDoctypeDecl('<!DOCTYPE doctypeName PUBLIC "pubid""system"><root/>'))
+    expect(() =>
+      getDoctypeDecl('<!DOCTYPE doctypeName PUBLIC "pubid""system"><root/>')
+    )
       .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
   });
   it("not-wf: doctypedecl with invalid PubidChar", function() {
-    expect(() => getDoctypeDecl('<!DOCTYPE doctypeName PUBLIC "{{pubid}}" "system"><root/>'))
+    expect(() =>
+      getDoctypeDecl(
+        '<!DOCTYPE doctypeName PUBLIC "{{pubid}}" "system"><root/>',
+      )
+    )
       .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
   });
   it("not-wf: doctypedecl with malformed ExternalID", function() {
-    expect(() => getDoctypeDecl('<!DOCTYPE doctypeName PUBLIK "pubid" "system"><root/>'))
+    expect(() =>
+      getDoctypeDecl('<!DOCTYPE doctypeName PUBLIK "pubid" "system"><root/>')
+    )
       .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
   });
 });

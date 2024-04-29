@@ -6,6 +6,8 @@ export const enum Chars {
   SP = 0x20,
   AMPERSAND = 0x26,
   APOSTROPHE = 0x27,
+  OPEN_PAREN = 0x28,
+  CLOSE_PAREN = 0x29,
   BANG = 0x21,
   QUOTE = 0x22,
   HASH = 0x23,
