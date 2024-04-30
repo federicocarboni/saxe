@@ -9,6 +9,7 @@ import {
   isWhiteSpace,
 } from "./chars.ts";
 import {createSaxError} from "./error.ts";
+import {MAX_ENTITY_LENGTH} from "./limits.ts";
 
 export {isSaxError, type SaxError, type SaxErrorCode} from "./error.ts";
 
@@ -262,7 +263,7 @@ export interface SaxOptions {
    *
    * It is recommended to set this to a sensible value when handling potentially
    * malicious input.
-   * @default undefined
+   * @default 1_000_000
    */
   maxEntityLength?: number | undefined;
   /**
@@ -427,7 +428,7 @@ export class SaxParser {
 
   // Options
   // @internal
-  private maxEntityLength_: number;
+  private maxEntityLength_: number | undefined;
 
   // State
   // @internal
@@ -525,7 +526,7 @@ export class SaxParser {
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
-    this.maxEntityLength_ = options?.maxEntityLength ?? NaN;
+    this.maxEntityLength_ = options?.maxEntityLength ?? MAX_ENTITY_LENGTH;
     this.entityStack_;
   }
 
@@ -1116,7 +1117,7 @@ export class SaxParser {
               throw createSaxError("INVALID_INTERNAL_SUBSET");
             }
             this.entityLength_ += replacementText.length;
-            if (this.entityLength_ > this.maxEntityLength_) {
+            if (this.entityLength_ > this.maxEntityLength_!) {
               throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED", {
                 entity: `%${name}`,
               });
