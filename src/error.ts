@@ -15,6 +15,8 @@ const ERRORS = {
   INVALID_PI: () => "Processing instruction not well-formed",
 
   INVALID_ENTITY_REF: () => "Entity reference not well-formed",
+  MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
+    `Entity "${entity}" expands to a very large payload`,
   UNRESOLVED_ENTITY: ({entity}: {entity: string}) =>
     `Entity "${entity}" cannot be resolved`,
 

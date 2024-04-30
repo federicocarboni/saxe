@@ -252,10 +252,19 @@ export interface SaxOptions {
    * **Note**: while this can speed up documents with large chunks of text that
    * will be ignored it can have a negative impact on documents with many short
    * text nodes.
-   *
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
+  /**
+   * To protect against malicious input this can be used to cap the number of
+   * code units which can be produced while expanding an entity. If it is not
+   * specified or set to `undefined` entity expansion is essentially uncapped.
+   *
+   * It is recommended to set this to a sensible value when handling potentially
+   * malicious input.
+   * @default undefined
+   */
+  maxEntityLength?: number | undefined;
   /**
    * @default "default"
    */
@@ -417,7 +426,8 @@ export class SaxParser {
   private reader_: SaxReader;
 
   // Options
-  // nothing here yet
+  // @internal
+  private maxEntityLength_: number;
 
   // State
   // @internal
@@ -432,6 +442,8 @@ export class SaxParser {
   // @internal
   private flags_ = Flags.INIT;
   // @internal
+  private entityLength_ = 0;
+  // @internal
   private charRef_ = 0;
   // @internal
   private quote_ = -1;
@@ -439,12 +451,9 @@ export class SaxParser {
   // @internal
   private elements_: string[] = [];
 
-  // Internal entities declared in the internal subset.
+  // Stack of entities forming replacement text
   // @internal
-  private entities_ = new Map<string, string>();
-  // Attlists declared in the internal subset.
-  // @internal
-  private attlists_ = new Map<string, Map<string, AttDef>>();
+  private entityStack_: string[] = [];
 
   // Accumulators
 
@@ -466,6 +475,17 @@ export class SaxParser {
   // plain object.
   // @internal
   private attributes_ = new Map<string, string>();
+
+  // Internal entities declared in the internal subset.
+  // @internal
+  private entities_ = new Map<string, string>();
+  // Attlists declared in the internal subset.
+  // @internal
+  private attlists_ = new Map<string, Map<string, AttDef>>();
+  // Markup declarations are not supported in parameter entities, but parameter
+  // entity expansion is still required in EntityValue literals.
+  // @internal
+  private parameterEntities_ = new Map<string, string>();
 
   // TODO: Namespace support?
   // readonly namespaces: ReadonlyMap<string, string>;
@@ -505,7 +525,8 @@ export class SaxParser {
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
-    this.attlists_;
+    this.maxEntityLength_ = options?.maxEntityLength ?? NaN;
+    this.entityStack_;
   }
 
   /**
@@ -1066,6 +1087,65 @@ export class SaxParser {
   }
 
   // @internal
+  private readEntityValue_() {
+    const start = this.index_;
+    while (this.index_ < this.chunk_.length) {
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      switch (codeUnit) {
+        case this.quote_:
+          this.content_ += this.chunk_.slice(start, this.index_);
+          return;
+        case Chars.AMPERSAND:
+          if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.HASH) {
+            ++this.index_;
+            this.otherState_ = this.state_;
+            this.parseCharRef_();
+            this.parseStep_();
+            break;
+          }
+        // fallthrough
+        case Chars.PERCENT: {
+          const name = this.readName_();
+          if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
+            throw createSaxError("INVALID_INTERNAL_SUBSET");
+          }
+          ++this.index_;
+          if (codeUnit === Chars.PERCENT) {
+            const replacementText = this.parameterEntities_.get(name);
+            if (replacementText === undefined) {
+              throw createSaxError("INVALID_INTERNAL_SUBSET");
+            }
+            this.entityLength_ += replacementText.length;
+            if (this.entityLength_ > this.maxEntityLength_) {
+              throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED", {
+                entity: `%${name}`,
+              });
+            }
+            const index = this.index_;
+            const chunk = this.chunk_;
+            const quote = this.quote_;
+            this.index_ = 0;
+            this.chunk_ = replacementText;
+            this.quote_ = -1;
+            this.readEntityValue_();
+            this.index_ = index;
+            this.chunk_ = chunk;
+            this.quote_ = quote;
+          }
+          break;
+        }
+        default:
+          // Other characters still need to be validated:
+          if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+            throw createSaxError("INVALID_CHAR");
+          }
+      }
+      ++this.index_;
+    }
+    this.content_ += this.chunk_.slice(start, this.index_);
+  }
+
+  // @internal
   private readEntityDecl_() {
     this.index_ += 7;
     this.skipWhiteSpace_();
@@ -1081,38 +1161,18 @@ export class SaxParser {
     this.skipWhiteSpace_();
     const quote = this.chunk_.charCodeAt(this.index_);
     ++this.index_;
-    let external = false;
-    let replacementText = "";
     if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
-      const start = this.index_;
-      loop: while (this.index_ < this.chunk_.length) {
-        const codeUnit = this.chunk_.charCodeAt(this.index_);
-        switch (codeUnit) {
-          case quote:
-            replacementText += this.chunk_.slice(start, this.index_);
-            break loop;
-          case Chars.PERCENT:
-            external = true;
-          // fallthrough
-          case Chars.AMPERSAND:
-            this.readName_();
-            if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
-              throw createSaxError("INVALID_INTERNAL_SUBSET");
-            }
-            ++this.index_;
-            break;
-          default:
-            // Other characters still need to be validated:
-            if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
-              throw createSaxError("INVALID_CHAR");
-            }
-        }
-        ++this.index_;
-      }
+      this.quote_ = quote;
+      this.readEntityValue_();
       if (this.chunk_.charCodeAt(this.index_) !== quote) {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       ++this.index_;
+      const entities = isParameter ? this.parameterEntities_ : this.entities_;
+      if (!entities.has(entityName)) {
+        entities.set(entityName, this.content_);
+      }
+      this.content_ = "";
     } else {
       // TODO: external entities
       this.index_ = this.chunk_.length - 1;
@@ -1120,9 +1180,6 @@ export class SaxParser {
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
-    }
-    if (!external && !this.entities_.has(entityName)) {
-      this.entities_.set(entityName, replacementText);
     }
   }
 
@@ -1821,7 +1878,6 @@ export class SaxParser {
       this.state_ = State.CHAR_REF_HEX;
     } else {
       this.state_ = State.CHAR_REF_DEC;
-      this.parseCharRefDec_();
     }
   }
 
