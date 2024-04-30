@@ -33,7 +33,7 @@ export const enum Chars {
 // https://www.w3.org/TR/REC-xml/#NT-S
 // § White Space
 // @internal
-export function isWhitespace(c: number) {
+export function isWhiteSpace(c: number) {
   return c === Chars.SP || c === Chars.TAB || c === Chars.LF || c === Chars.CR;
 }
 

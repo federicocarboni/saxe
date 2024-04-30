@@ -3,7 +3,7 @@
 // Worker runtime support it.
 /// <reference lib="dom" />
 
-import {Chars, isWhitespace} from "./chars.ts";
+import {Chars, isWhiteSpace} from "./chars.ts";
 import {createSaxError} from "./error.ts";
 import {SaxParser} from "./index.ts";
 
@@ -96,7 +96,7 @@ export class SaxDecoder {
       this.firstChunk_![2] === Chars.LOWER_X &&
       this.firstChunk_![3] === Chars.LOWER_M &&
       this.firstChunk_![4] === Chars.LOWER_L &&
-      isWhitespace(this.firstChunk_![5]!)
+      isWhiteSpace(this.firstChunk_![5]!)
     ) {
       // Ensure the XMLDecl has ended before parsing the encoding part
       const question = this.firstChunk_!.indexOf(Chars.QUESTION, 6);

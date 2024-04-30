@@ -1,6 +1,4 @@
-/**
- * @author Federico Carboni
- */
+/** */
 
 import {
   Chars,
@@ -8,7 +6,7 @@ import {
   isChar,
   isNameChar,
   isNameStartChar,
-  isWhitespace,
+  isWhiteSpace,
 } from "./chars.ts";
 import {createSaxError} from "./error.ts";
 
@@ -34,8 +32,8 @@ export interface XmlDeclaration {
    * `encoding` property of `TextDecoder`, and ensures encoding labels are
    * processed in a case-insensitive way.
    *
-   * The parser does not validate that the encoding labels is one of the
-   * officially assigned [IANA Character Sets].
+   * The parser does not validate that the encoding label is one of the
+   * officially assigned [IANA Character Sets] nor does it resolve aliases.
    *
    * [IANA Character Sets]:
    * https://www.iana.org/assignments/character-sets/character-sets.xhtml
@@ -43,9 +41,26 @@ export interface XmlDeclaration {
    */
   encoding?: string | undefined;
   /**
-   * Standalone value declared in the XML Declaration. `true` when set to `yes`,
-   * `false` when set to `no`, or `undefined` when unspecified (should be
-   * treated as a `false`).
+   * Standalone value declared in the XML Declaration.
+   *
+   * `true` when set to `yes`, `false` when set to `no`, or `undefined` when
+   * unspecified.
+   *
+   * #### [VC: Standalone Document Declaration]
+   * The standalone document declaration MUST have the value "no" if any
+   * external markup declarations contain declarations of:
+   *
+   * - attributes with default values, if elements to which these attributes
+   *   apply appear in the document without specifications of values for these
+   *   attributes, or
+   * - entities (other than `amp`, `lt`, `gt`, `apos`, `quot`), if references to
+   *   those entities appear in the document, or
+   * - attributes with tokenized types, where the attribute appears in the
+   *   document with a value such that normalization will produce a different
+   *   value from that which would be produced in the absence of the
+   *   declaration, or
+   * - element types with element content, if white space occurs directly within
+   *   any instance of those types.
    * @since 1.0.0
    */
   standalone?: boolean | undefined;
@@ -54,13 +69,16 @@ export interface XmlDeclaration {
 /**
  * Document type declaration.
  *
+ * ```xml
+ * <!DOCTYPE example PUBLIC "-//Example//example doc" "http://example.org/example.dtd">
+ * ```
  * @since 1.0.0
  */
 export interface Doctype {
   /**
    * Name in the document type declaration.
    *
-   * [VC: Root Element Type]
+   * #### [VC: Root Element Type]
    * The Name in the document type declaration MUST match the element type of
    * the root element.
    */
@@ -68,14 +86,22 @@ export interface Doctype {
   /**
    * Public identifier in the document type declaration, if present.
    *
-   * ```text
-   * [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"
-   * [13] PubidChar	::= #x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]
-   * ```
+   * All strings of white space in the public identifier are normalized to
+   * single space characters, and leading and trailing white space is removed.
    */
   publicId?: string | undefined;
   /**
    * System identifier in the document type declaration, if present.
+   *
+   * It is meant to be converted to a URI reference relative to the document
+   * entity, the parser does not process it as external markup declarations are
+   * not supported.
+   *
+   * System identifiers may contain characters that, according to
+   * [IETF RFC 3986], must be escaped before a URI can be used to retrieve the
+   * referenced resource.
+   *
+   * [IETF RFC 3986]: https://www.ietf.org/rfc/rfc3986.txt
    */
   systemId?: string | undefined;
 }
@@ -91,6 +117,10 @@ export interface SaxReader {
    */
   xml?(declaration: XmlDeclaration): void;
   /**
+   * Document type declaration.
+   *
+   * If the internal DTD subset is present, this handler is called before
+   * parsing it.
    * @param doctype -
    */
   doctype?(doctype: Doctype): void;
@@ -652,7 +682,7 @@ export class SaxParser {
     // a PI with a name that happens to start with xml.
     if (
       this.element_.slice(0, -1) === "<?xml" &&
-      isWhitespace(this.element_.charCodeAt(5))
+      isWhiteSpace(this.element_.charCodeAt(5))
     ) {
       this.state_ = State.XML_DECL;
       this.element_ = "";
@@ -671,8 +701,8 @@ export class SaxParser {
     if (end === -1) {
       end = this.chunk_.length;
     } else {
-      // Remove whitespace from the end
-      while (isWhitespace(this.chunk_.charCodeAt(--end)));
+      // Remove white space from the end
+      while (isWhiteSpace(this.chunk_.charCodeAt(--end)));
       end++;
     }
     // "standalone" is the longest XMLDecl attribute, if this is longer then
@@ -688,7 +718,7 @@ export class SaxParser {
 
   // @internal
   private parseXmlDecl_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       if (codeUnit === Chars.QUESTION) {
         ++this.index_;
@@ -702,7 +732,7 @@ export class SaxParser {
   // @internal
   private parseXmlDeclSpace_() {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
-    if (!isWhitespace(codeUnit) && codeUnit !== Chars.QUESTION) {
+    if (!isWhiteSpace(codeUnit) && codeUnit !== Chars.QUESTION) {
       throw createSaxError("INVALID_XML_DECL");
     }
     this.state_ = State.XML_DECL;
@@ -711,7 +741,7 @@ export class SaxParser {
 
   // @internal
   private parseXmlDeclValue_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case Chars.APOSTROPHE:
@@ -812,7 +842,7 @@ export class SaxParser {
     this.index_ += 7 - this.element_.length;
     if (
       this.element_.slice(0, 6) === "OCTYPE" &&
-      isWhitespace(this.element_.charCodeAt(6))
+      isWhiteSpace(this.element_.charCodeAt(6))
     ) {
       this.flags_ |= Flags.SEEN_DOCTYPE;
       this.state_ = State.DOCTYPE_DECL;
@@ -824,7 +854,7 @@ export class SaxParser {
 
   // @internal
   private parseDoctypeDecl_() {
-    if (!this.skipWhitespace_()) {
+    if (!this.skipWhiteSpace_()) {
       return;
     }
     const char = this.chunk_.codePointAt(this.index_)!;
@@ -852,10 +882,12 @@ export class SaxParser {
   private doctypeEnd_() {
     ++this.index_;
     const systemId = this.flags_ & Flags.DOCTYPE_SYSTEM
-      ? this.content_
+      ? normalizeLineEndings(this.content_)
       : undefined;
     const publicId = this.flags_ & Flags.DOCTYPE_PUBLIC
       ? this.attribute_
+        .replace(/^[ \n\r]+|[ \n\r]+$/g, "")
+        .replace(/[ \n\r]+/g, " ")
       : undefined;
     // [11] SystemLiteral	::= ('"' [^"]* '"') | ("'" [^']* "'")
     // [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'
@@ -865,7 +897,7 @@ export class SaxParser {
     if (
       systemId !== undefined && hasInvalidChar(systemId) ||
       publicId !== undefined &&
-        /[^ \r\na-zA-Z0-9-'()+,./:=?;!*#@$_%]/.test(publicId)
+        /[^ a-zA-Z0-9-'()+,./:=?;!*#@$_%]/.test(publicId)
     ) {
       throw createSaxError("INVALID_DOCTYPE_DECL");
     }
@@ -878,7 +910,7 @@ export class SaxParser {
 
   // @internal
   private parseDoctypeNameEnd_() {
-    if (!this.skipWhitespace_()) {
+    if (!this.skipWhiteSpace_()) {
       return;
     }
     const codeUnit = this.chunk_.charCodeAt(this.index_);
@@ -886,10 +918,8 @@ export class SaxParser {
       this.doctypeEnd_();
       return;
     }
-    this.otherState_ = 0;
     if (codeUnit === Chars.OPEN_BRACKET) {
-      ++this.index_;
-      ++this.otherState_;
+      this.doctypeEnd_();
       this.state_ = State.INTERNAL_SUBSET;
     } else {
       this.state_ = State.EXTERNAL_ID;
@@ -905,7 +935,7 @@ export class SaxParser {
     this.index_ += newChunk.length;
     this.content_ += newChunk;
     const externalId = this.content_.slice(0, 6);
-    const isS = isWhitespace(this.content_.charCodeAt(6));
+    const isS = isWhiteSpace(this.content_.charCodeAt(6));
     if (externalId === "PUBLIC" && isS) {
       this.flags_ |= Flags.DOCTYPE_PUBLIC;
       this.flags_ |= Flags.DOCTYPE_SYSTEM;
@@ -926,7 +956,7 @@ export class SaxParser {
   private parseDoctypeSystemSpace_() {
     this.attribute_ = this.content_;
     this.content_ = "";
-    if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+    if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
       throw createSaxError("INVALID_DOCTYPE_DECL");
     }
     ++this.index_;
@@ -936,7 +966,7 @@ export class SaxParser {
 
   // @internal
   private parseDoctypeExternalIdQuotedStart_() {
-    if (!this.skipWhitespace_()) {
+    if (!this.skipWhiteSpace_()) {
       return;
     }
     const codeUnit = this.chunk_.charCodeAt(this.index_);
@@ -969,7 +999,7 @@ export class SaxParser {
 
   // @internal
   private parseDoctypeMaybeInternalSubset_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       if (codeUnit === Chars.OPEN_BRACKET) {
         this.state_ = State.INTERNAL_SUBSET;
@@ -994,7 +1024,7 @@ export class SaxParser {
           this.state_ = State.DOCTYPE_END;
           break loop;
         default:
-          if (!isWhitespace(codeUnit)) {
+          if (!isWhiteSpace(codeUnit)) {
             throw createSaxError("INVALID_DOCTYPE_DECL");
           }
       }
@@ -1038,17 +1068,17 @@ export class SaxParser {
   // @internal
   private readEntityDecl_() {
     this.index_ += 7;
-    this.skipWhitespace_();
+    this.skipWhiteSpace_();
     const isParameter = this.chunk_.charCodeAt(this.index_) === Chars.PERCENT;
     if (isParameter) {
       ++this.index_;
-      this.skipWhitespace_();
+      this.skipWhiteSpace_();
     }
     const entityName = this.readName_();
-    if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+    if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
-    this.skipWhitespace_();
+    this.skipWhiteSpace_();
     const quote = this.chunk_.charCodeAt(this.index_);
     ++this.index_;
     let external = false;
@@ -1087,7 +1117,7 @@ export class SaxParser {
       // TODO: external entities
       this.index_ = this.chunk_.length - 1;
     }
-    this.skipWhitespace_();
+    this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
@@ -1099,7 +1129,7 @@ export class SaxParser {
   // @internal
   private readAttlistDecl_() {
     this.index_ += 8;
-    this.skipWhitespace_();
+    this.skipWhiteSpace_();
     const element = this.readName_();
     let attlist = this.attlists_.get(element);
     if (attlist === undefined) {
@@ -1108,22 +1138,22 @@ export class SaxParser {
     }
     while (true) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
-      if (!isWhitespace(codeUnit) && codeUnit !== Chars.GT) {
+      if (!isWhiteSpace(codeUnit) && codeUnit !== Chars.GT) {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
-      this.skipWhitespace_();
+      this.skipWhiteSpace_();
       if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
         break;
       }
       const attribute = this.readName_();
-      if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+      if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
-      this.skipWhitespace_();
+      this.skipWhiteSpace_();
       let isTokenized_ = false;
       if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
         const start = this.index_;
-        while (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+        while (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
           ++this.index_;
         }
         const attType = this.chunk_.slice(start, this.index_);
@@ -1134,22 +1164,22 @@ export class SaxParser {
           isTokenized_ = true;
         }
         if (attType === "NOTATION") {
-          this.skipWhitespace_();
+          this.skipWhiteSpace_();
           this.index_ = this.chunk_.indexOf(")", this.index_) + 1;
         }
       } else {
         this.index_ = this.chunk_.indexOf(")", this.index_) + 1;
       }
-      if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+      if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
-      this.skipWhitespace_();
+      this.skipWhiteSpace_();
       const hash = this.chunk_.charCodeAt(this.index_);
       if (hash === Chars.HASH) {
         const start = this.index_;
         let codeUnit;
         while (
-          !isWhitespace(codeUnit = this.chunk_.charCodeAt(this.index_)) &&
+          !isWhiteSpace(codeUnit = this.chunk_.charCodeAt(this.index_)) &&
           codeUnit !== Chars.GT
         ) {
           ++this.index_;
@@ -1165,7 +1195,7 @@ export class SaxParser {
           continue;
         }
       }
-      this.skipWhitespace_();
+      this.skipWhiteSpace_();
       let default_;
       const quote = this.chunk_.charCodeAt(this.index_);
       if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
@@ -1182,7 +1212,7 @@ export class SaxParser {
       }
       attlist.set(attribute, {default_, isTokenized_});
     }
-    this.skipWhitespace_();
+    this.skipWhiteSpace_();
   }
 
   // @internal
@@ -1194,12 +1224,12 @@ export class SaxParser {
     this.content_ = "";
     if (
       this.chunk_.slice(0, 6) === "ENTITY" &&
-      isWhitespace(this.chunk_.charCodeAt(6))
+      isWhiteSpace(this.chunk_.charCodeAt(6))
     ) {
       this.readEntityDecl_();
     } else if (
       this.chunk_.slice(0, 7) === "ATTLIST" &&
-      isWhitespace(this.chunk_.charCodeAt(7))
+      isWhiteSpace(this.chunk_.charCodeAt(7))
     ) {
       this.readAttlistDecl_();
     }
@@ -1247,18 +1277,19 @@ export class SaxParser {
 
   // @internal
   private parseDoctypeEnd_() {
-    if (!this.skipWhitespace_()) {
+    if (!this.skipWhiteSpace_()) {
       return;
     }
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
       throw createSaxError("INVALID_DOCTYPE_DECL");
     }
-    this.doctypeEnd_();
+    ++this.index_;
+    this.state_ = State.MISC;
   }
 
   // @internal
   private parseMisc_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       if (this.chunk_.charCodeAt(this.index_) === Chars.LT) {
         ++this.index_;
         this.state_ = State.OPEN_ANGLE_BRACKET;
@@ -1295,7 +1326,7 @@ export class SaxParser {
       }
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
-      if (isWhitespace(codeUnit)) {
+      if (isWhiteSpace(codeUnit)) {
         this.state_ = State.PI_CONTENT_START;
       } else if (codeUnit === Chars.QUESTION) {
         this.state_ = State.PI_END;
@@ -1307,7 +1338,7 @@ export class SaxParser {
 
   // @internal
   private parsePiContentStart_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       this.state_ = State.PI_CONTENT;
     }
   }
@@ -1501,7 +1532,7 @@ export class SaxParser {
       ++this.index_;
       if (codeUnit === Chars.GT) {
         this.startTagEnd_();
-      } else if (isWhitespace(codeUnit)) {
+      } else if (isWhiteSpace(codeUnit)) {
         this.state_ = State.START_TAG;
       } else if (codeUnit === Chars.SLASH) {
         this.state_ = State.EMPTY_TAG;
@@ -1513,7 +1544,7 @@ export class SaxParser {
 
   // @internal
   private parseStartTag_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       const char = this.chunk_.codePointAt(this.index_)!;
       ++this.index_;
       if (char > 0xFFFF) {
@@ -1538,7 +1569,7 @@ export class SaxParser {
     ++this.index_;
     if (codeUnit === Chars.GT) {
       this.startTagEnd_();
-    } else if (isWhitespace(codeUnit)) {
+    } else if (isWhiteSpace(codeUnit)) {
       this.state_ = State.START_TAG;
       this.parseStartTag_();
     } else if (codeUnit === Chars.SLASH) {
@@ -1557,7 +1588,7 @@ export class SaxParser {
       if (codeUnit === Chars.EQ) {
         // Most likely case
         this.state_ = State.START_TAG_ATTR_VALUE;
-      } else if (isWhitespace(codeUnit)) {
+      } else if (isWhiteSpace(codeUnit)) {
         this.state_ = State.START_TAG_ATTR_EQ;
       } else {
         throw createSaxError("INVALID_START_TAG");
@@ -1567,7 +1598,7 @@ export class SaxParser {
 
   // @internal
   private parseStartTagAttrEq_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       if (this.chunk_.charCodeAt(this.index_) === Chars.EQ) {
         ++this.index_;
         this.state_ = State.START_TAG_ATTR_VALUE;
@@ -1579,7 +1610,7 @@ export class SaxParser {
 
   // @internal
   private parseStartTagAttrValue_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case Chars.APOSTROPHE:
@@ -1685,7 +1716,7 @@ export class SaxParser {
         case Chars.LF:
           // TAB and LF are valid and since they are common, it's faster to
           // handle them here than in the default case
-          // TODO: add significant whitespace handler?
+          // TODO: add significant white space handler?
           break;
         case Chars.CR:
           // Carriage return requires new-line normalization
@@ -1954,7 +1985,7 @@ export class SaxParser {
 
   // @internal
   private parseEndTagEnd_() {
-    if (this.skipWhitespace_()) {
+    if (this.skipWhiteSpace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       if (codeUnit !== Chars.GT || this.elements_.pop() !== this.element_) {
         throw createSaxError("INVALID_END_TAG");
@@ -1989,9 +2020,9 @@ export class SaxParser {
   }
 
   // @internal
-  private skipWhitespace_() {
+  private skipWhiteSpace_() {
     while (this.index_ < this.chunk_.length) {
-      if (!isWhitespace(this.chunk_.charCodeAt(this.index_))) {
+      if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         break;
       }
       ++this.index_;
