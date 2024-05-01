@@ -17,8 +17,10 @@ const ERRORS = {
   INVALID_ENTITY_REF: () => "Entity reference not well-formed",
   MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
     `Entity "${entity}" expands to a very large payload`,
-  UNRESOLVED_ENTITY: ({entity}: {entity: string}) =>
-    `Entity "${entity}" cannot be resolved`,
+  RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
+    `Entity "${entity}" directly or indirectly refers to itself`,
+  UNDECLARED_ENTITY: ({entity}: {entity: string}) =>
+    `Declaration of entity "${entity}" was not read`,
 
   INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
     `Character reference to illegal character: ${char}`,

@@ -428,7 +428,7 @@ export class SaxParser {
 
   // Options
   // @internal
-  private maxEntityLength_: number | undefined;
+  private maxEntityLength_: number;
 
   // State
   // @internal
@@ -452,7 +452,8 @@ export class SaxParser {
   // @internal
   private elements_: string[] = [];
 
-  // Stack of entities forming replacement text
+  // Stack of entities currently expanded, required for the WFC No Recursion and
+  // to limit the depth of entity expansion allowed.
   // @internal
   private entityStack_: string[] = [];
 
@@ -527,7 +528,6 @@ export class SaxParser {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
     this.maxEntityLength_ = options?.maxEntityLength ?? MAX_ENTITY_LENGTH;
-    this.entityStack_;
   }
 
   /**
@@ -1089,7 +1089,7 @@ export class SaxParser {
 
   // @internal
   private readEntityValue_() {
-    const start = this.index_;
+    let start = this.index_;
     while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
@@ -1098,10 +1098,12 @@ export class SaxParser {
           return;
         case Chars.AMPERSAND:
           if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.HASH) {
-            ++this.index_;
+            this.content_ += this.chunk_.slice(start, this.index_);
+            this.index_ += 2;
             this.otherState_ = this.state_;
             this.parseCharRef_();
             this.parseStep_();
+            start = this.index_;
             break;
           }
         // fallthrough
@@ -1122,6 +1124,11 @@ export class SaxParser {
                 entity: `%${name}`,
               });
             }
+            // WFC: No Recursion
+            if (this.entityStack_.indexOf(name) !== -1) {
+              throw createSaxError("RECURSIVE_ENTITY", {entity: `%${name}`});
+            }
+            this.entityStack_.push(name);
             const index = this.index_;
             const chunk = this.chunk_;
             const quote = this.quote_;
@@ -1232,6 +1239,7 @@ export class SaxParser {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       this.skipWhiteSpace_();
+      let canHaveDefault = true;
       const hash = this.chunk_.charCodeAt(this.index_);
       if (hash === Chars.HASH) {
         const start = this.index_;
@@ -1250,23 +1258,25 @@ export class SaxParser {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
         }
         if (defaultDecl !== "#FIXED") {
-          continue;
+          canHaveDefault = false;
         }
       }
-      this.skipWhiteSpace_();
       let default_;
-      const quote = this.chunk_.charCodeAt(this.index_);
-      if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
-        ++this.index_;
-        const index = this.chunk_.indexOf(
-          quote === Chars.APOSTROPHE ? "'" : '"',
-          this.index_,
-        );
-        if (index === -1) {
-          throw createSaxError("INVALID_INTERNAL_SUBSET");
+      if (canHaveDefault) {
+        this.skipWhiteSpace_();
+        const quote = this.chunk_.charCodeAt(this.index_);
+        if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
+          ++this.index_;
+          const index = this.chunk_.indexOf(
+            quote === Chars.APOSTROPHE ? "'" : '"',
+            this.index_,
+          );
+          if (index === -1) {
+            throw createSaxError("INVALID_INTERNAL_SUBSET");
+          }
+          default_ = this.chunk_.slice(this.index_, index);
+          this.index_ = index + 1;
         }
-        default_ = this.chunk_.slice(this.index_, index);
-        this.index_ = index + 1;
       }
       attlist.set(attribute, {default_, isTokenized_});
     }
@@ -1853,19 +1863,51 @@ export class SaxParser {
       if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
         throw createSaxError("INVALID_ENTITY_REF");
       }
+      ++this.index_;
       if (PREDEFINED_ENTITIES.hasOwnProperty(this.entity_)) {
         this.content_ +=
           PREDEFINED_ENTITIES[this.entity_ as keyof typeof PREDEFINED_ENTITIES];
       } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
-        // const entityValue = this.reader_.replaceEntityRef?.(this.entity_);
-        // if (entityValue == null) {
-        //   throw createSaxError("UNRESOLVED_ENTITY", {entity: this.entity_});
-        // }
-        // this.content_ += entityValue;
+        let entityValue;
+        if (this.entities_.has(this.entity_)) {
+          entityValue = this.entities_.get(this.entity_);
+        } else if (!this.standalone_) {
+          // WFC: Entity Declared
+          entityValue = this.reader_.getGeneralEntity?.(this.entity_);
+        }
+        if (entityValue == null) {
+          // WFC: No External Entity References
+          // WFC: Parsed Entity
+          // error: unread entity
+          // The last one is not a fatal error but for simplicity the parser
+          // cannot recover from it.
+          // https://www.w3.org/TR/REC-xml/#sec-terminology
+          throw createSaxError("UNDECLARED_ENTITY", {entity: this.entity_});
+        }
+        const index = this.index_;
+        const chunk = this.chunk_;
+        const quote = this.quote_;
+        this.index_ = 0;
+        this.chunk_ = entityValue;
+        this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
+        this.otherState_ = 0;
+        this.entity_ = "";
+
+        while (this.index_ < this.chunk_.length) {
+          this.parseStep_();
+        }
+
+        // https://www.w3.org/TR/REC-xml/#intern-replacement
+        // [...] references MUST be contained entirely within the literal entity
+        // value.
+
+        this.index_ = index;
+        this.chunk_ = chunk;
+        this.quote_ = quote;
+        return;
       } else {
         this.reader_.entityRef?.(this.entity_);
       }
-      ++this.index_;
       this.state_ = this.otherState_;
       this.otherState_ = 0;
       this.entity_ = "";
