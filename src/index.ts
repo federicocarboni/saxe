@@ -1900,6 +1900,9 @@ export class SaxParser {
         // https://www.w3.org/TR/REC-xml/#intern-replacement
         // [...] references MUST be contained entirely within the literal entity
         // value.
+        if (this.state_ !== State.START_TAG_ATTR_VALUE_QUOTED) {
+          throw createSaxError("INVALID_ATTRIBUTE_VALUE");
+        }
 
         this.index_ = index;
         this.chunk_ = chunk;
