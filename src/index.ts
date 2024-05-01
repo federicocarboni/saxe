@@ -393,7 +393,7 @@ const ATT_TYPES = [
 
 // Even if predefined entities are declared somewhere in a DTD
 // they MUST have replacement text that produces text exactly
-// equal to the predefined ones, so we can have treat them essentially
+// equal to the predefined ones, so we can treat them essentially
 // the same as a char reference.
 // https://www.w3.org/TR/REC-xml/#sec-predefined-ent
 const PREDEFINED_ENTITIES = {
