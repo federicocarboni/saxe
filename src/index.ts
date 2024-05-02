@@ -349,10 +349,11 @@ const enum Flags {
   // OPT_TEXT_ONLY_ENTITIES = 1 << 4,
 
   // Runtime flags:
-  SEEN_DOCTYPE = 1 << 10,
-  SEEN_ROOT = 1 << 11,
-  DOCTYPE_PUBLIC = 1 << 12,
-  DOCTYPE_SYSTEM = 1 << 13,
+  IN_ENTITY = 1 << 4,
+  SEEN_DOCTYPE = 1 << 5,
+  SEEN_ROOT = 1 << 6,
+  DOCTYPE_PUBLIC = 1 << 7,
+  DOCTYPE_SYSTEM = 1 << 8,
 }
 
 // Normalize XML line endings.
@@ -1555,7 +1556,11 @@ export class SaxParser {
     if (isNameStartChar(char)) {
       this.element_ = String.fromCodePoint(char);
       // Cannot have two root elements
-      if (this.elements_.length === 0 && this.flags_ & Flags.SEEN_ROOT) {
+      if (
+        this.elements_.length === 0 &&
+        this.flags_ & Flags.SEEN_ROOT &&
+        !(this.flags_ & Flags.IN_ENTITY)
+      ) {
         throw createSaxError("INVALID_START_TAG");
       }
       this.flags_ |= Flags.SEEN_ROOT;
@@ -1939,6 +1944,7 @@ export class SaxParser {
         const quote = this.quote_;
         const elements = this.elements_;
 
+        this.flags_ |= Flags.IN_ENTITY;
         this.index_ = 0;
         this.chunk_ = "" + entityValue;
         this.quote_ = -1;
@@ -1964,6 +1970,9 @@ export class SaxParser {
         }
 
         this.entityStack_.pop();
+        if (this.entityStack_.length === 0) {
+          this.flags_ ^= Flags.IN_ENTITY;
+        }
         this.index_ = index;
         this.chunk_ = chunk;
         this.quote_ = quote;
