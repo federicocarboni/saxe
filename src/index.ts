@@ -154,9 +154,12 @@ export interface SaxReader {
    */
   comment?(text: string): void;
   /**
-   * @param entity
+   * Return the replacement text of an external entity or an entity declared in
+   * external markup declarations. For unparsed entities, or entities for which
+   * the application has no declarations `undefined` should be returned.
+   * @param entityName -
    */
-  getGeneralEntity?(entity: string): string | undefined;
+  getGeneralEntity?(entityName: string): string | undefined;
   /**
    * A general entity reference.
    *
@@ -165,10 +168,9 @@ export interface SaxReader {
    * &entity;
    * </root>
    * ```
-   *
-   * @param entity
+   * @param entityName -
    */
-  entityRef?(entity: string): void;
+  entityRef?(entityName: string): void;
   /**
    * Start tag.
    *
@@ -391,6 +393,11 @@ const ATT_TYPES = [
   "NOTATION",
 ];
 
+const enum EntityDecl {
+  EXTERNAL = 1,
+  UNPARSED,
+}
+
 // Even if predefined entities are declared somewhere in a DTD
 // they MUST have replacement text that produces text exactly
 // equal to the predefined ones, so we can treat them essentially
@@ -480,7 +487,7 @@ export class SaxParser {
 
   // Internal entities declared in the internal subset.
   // @internal
-  private entities_ = new Map<string, string>();
+  private entities_ = new Map<string, string | EntityDecl>();
   // Attlists declared in the internal subset.
   // @internal
   private attlists_ = new Map<string, Map<string, AttDef>>();
@@ -1114,31 +1121,30 @@ export class SaxParser {
           }
           ++this.index_;
           if (codeUnit === Chars.PERCENT) {
-            const replacementText = this.parameterEntities_.get(name);
-            if (replacementText === undefined) {
+            const entityValue = this.parameterEntities_.get(name);
+            if (entityValue === undefined) {
               throw createSaxError("INVALID_INTERNAL_SUBSET");
-            }
-            this.entityLength_ += replacementText.length;
-            if (this.entityLength_ > this.maxEntityLength_!) {
-              throw createSaxError("MAX_ENTITY_LENGTH_EXCEEDED", {
-                entity: `%${name}`,
-              });
             }
             // WFC: No Recursion
             if (this.entityStack_.indexOf(name) !== -1) {
               throw createSaxError("RECURSIVE_ENTITY", {entity: `%${name}`});
             }
             this.entityStack_.push(name);
+            this.entityLength_ += entityValue.length;
+            if (this.entityLength_ > this.maxEntityLength_!) {
+              throw createSaxError("LIMIT_EXCEEDED");
+            }
             const index = this.index_;
             const chunk = this.chunk_;
             const quote = this.quote_;
             this.index_ = 0;
-            this.chunk_ = replacementText;
+            this.chunk_ = entityValue;
             this.quote_ = -1;
             this.readEntityValue_();
             this.index_ = index;
             this.chunk_ = chunk;
             this.quote_ = quote;
+            this.entityStack_.pop();
           }
           break;
         }
@@ -1316,7 +1322,7 @@ export class SaxParser {
         case Chars.QUOTE:
           this.quote_ = codeUnit;
           this.state_ = State.INTERNAL_SUBSET_DECL_QUOTED;
-          break;
+          break loop;
         case Chars.GT:
           this.state_ = State.INTERNAL_SUBSET;
           break loop;
@@ -1334,13 +1340,14 @@ export class SaxParser {
       this.quote_ === Chars.APOSTROPHE ? "'" : '"',
       this.index_,
     );
+    const start = this.index_;
     if (index !== -1) {
       this.index_ = index + 1;
       this.state_ = State.INTERNAL_SUBSET_DECL;
     } else {
-      this.content_ += this.chunk_.slice(this.index_);
       this.index_ = this.chunk_.length;
     }
+    this.content_ += this.chunk_.slice(start, this.index_);
   }
 
   // @internal
@@ -1739,7 +1746,7 @@ export class SaxParser {
         }
         case Chars.LT:
           // < is not allowed inside attribute values
-          throw createSaxError("INVALID_ATTRIBUTE_VALUE");
+          throw createSaxError("LT_IN_ATTRIBUTE");
         default:
           // Other characters still need to be validated:
           if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
@@ -1859,37 +1866,84 @@ export class SaxParser {
   // @internal
   private parseEntityRef_() {
     this.entity_ += this.readNameCharacters_();
-    if (this.index_ < this.chunk_.length) {
-      if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
-        throw createSaxError("INVALID_ENTITY_REF");
+    if (this.index_ >= this.chunk_.length) {
+      return;
+    }
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
+      throw createSaxError("INVALID_ENTITY_REF");
+    }
+    ++this.index_;
+    if (PREDEFINED_ENTITIES.hasOwnProperty(this.entity_)) {
+      this.content_ +=
+        PREDEFINED_ENTITIES[this.entity_ as keyof typeof PREDEFINED_ENTITIES];
+    } else {
+      // WFC: No Recursion
+      if (this.entityStack_.indexOf(this.entity_) !== -1) {
+        throw createSaxError("RECURSIVE_ENTITY", {entity: this.entity_});
       }
-      ++this.index_;
-      if (PREDEFINED_ENTITIES.hasOwnProperty(this.entity_)) {
-        this.content_ +=
-          PREDEFINED_ENTITIES[this.entity_ as keyof typeof PREDEFINED_ENTITIES];
-      } else if (this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED) {
-        let entityValue;
-        if (this.entities_.has(this.entity_)) {
-          entityValue = this.entities_.get(this.entity_);
-        } else if (!this.standalone_) {
+
+      // const isAttValue = this.otherState_ ===
+      //   State.START_TAG_ATTR_VALUE_QUOTED;
+      let entityValue = this.entities_.get(this.entity_);
+      // Unparsed entities cannot be referenced anywhere.
+      // WFC: Parsed Entity
+      if (entityValue === EntityDecl.UNPARSED) {
+        throw createSaxError("UNPARSED_ENTITY", {entity: this.entity_});
+      }
+      // Attribute values
+      // WFC: No External Entity References
+      if (
+        this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED &&
+        entityValue === EntityDecl.EXTERNAL
+      ) {
+        throw createSaxError("EXTERNAL_ENTITY", {entity: this.entity_});
+      }
+      // Allow the application to set a default value for an entity not
+      // declared in internal markup declarations.
+      if (
+        entityValue === EntityDecl.EXTERNAL ||
+        entityValue === undefined
+      ) {
+        entityValue = this.reader_.getGeneralEntity?.(this.entity_);
+      }
+      if (entityValue == null) {
+        if (
           // WFC: Entity Declared
-          entityValue = this.reader_.getGeneralEntity?.(this.entity_);
-        }
-        if (entityValue == null) {
-          // WFC: No External Entity References
-          // WFC: Parsed Entity
-          // error: unread entity
-          // The last one is not a fatal error but for simplicity the parser
-          // cannot recover from it.
-          // https://www.w3.org/TR/REC-xml/#sec-terminology
+          // [..] [For] non-validating processors [..], the rule that an entity
+          // must be declared is a well-formedness constraint only if
+          // standalone="yes"
+          this.standalone_ ||
+          // It is an error if an attribute value contains a reference to an
+          // entity for which no declaration has been read
+          // This is not a fatal error but recovering from here is too
+          // complicated and not generally useful (an application can still
+          // just return any value from getGeneralEntity to suppress the error)
+          this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED ||
+          // If the application does not handle undeclared entities throw an
+          // error
+          this.reader_.entityRef == null
+        ) {
           throw createSaxError("UNDECLARED_ENTITY", {entity: this.entity_});
         }
+        // Allow the application to handle undeclared entities in content.
+        this.reader_.entityRef(this.entity_);
+      } else {
+        this.entityLength_ += entityValue.length;
+        if (this.entityLength_ > this.maxEntityLength_) {
+          throw createSaxError("LIMIT_EXCEEDED");
+        }
+
+        this.entityStack_.push(this.entity_);
         const index = this.index_;
         const chunk = this.chunk_;
         const quote = this.quote_;
+        const elements = this.elements_;
+
         this.index_ = 0;
-        this.chunk_ = entityValue;
-        this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
+        this.chunk_ = "" + entityValue;
+        this.quote_ = -1;
+        this.elements_ = [];
+        this.state_ = this.otherState_;
         this.otherState_ = 0;
         this.entity_ = "";
 
@@ -1900,21 +1954,26 @@ export class SaxParser {
         // https://www.w3.org/TR/REC-xml/#intern-replacement
         // [...] references MUST be contained entirely within the literal entity
         // value.
-        if (this.state_ !== State.START_TAG_ATTR_VALUE_QUOTED) {
-          throw createSaxError("INVALID_ATTRIBUTE_VALUE");
+        // TODO: error handling
+        // if (isAttValue && this.state_ !== State.START_TAG_ATTR_VALUE_QUOTED) {
+        //   throw createSaxError("INVALID_ATTRIBUTE_VALUE");
+        // }
+        // Entity value must match content production
+        if (this.elements_.length !== 0) {
+          throw createSaxError("INVALID_NESTING");
         }
 
+        this.entityStack_.pop();
         this.index_ = index;
         this.chunk_ = chunk;
         this.quote_ = quote;
-        return;
-      } else {
-        this.reader_.entityRef?.(this.entity_);
+        this.elements_ = elements;
+        this.otherState_ = this.state_;
       }
-      this.state_ = this.otherState_;
-      this.otherState_ = 0;
-      this.entity_ = "";
     }
+    this.state_ = this.otherState_;
+    this.otherState_ = 0;
+    this.entity_ = "";
   }
 
   // @internal
@@ -1934,7 +1993,7 @@ export class SaxParser {
     // TODO: 0 is not allowed so both explicit zero &#0; and zero size number
     //  &#; end up throwing here, but there's no way to know which one it is now
     if (!isChar(this.charRef_)) {
-      throw createSaxError("INVALID_CHAR_REF", {char: this.charRef_});
+      throw createSaxError("INVALID_CHAR_REF");
     }
     this.content_ += String.fromCodePoint(this.charRef_);
     this.charRef_ = 0;
@@ -1952,7 +2011,7 @@ export class SaxParser {
       }
       const digit = (codeUnit - 0x30) >>> 0;
       if (digit > 9) {
-        throw createSaxError("INVALID_CHAR_REF", {char: undefined});
+        throw createSaxError("INVALID_CHAR_REF");
       }
       this.charRef_ = this.charRef_ * 10 + digit;
       ++this.index_;
@@ -1971,7 +2030,7 @@ export class SaxParser {
       if (digit > 9) {
         digit = ((codeUnit | 0x20) - 0x57) >>> 0;
         if (digit < 10 || digit > 15) {
-          throw createSaxError("INVALID_CHAR_REF", {char: undefined});
+          throw createSaxError("INVALID_CHAR_REF");
         }
       }
       this.charRef_ = this.charRef_ * 16 + digit;

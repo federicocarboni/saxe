@@ -1,4 +1,6 @@
 const ERRORS = {
+  LIMIT_EXCEEDED: () => "",
+
   // Encoding errors
   ENCODING_NOT_SUPPORTED: ({encoding}: {encoding: string}) =>
     `The "${encoding}" encoding is not supported`,
@@ -10,30 +12,31 @@ const ERRORS = {
   // doctypedecl
   INVALID_DOCTYPE_DECL: () => "DOCTYPE Declaration not well-formed",
   INVALID_INTERNAL_SUBSET: () => "Internal subset not well-formed",
-  INVALID_COMMENT: () => "Comments cannot contain '--'",
+  INVALID_COMMENT: () => "Comment must not contain '--'",
   RESERVED_PI: () => "Processing instruction target 'XML' is reserved",
   INVALID_PI: () => "Processing instruction not well-formed",
 
   INVALID_ENTITY_REF: () => "Entity reference not well-formed",
-  MAX_ENTITY_LENGTH_EXCEEDED: ({entity}: {entity: string}) =>
-    `Entity "${entity}" expands to a very large payload`,
   RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
-    `Entity "${entity}" directly or indirectly refers to itself`,
+    `Entity '${entity}' directly or indirectly refers to itself`,
   UNDECLARED_ENTITY: ({entity}: {entity: string}) =>
-    `Declaration of entity "${entity}" was not read`,
+    `Entity '${entity}' not declared`,
+  UNPARSED_ENTITY: ({entity}: {entity: string}) =>
+    `Entity reference to unparsed entity '${entity}'`,
+  EXTERNAL_ENTITY: ({entity}: {entity: string}) =>
+    `Attribute references external entity '${entity}'`,
 
-  INVALID_CHAR_REF: ({char}: {char: number | undefined}) =>
-    `Character reference to illegal character: ${char}`,
+  INVALID_CHAR_REF: () => "Character reference to invalid character",
+  INVALID_CHAR: () => "Invalid character",
+  INVALID_CDEND: () => "Sequence ']]>' not allowed in content",
+  INVALID_CDATA: () => "Character data cannot appear outside the root element",
 
   INVALID_START_TAG: () => "Start tag not well-formed",
-  INVALID_ATTRIBUTE_VALUE: () =>
-    "Attribute values cannot contain a literal '<'",
+  LT_IN_ATTRIBUTE: () =>
+    "Attribute value must not contain an literal '<'",
   DUPLICATE_ATTR: () => "Attribute appears more than once in the same tag",
   INVALID_END_TAG: () => "End tag not well-formed or improper nesting",
-
-  INVALID_CHAR: () => "Input contains illegal characters",
-  INVALID_CDEND: () => "Character data cannot contain ']]>'",
-  INVALID_CDATA: () => "Character data cannot appear outside the root element",
+  INVALID_NESTING: () => "Elements must nest properly",
 
   UNEXPECTED_EOF: () => "Unexpected end of file",
 } as const;
