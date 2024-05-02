@@ -1,5 +1,5 @@
 const ERRORS = {
-  LIMIT_EXCEEDED: () => "",
+  LIMIT_EXCEEDED: () => "Limit exceeded",
 
   // Encoding errors
   ENCODING_NOT_SUPPORTED: ({encoding}: {encoding: string}) =>
@@ -18,7 +18,7 @@ const ERRORS = {
 
   INVALID_ENTITY_REF: () => "Entity reference not well-formed",
   RECURSIVE_ENTITY: ({entity}: {entity: string}) =>
-    `Entity '${entity}' directly or indirectly refers to itself`,
+    `Entity '${entity}' directly or indirectly references itself`,
   UNDECLARED_ENTITY: ({entity}: {entity: string}) =>
     `Entity '${entity}' not declared`,
   UNPARSED_ENTITY: ({entity}: {entity: string}) =>
