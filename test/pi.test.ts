@@ -67,6 +67,12 @@ describe("processing instruction", function() {
         content: "content ",
       });
   });
+  it("wf: processing instruction in internal subset", function() {
+    expect(getPi("<!DOCTYPE root [<?target content?>]><root/>")).deep.equals({
+      target: "target",
+      content: "content",
+    });
+  });
   it("not-wf: processing instruction with invalid character in name", function() {
     expect(() => getPi("<?target! ?><root/>"))
       .to.throw().and.have.property("code", "INVALID_PI");
