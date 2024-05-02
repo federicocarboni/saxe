@@ -349,11 +349,10 @@ const enum Flags {
   // OPT_TEXT_ONLY_ENTITIES = 1 << 4,
 
   // Runtime flags:
-  IN_ENTITY = 1 << 4,
-  SEEN_DOCTYPE = 1 << 5,
-  SEEN_ROOT = 1 << 6,
-  DOCTYPE_PUBLIC = 1 << 7,
-  DOCTYPE_SYSTEM = 1 << 8,
+  SEEN_DOCTYPE = 1 << 4,
+  SEEN_ROOT = 1 << 5,
+  DOCTYPE_PUBLIC = 1 << 6,
+  DOCTYPE_SYSTEM = 1 << 7,
 }
 
 // Normalize XML line endings.
@@ -1561,8 +1560,8 @@ export class SaxParser {
       // Cannot have two root elements
       if (
         this.elements_.length === 0 &&
-        this.flags_ & Flags.SEEN_ROOT &&
-        !(this.flags_ & Flags.IN_ENTITY)
+        this.entityStack_.length === 0 &&
+        this.flags_ & Flags.SEEN_ROOT
       ) {
         throw createSaxError("INVALID_START_TAG");
       }
@@ -1787,9 +1786,10 @@ export class SaxParser {
       ++this.index_;
       this.setDefaultAttributes_();
       // Empty tag could still be the root element
-      this.state_ = this.elements_.length !== 0
-        ? State.TEXT_CONTENT
-        : State.MISC;
+      this.state_ =
+        this.elements_.length === 0 && this.entityStack_.length === 0
+          ? State.MISC
+          : State.TEXT_CONTENT;
       this.otherState_ = 0;
       this.reader_.empty(this.element_, this.attributes_);
       this.element_ = "";
@@ -1961,8 +1961,8 @@ export class SaxParser {
         const chunk = this.chunk_;
         const quote = this.quote_;
         const elements = this.elements_;
+        const otherState = this.otherState_;
 
-        this.flags_ |= Flags.IN_ENTITY;
         this.index_ = 0;
         this.chunk_ = "" + entityValue;
         this.quote_ = -1;
@@ -1983,13 +1983,13 @@ export class SaxParser {
         //   throw createSaxError("INVALID_ATTRIBUTE_VALUE");
         // }
         // Entity value must match content production
-        if (this.elements_.length !== 0) {
-          throw createSaxError("INVALID_NESTING");
+        if (this.elements_.length !== 0 || this.state_ !== otherState) {
+          throw createSaxError("UNEXPECTED_EOF");
         }
 
         this.entityStack_.pop();
         if (this.entityStack_.length === 0) {
-          this.flags_ ^= Flags.IN_ENTITY;
+          this.entityLength_ = 0;
         }
         this.index_ = index;
         this.chunk_ = chunk;
@@ -2179,9 +2179,10 @@ export class SaxParser {
         throw createSaxError("INVALID_END_TAG");
       }
       ++this.index_;
-      this.state_ = this.elements_.length === 0
-        ? State.MISC
-        : State.TEXT_CONTENT;
+      this.state_ =
+        this.elements_.length === 0 && this.entityStack_.length === 0
+          ? State.MISC
+          : State.TEXT_CONTENT;
       this.otherState_ = 0;
       this.reader_.end(this.element_);
       this.element_ = "";
