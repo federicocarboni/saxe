@@ -914,9 +914,13 @@ export class SaxParser {
       ? normalizeLineEndings(this.content_)
       : undefined;
     const publicId = this.flags_ & Flags.DOCTYPE_PUBLIC
+      // [..] all strings of white space in the public identifier MUST be
+      // normalized to single space characters (#x20), and leading and trailing
+      // white space MUST be removed
+      // TAB is not allowed in public identifiers
       ? this.attribute_
-        .replace(/^[ \n\r]+|[ \n\r]+$/g, "")
-        .replace(/[ \n\r]+/g, " ")
+        .replace(/^[\n\r ]*|[\n\r ]*$|[\n\r ]+/g, " ")
+        .slice(1, -1)
       : undefined;
     // [11] SystemLiteral	::= ('"' [^"]* '"') | ("'" [^']* "'")
     // [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'
