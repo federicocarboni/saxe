@@ -29,7 +29,7 @@ const ERRORS = {
   INVALID_CHAR_REF: () => "Character reference to invalid character",
   INVALID_CHAR: () => "Invalid character",
   INVALID_CDEND: () => "Sequence ']]>' not allowed in content",
-  INVALID_CDATA: () => "Character data cannot appear outside the root element",
+  INVALID_CDATA: () => "Content must not appear outside root element",
 
   INVALID_START_TAG: () => "Start tag not well-formed",
   LT_IN_ATTRIBUTE: () => "Attribute value must not contain an literal '<'",
