@@ -32,11 +32,9 @@ const ERRORS = {
   INVALID_CDATA: () => "Character data cannot appear outside the root element",
 
   INVALID_START_TAG: () => "Start tag not well-formed",
-  LT_IN_ATTRIBUTE: () =>
-    "Attribute value must not contain an literal '<'",
+  LT_IN_ATTRIBUTE: () => "Attribute value must not contain an literal '<'",
   DUPLICATE_ATTR: () => "Attribute appears more than once in the same tag",
   INVALID_END_TAG: () => "End tag not well-formed or improper nesting",
-  INVALID_NESTING: () => "Elements must nest properly",
 
   UNEXPECTED_EOF: () => "Unexpected end of file",
 } as const;
