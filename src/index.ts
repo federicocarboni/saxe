@@ -1225,7 +1225,10 @@ export class SaxParser {
       let isTokenized_ = false;
       if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
         const start = this.index_;
-        while (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+        while (
+          this.index_ < this.chunk_.length &&
+          !isWhiteSpace(this.chunk_.charCodeAt(this.index_))
+        ) {
           ++this.index_;
         }
         const attType = this.chunk_.slice(start, this.index_);
@@ -1595,7 +1598,21 @@ export class SaxParser {
   }
 
   // @internal
+  private setDefaultAttributes_() {
+    const attlist = this.attlists_.get(this.element_);
+    if (attlist === undefined) {
+      return;
+    }
+    for (const [attribute, {default_}] of attlist) {
+      if (default_ !== undefined && !this.attributes_.has(attribute)) {
+        this.attributes_.set(attribute, default_);
+      }
+    }
+  }
+
+  // @internal
   private startTagEnd_() {
+    this.setDefaultAttributes_();
     this.state_ = State.TEXT_CONTENT;
     this.otherState_ = 0;
     this.reader_.start(this.element_, this.attributes_);
@@ -1768,6 +1785,7 @@ export class SaxParser {
   private parseEmptyTag_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       ++this.index_;
+      this.setDefaultAttributes_();
       // Empty tag could still be the root element
       this.state_ = this.elements_.length !== 0
         ? State.TEXT_CONTENT
