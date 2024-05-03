@@ -36,4 +36,18 @@ describe("InternalSubset", function() {
       ),
     ).equals('<root attribute="many so-many very-many spaces"></root>');
   });
+  it("wf: markup declarations are ignored after a parameter entity", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE doc [ %something; <!ENTITY foo "&amp;">]><doc>&foo;</doc>',
+      )
+    ).to.throw().and.have.property("code", "UNDECLARED_ENTITY");
+  });
+  it("wf: markup declarations are not ignored after a parameter entity when standalone='yes'", function() {
+    expect(
+      toCanonical(
+        '<?xml version="1.0" standalone="yes" ?><!DOCTYPE doc [ %something; <!ENTITY foo "&amp;">]><doc>&foo;</doc>',
+      ),
+    ).equals("<doc>&amp;</doc>");
+  });
 });
