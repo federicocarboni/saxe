@@ -1173,7 +1173,7 @@ export class SaxParser {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
         default:
           // Other characters still need to be validated:
-          if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+          if (codeUnit < 0x20 || codeUnit > 0xFFFD) {
             throw createSaxError("INVALID_CHAR");
           }
       }
@@ -1819,7 +1819,7 @@ export class SaxParser {
           throw createSaxError("LT_IN_ATTRIBUTE");
         default:
           // Other characters still need to be validated:
-          if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+          if (codeUnit < 0x20 || codeUnit > 0xFFFD) {
             throw createSaxError("INVALID_CHAR");
           }
       }
@@ -1893,7 +1893,7 @@ export class SaxParser {
           break;
         default:
           // Other characters still need to be validated:
-          if (codeUnit < 0x20 || codeUnit === 0xFFFE || codeUnit === 0xFFFF) {
+          if (codeUnit < 0x20 || codeUnit > 0xFFFD) {
             throw createSaxError("INVALID_CHAR");
           }
       }
