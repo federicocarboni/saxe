@@ -291,6 +291,8 @@ const enum State {
   EXTERNAL_ID_QUOTED,
   DOCTYPE_MAYBE_INTERNAL_SUBSET,
   INTERNAL_SUBSET,
+  INTERNAL_SUBSET_PE_REF_START,
+  INTERNAL_SUBSET_PE_REF,
   INTERNAL_SUBSET_OPEN_ANGLE,
   INTERNAL_SUBSET_OPEN_ANGLE_BANG,
   INTERNAL_SUBSET_DECL,
@@ -353,6 +355,7 @@ const enum Flags {
   SEEN_ROOT = 1 << 5,
   DOCTYPE_PUBLIC = 1 << 6,
   DOCTYPE_SYSTEM = 1 << 7,
+  IGNORE_INT_SUBSET_DECL = 1 << 8,
 }
 
 // Normalize XML line endings.
@@ -611,6 +614,10 @@ export class SaxParser {
         return this.parseDoctypeMaybeInternalSubset_();
       case State.INTERNAL_SUBSET:
         return this.parseInternalSubset_();
+      case State.INTERNAL_SUBSET_PE_REF_START:
+        return this.parseInternalSubsetPeRefStart_();
+      case State.INTERNAL_SUBSET_PE_REF:
+        return this.parseInternalSubsetPeRef_();
       case State.INTERNAL_SUBSET_OPEN_ANGLE:
         return this.parseInternalSubsetOpenAngle_();
       case State.INTERNAL_SUBSET_OPEN_ANGLE_BANG:
@@ -1046,6 +1053,9 @@ export class SaxParser {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
       switch (codeUnit) {
+        case Chars.PERCENT:
+          this.state_ = State.INTERNAL_SUBSET_PE_REF_START;
+          break loop;
         case Chars.LT:
           this.state_ = State.INTERNAL_SUBSET_OPEN_ANGLE;
           break loop;
@@ -1057,6 +1067,35 @@ export class SaxParser {
             throw createSaxError("INVALID_DOCTYPE_DECL");
           }
       }
+    }
+  }
+
+  // @internal
+  private parseInternalSubsetPeRefStart_() {
+    const codePoint = this.chunk_.codePointAt(this.index_)!;
+    ++this.index_;
+    if (codePoint > 0xFFFF) {
+      ++this.index_;
+    }
+    if (!isNameStartChar(codePoint)) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    this.state_ = State.INTERNAL_SUBSET_PE_REF;
+  }
+
+  // @internal
+  private parseInternalSubsetPeRef_() {
+    this.readNameCharacters_();
+    if (this.index_ >= this.chunk_.length) {
+      return;
+    }
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    ++this.index_;
+    this.state_ = State.INTERNAL_SUBSET;
+    if (!this.standalone_) {
+      this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
     }
   }
 
@@ -1112,12 +1151,12 @@ export class SaxParser {
             this.parseStep_();
             start = this.index_;
           } else {
+            ++this.index_;
             // Entities must not be expanded but must parse correctly.
             this.readName_();
             if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
               throw createSaxError("INVALID_INTERNAL_SUBSET");
             }
-            ++this.index_;
           }
           break;
         case Chars.PERCENT:
@@ -1156,7 +1195,10 @@ export class SaxParser {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       ++this.index_;
-      if (!isParameter && !this.entities_.has(entityName)) {
+      if (
+        !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
+        !isParameter && !this.entities_.has(entityName)
+      ) {
         this.entities_.set(entityName, this.content_);
       }
       this.content_ = "";
