@@ -1225,8 +1225,9 @@ export class SaxParser {
         this.skipWhiteSpace_();
         if (
           this.chunk_.slice(this.index_, this.index_ + 5) === "NDATA" &&
-          isWhiteSpace(this.chunk_.charCodeAt(this.index_))
+          isWhiteSpace(this.chunk_.charCodeAt(this.index_ + 5))
         ) {
+          this.index_ += 6;
           this.skipWhiteSpace_();
           this.readName_();
           decl = EntityDecl.UNPARSED;
