@@ -1037,10 +1037,11 @@ export class SaxParser {
   private parseDoctypeMaybeInternalSubset_() {
     if (this.skipWhiteSpace_()) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
-      if (codeUnit === Chars.OPEN_BRACKET) {
-        this.state_ = State.INTERNAL_SUBSET;
-      } else if (codeUnit === Chars.GT) {
+      if (codeUnit === Chars.OPEN_BRACKET || codeUnit === Chars.GT) {
         this.doctypeEnd_();
+        if (codeUnit === Chars.OPEN_BRACKET) {
+          this.state_ = State.INTERNAL_SUBSET;
+        }
       } else {
         throw createSaxError("INVALID_DOCTYPE_DECL");
       }
