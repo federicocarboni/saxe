@@ -42,14 +42,6 @@ export class CanonicalXmlWriter implements SaxReader {
   // There are no comments in Canonical XML
   comment(): void {
   }
-  // Parser will throw if it finds a non-predefined entity in an attribute value
-  replaceEntityRef(): string | undefined {
-    throw new Error("Entities are not supported");
-  }
-  // Cannot read entities from DTD so can't do anything with them
-  entityRef(): void {
-    throw new Error("Entities are not supported");
-  }
   start(name: string, attributes: ReadonlyMap<string, string>): void {
     this.output += `<${name}`;
     // As per canonical XML rule lexicographically sort attributes
