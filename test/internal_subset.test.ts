@@ -50,4 +50,25 @@ describe("InternalSubset", function() {
       ),
     ).equals("<doc>&amp;</doc>");
   });
+  it("not-wf: external entity reference in attribute", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent">]><doc attribute="&foo;"></doc>',
+      )
+    ).to.throw().and.have.property("code", "EXTERNAL_ENTITY");
+  });
+  it("not-wf: unparsed entity reference in attribute", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc attribute="&foo;"></doc>',
+      )
+    ).to.throw().and.have.property("code", "UNPARSED_ENTITY");
+  });
+  it("not-wf: unparsed entity reference in content", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc>&foo;</doc>',
+      )
+    ).to.throw().and.have.property("code", "UNPARSED_ENTITY");
+  });
 });
