@@ -1196,6 +1196,7 @@ export class SaxParser {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
     this.skipWhiteSpace_();
+    let decl: string | EntityDecl;
     const quote = this.chunk_.charCodeAt(this.index_);
     if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
       ++this.index_;
@@ -1205,14 +1206,10 @@ export class SaxParser {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       ++this.index_;
-      if (
-        !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
-        !isParameter && !this.entities_.has(entityName)
-      ) {
-        this.entities_.set(entityName, this.content_);
-      }
+      decl = this.content_;
       this.content_ = "";
     } else {
+      decl = EntityDecl.EXTERNAL;
       this.parseDoctypeExternalId_();
       while (
         this.index_ < this.chunk_.length &&
@@ -1224,7 +1221,6 @@ export class SaxParser {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       this.state_ = State.INTERNAL_SUBSET;
-      let decl = EntityDecl.EXTERNAL;
       if (isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         this.skipWhiteSpace_();
         if (
@@ -1236,16 +1232,16 @@ export class SaxParser {
           decl = EntityDecl.UNPARSED;
         }
       }
-      if (
-        !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
-        !isParameter && !this.entities_.has(entityName)
-      ) {
-        this.entities_.set(entityName, decl);
-      }
     }
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    if (
+      !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
+      !isParameter && !this.entities_.has(entityName)
+    ) {
+      this.entities_.set(entityName, decl);
     }
   }
 
