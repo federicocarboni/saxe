@@ -81,5 +81,5 @@ export function isNameChar(c: number) {
 export function hasInvalidChar(s: string) {
   // Astral characters are not considered because enabling Unicode support on
   // regexes is a performance hit and we assume strings are well-formed.
-  return /[^\t\n\r\x20-\uFFFD]/.test(s);
+  return /[^\t\n\r -\uFFFD]/.test(s);
 }
