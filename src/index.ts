@@ -911,8 +911,7 @@ export class SaxParser {
   }
 
   // @internal
-  private doctypeEnd_() {
-    ++this.index_;
+  private getNameAndExternalId_() {
     const systemId = this.flags_ & Flags.DOCTYPE_SYSTEM
       ? normalizeLineEndings(this.content_)
       : undefined;
@@ -935,9 +934,19 @@ export class SaxParser {
       publicId !== undefined &&
         /[^ a-zA-Z0-9-'()+,./:=?;!*#@$_%]/.test(publicId)
     ) {
+      return undefined;
+    }
+    return {name: this.element_, publicId, systemId};
+  }
+
+  // @internal
+  private doctypeEnd_() {
+    ++this.index_;
+    const doctype = this.getNameAndExternalId_();
+    if (doctype === undefined) {
       throw createSaxError("INVALID_DOCTYPE_DECL");
     }
-    this.reader_.doctype?.({name: this.element_, publicId, systemId});
+    this.reader_.doctype?.(doctype);
     this.element_ = "";
     this.content_ = "";
     this.attribute_ = "";
@@ -1188,8 +1197,8 @@ export class SaxParser {
     }
     this.skipWhiteSpace_();
     const quote = this.chunk_.charCodeAt(this.index_);
-    ++this.index_;
     if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
+      ++this.index_;
       this.quote_ = quote;
       this.readEntityValue_();
       if (this.chunk_.charCodeAt(this.index_) !== quote) {
@@ -1204,8 +1213,35 @@ export class SaxParser {
       }
       this.content_ = "";
     } else {
-      // TODO: external entities
-      this.index_ = this.chunk_.length - 1;
+      this.parseDoctypeExternalId_();
+      while (
+        this.index_ < this.chunk_.length &&
+        this.state_ !== State.DOCTYPE_MAYBE_INTERNAL_SUBSET
+      ) {
+        this.parseStep_();
+      }
+      if (this.getNameAndExternalId_() === undefined) {
+        throw createSaxError("INVALID_INTERNAL_SUBSET");
+      }
+      this.state_ = State.INTERNAL_SUBSET;
+      let decl = EntityDecl.EXTERNAL;
+      if (isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+        this.skipWhiteSpace_();
+        if (
+          this.chunk_.slice(this.index_, this.index_ + 5) === "NDATA" &&
+          isWhiteSpace(this.chunk_.charCodeAt(this.index_))
+        ) {
+          this.skipWhiteSpace_();
+          this.readName_();
+          decl = EntityDecl.UNPARSED;
+        }
+      }
+      if (
+        !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
+        !isParameter && !this.entities_.has(entityName)
+      ) {
+        this.entities_.set(entityName, decl);
+      }
     }
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
