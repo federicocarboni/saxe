@@ -1191,11 +1191,11 @@ export class SaxParser {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case this.quote_:
-          this.appendContent(start, this.maxEntityLength_);
+          this.appendContent_(start, this.maxEntityLength_);
           return;
         case Chars.AMPERSAND:
           if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.HASH) {
-            this.appendContent(start, this.maxEntityLength_);
+            this.appendContent_(start, this.maxEntityLength_);
             this.index_ += 2;
             this.otherState_ = this.state_;
             this.parseCharRef_();
@@ -1220,7 +1220,7 @@ export class SaxParser {
       }
       ++this.index_;
     }
-    this.appendContent(start, this.maxEntityLength_);
+    this.appendContent_(start, this.maxEntityLength_);
   }
 
   // @internal
@@ -1421,7 +1421,7 @@ export class SaxParser {
           break loop;
       }
     }
-    this.appendContent(start, this.maxTextLength_);
+    this.appendContent_(start, this.maxTextLength_);
     if (this.state_ === State.INTERNAL_SUBSET) {
       this.readInternalSubsetDecl_();
     }
@@ -1440,7 +1440,7 @@ export class SaxParser {
     } else {
       this.index_ = this.chunk_.length;
     }
-    this.appendContent(start, this.maxTextLength_);
+    this.appendContent_(start, this.maxTextLength_);
   }
 
   // @internal
@@ -1832,7 +1832,7 @@ export class SaxParser {
         case Chars.TAB:
         case Chars.LF:
         case Chars.CR:
-          this.appendContent(start, this.maxTextLength_ - 1);
+          this.appendContent_(start, this.maxTextLength_ - 1);
           this.content_ += " ";
           if (
             codeUnit === Chars.CR &&
@@ -1849,7 +1849,7 @@ export class SaxParser {
           this.otherState_ = State.START_TAG_ATTR_VALUE_QUOTED;
           break loop;
         case quote: {
-          this.appendContent(start, this.maxTextLength_);
+          this.appendContent_(start, this.maxTextLength_);
           ++this.index_;
           this.state_ = State.START_TAG_SPACE;
           if (this.attributes_.has(this.attribute_)) {
@@ -1881,7 +1881,7 @@ export class SaxParser {
       }
       ++this.index_;
     }
-    this.appendContent(start, this.maxTextLength_);
+    this.appendContent_(start, this.maxTextLength_);
     ++this.index_;
   }
 
@@ -2312,7 +2312,7 @@ export class SaxParser {
   // Internal functions
 
   // @internal
-  private appendContent(start: number, limit: number) {
+  private appendContent_(start: number, limit: number) {
     const chunk = this.chunk_.slice(start, this.index_);
     if (this.content_.length + chunk.length > limit) {
       throw createSaxError("LIMIT_EXCEEDED");
