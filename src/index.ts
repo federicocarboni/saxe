@@ -1197,6 +1197,7 @@ export class SaxParser {
             this.parseCharRef_();
             this.parseStep_();
             start = this.index_;
+            --this.index_;
           } else {
             ++this.index_;
             // Entities must not be expanded but must parse correctly.
