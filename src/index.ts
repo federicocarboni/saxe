@@ -926,11 +926,7 @@ export class SaxParser {
     if (!this.skipWhiteSpace_()) {
       return;
     }
-    const char = this.chunk_.codePointAt(this.index_)!;
-    ++this.index_;
-    if (char > 0xFFFF) {
-      ++this.index_;
-    }
+    const char = this.nextCodePoint_();
     if (!isNameStartChar(char)) {
       throw createSaxError("INVALID_DOCTYPE_DECL");
     }
@@ -1123,11 +1119,7 @@ export class SaxParser {
 
   // @internal
   private parseInternalSubsetPeRefStart_() {
-    const codePoint = this.chunk_.codePointAt(this.index_)!;
-    ++this.index_;
-    if (codePoint > 0xFFFF) {
-      ++this.index_;
-    }
+    const codePoint = this.nextCodePoint_();
     if (!isNameStartChar(codePoint)) {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
@@ -1471,14 +1463,10 @@ export class SaxParser {
   // @internal
   private parsePiTargetStart_() {
     // codePointAt is fine here since we are not in a loop
-    const char = this.chunk_.codePointAt(this.index_)!;
-    if (isNameStartChar(char)) {
-      ++this.index_;
-      if (char > 0xFFFF) {
-        ++this.index_;
-      }
+    const codePoint = this.nextCodePoint_();
+    if (isNameStartChar(codePoint)) {
       this.state_ = State.PI_TARGET;
-      this.element_ = String.fromCodePoint(char);
+      this.element_ = String.fromCodePoint(codePoint);
     } else {
       throw createSaxError("INVALID_PI");
     }
@@ -1648,13 +1636,9 @@ export class SaxParser {
 
   // @internal
   private parseOpenAngleBracket_() {
-    const char = this.chunk_.codePointAt(this.index_)!;
-    ++this.index_;
-    if (char > 0xFFFF) {
-      ++this.index_;
-    }
-    if (isNameStartChar(char)) {
-      this.element_ = String.fromCodePoint(char);
+    const codePoint = this.nextCodePoint_();
+    if (isNameStartChar(codePoint)) {
+      this.element_ = String.fromCodePoint(codePoint);
       // Cannot have two root elements
       if (
         this.elements_.length === 0 &&
@@ -1665,11 +1649,11 @@ export class SaxParser {
       }
       this.flags_ |= Flags.SEEN_ROOT;
       this.state_ = State.START_TAG_NAME;
-    } else if (char === Chars.SLASH) {
+    } else if (codePoint === Chars.SLASH) {
       this.state_ = State.END_TAG_START;
-    } else if (char === Chars.BANG) {
+    } else if (codePoint === Chars.BANG) {
       this.state_ = State.OPEN_ANGLE_BRACKET_BANG;
-    } else if (char === Chars.QUESTION) {
+    } else if (codePoint === Chars.QUESTION) {
       this.state_ = State.PI_TARGET_START;
     } else {
       throw createSaxError("INVALID_START_TAG");
@@ -1741,22 +1725,19 @@ export class SaxParser {
 
   // @internal
   private parseStartTag_() {
-    if (this.skipWhiteSpace_()) {
-      const char = this.chunk_.codePointAt(this.index_)!;
-      ++this.index_;
-      if (char > 0xFFFF) {
-        ++this.index_;
-      }
-      if (isNameStartChar(char)) {
-        this.state_ = State.START_TAG_ATTR;
-        this.attribute_ = String.fromCodePoint(char);
-      } else if (char === Chars.GT) {
-        this.startTagEnd_();
-      } else if (char === Chars.SLASH) {
-        this.state_ = State.EMPTY_TAG;
-      } else {
-        throw createSaxError("INVALID_START_TAG");
-      }
+    if (!this.skipWhiteSpace_()) {
+      return;
+    }
+    const codePoint = this.nextCodePoint_();
+    if (isNameStartChar(codePoint)) {
+      this.state_ = State.START_TAG_ATTR;
+      this.attribute_ = String.fromCodePoint(codePoint);
+    } else if (codePoint === Chars.GT) {
+      this.startTagEnd_();
+    } else if (codePoint === Chars.SLASH) {
+      this.state_ = State.EMPTY_TAG;
+    } else {
+      throw createSaxError("INVALID_START_TAG");
     }
   }
 
@@ -1989,15 +1970,11 @@ export class SaxParser {
 
   // @internal
   private parseReference_() {
-    const char = this.chunk_.codePointAt(this.index_)!;
-    ++this.index_;
-    if (char > 0xFFFF) {
-      ++this.index_;
-    }
-    if (isNameStartChar(char)) {
-      this.entity_ = String.fromCodePoint(char);
+    const codePoint = this.nextCodePoint_();
+    if (isNameStartChar(codePoint)) {
+      this.entity_ = String.fromCodePoint(codePoint);
       this.state_ = State.ENTITY_REF;
-    } else if (char === Chars.HASH) {
+    } else if (codePoint === Chars.HASH) {
       this.state_ = State.CHAR_REF;
     } else {
       throw createSaxError("INVALID_ENTITY_REF");
@@ -2268,14 +2245,10 @@ export class SaxParser {
 
   // @internal
   private parseEndTagStart_() {
-    const char = this.chunk_.codePointAt(this.index_)!;
-    ++this.index_;
-    if (char > 0xFFFF) {
-      ++this.index_;
-    }
-    if (isNameStartChar(char)) {
+    const codePoint = this.nextCodePoint_();
+    if (isNameStartChar(codePoint)) {
       this.state_ = State.END_TAG;
-      this.element_ = String.fromCodePoint(char);
+      this.element_ = String.fromCodePoint(codePoint);
       // this.parseEndTag_();
     } else {
       throw createSaxError("INVALID_END_TAG");
@@ -2321,23 +2294,49 @@ export class SaxParser {
   }
 
   // @internal
+  private nextCodePoint_() {
+    let codePoint = this.chunk_.charCodeAt(this.index_);
+    if (codePoint >= 0xD800 && codePoint <= 0xDBFF) {
+      codePoint = 0x10000 + (codePoint - 0xD800) * 0x400 +
+        this.chunk_.charCodeAt(++this.index_) - 0xDC00;
+    }
+    ++this.index_;
+    return codePoint;
+  }
+
+  // @internal
   private readNameCharacters_(length: number) {
     const start = this.index_;
     while (this.index_ < this.chunk_.length) {
-      let char = this.chunk_.charCodeAt(this.index_)!;
-      if (0xD800 <= char && char <= 0xDBFF) {
-        char = 0x10000 + (char - 0xD800) * 0x400 +
-          this.chunk_.charCodeAt(++this.index_);
-      }
-      if (!isNameChar(char)) {
-        break;
+      const codeUnit = this.chunk_.charCodeAt(this.index_)!;
+      if (!isNameChar(codeUnit)) {
+        // codeUnit now is either an invalid code point or a leading surrogate
+        // of a valid or invalid code point.
+        // Trick: only limitation on astral code points is they have to be less
+        // than or equal to U+EFFFF, since we assume all strings are well-formed
+        // UTF-16, surrogates are known to be valid.
+        // Leading surrogate value is the only significant value to determine
+        // that the code point is in range -- restricted to 0x3BF (most
+        // significant 11 bits of 0xEFFFF) plus leading surrogate offset 0xD7C0.
+        // For our assumptions the following code unit is known to be a trailing
+        // surrogate character with the lower 10 bits of the code point which
+        // are irrelevant for the range check.
+        if (codeUnit >= 0xD800 && codeUnit <= 0xDB7F) {
+          // codeUnit is the leading surrogate of a valid astral code point
+          ++this.index_;
+        } else {
+          // codeUnit is an invalid code point or the leading surrogate of an
+          // invalid astral code point
+          break;
+        }
       }
       ++this.index_;
     }
-    if (length + (this.index_ - start) > this.maxNameLength_) {
+    const name = this.chunk_.slice(start, this.index_);
+    if (length + name.length > this.maxNameLength_) {
       throw createSaxError("LIMIT_EXCEEDED");
     }
-    return this.chunk_.slice(start, this.index_);
+    return name;
   }
 
   // @internal
