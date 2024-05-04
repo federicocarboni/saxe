@@ -2297,8 +2297,9 @@ export class SaxParser {
   private nextCodePoint_() {
     let codePoint = this.chunk_.charCodeAt(this.index_);
     if (codePoint >= 0xD800 && codePoint <= 0xDBFF) {
-      codePoint = 0x10000 + (codePoint - 0xD800) * 0x400 +
-        this.chunk_.charCodeAt(++this.index_) - 0xDC00;
+      // https://unicode.org/faq/utf_bom.html#utf16-3
+      codePoint = (codePoint << 10) + this.chunk_.charCodeAt(++this.index_) -
+        0x35FDC00;
     }
     ++this.index_;
     return codePoint;
