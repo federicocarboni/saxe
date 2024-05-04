@@ -9,7 +9,6 @@ import {
   isWhiteSpace,
 } from "./chars.ts";
 import {createSaxError} from "./error.ts";
-import {MAX_ENTITY_LENGTH} from "./limits.ts";
 
 export {isSaxError, type SaxError, type SaxErrorCode} from "./error.ts";
 
@@ -258,20 +257,38 @@ export interface SaxOptions {
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
+  // Limiting the memory usage of the parser is one of, if not the, most
+  // important security proofing step for XML.
+  // https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
   /**
-   * To protect against malicious input this can be used to cap the number of
-   * code units which can be produced while expanding an entity. If it is not
-   * specified or set to `undefined` entity expansion is essentially uncapped.
+   * Maximum size allowed for a markup identifier. Applies to tag names, public
+   * and system identifiers.
+   * @default 2_000
+   */
+  maxNameLength?: number | undefined;
+  /**
+   * Maximum size allowed for an attribute map.
+   * @default 2_000
+   */
+  maxAttributes?: number | undefined;
+  /**
+   * Maximum size allowed for a text node.
    *
-   * It is recommended to set this to a sensible value when handling potentially
-   * malicious input.
+   * Also applies to comments and processing instruction content when they are
+   * collected.
+   * @default 10_000_000
+   */
+  maxTextLength?: number | undefined;
+  /**
+   * Maximum size allowed for an entity value, including nested entities.
    * @default 1_000_000
    */
   maxEntityLength?: number | undefined;
   /**
-   * @default "default"
+   * Maximum nesting depth allowed for entities.
+   * @default 20
    */
-  internalSubset?: "default" | "ignore" | undefined;
+  maxEntityDepth?: number | undefined;
 }
 
 const enum State {
@@ -438,7 +455,15 @@ export class SaxParser {
 
   // Options
   // @internal
+  private maxNameLength_: number;
+  // @internal
+  private maxAttributes_: number;
+  // @internal
+  private maxTextLength_: number;
+  // @internal
   private maxEntityLength_: number;
+  // @internal
+  private maxEntityDepth_: number;
 
   // State
   // @internal
@@ -453,11 +478,15 @@ export class SaxParser {
   // @internal
   private flags_ = Flags.INIT;
   // @internal
-  private entityLength_ = 0;
-  // @internal
   private charRef_ = 0;
   // @internal
   private quote_ = -1;
+  // @internal
+  private entityLength_ = 0;
+  // Current text node length in code units. Required for when
+  // incompleteTextNodes is enabled.
+  // @internal
+  private textLength_ = 0;
 
   // @internal
   private elements_: string[] = [];
@@ -533,7 +562,11 @@ export class SaxParser {
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
-    this.maxEntityLength_ = options?.maxEntityLength ?? MAX_ENTITY_LENGTH;
+    this.maxNameLength_ = options?.maxNameLength ?? 2_000;
+    this.maxAttributes_ = options?.maxAttributes ?? 2_000;
+    this.maxTextLength_ = options?.maxTextLength ?? 10_000_000;
+    this.maxEntityLength_ = options?.maxEntityLength ?? 1_000_000;
+    this.maxEntityDepth_ = options?.maxEntityDepth ?? 20;
   }
 
   /**
@@ -836,7 +869,11 @@ export class SaxParser {
       this.index_,
     );
     const end = index === -1 ? this.chunk_.length : index;
-    this.content_ += this.chunk_.slice(this.index_, end);
+    const chunk = this.chunk_.slice(this.index_, end);
+    if (this.content_.length + chunk.length > this.maxNameLength_) {
+      throw createSaxError("LIMIT_EXCEEDED");
+    }
+    this.content_ += chunk;
     this.index_ = end + 1;
     if (index !== -1) {
       this.quote_ = -1;
@@ -903,7 +940,7 @@ export class SaxParser {
 
   // @internal
   private parseDoctypeName_() {
-    this.element_ += this.readNameCharacters_();
+    this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       this.state_ = State.DOCTYPE_NAME_END;
       this.parseDoctypeNameEnd_();
@@ -1029,10 +1066,14 @@ export class SaxParser {
       this.quote_ === Chars.APOSTROPHE ? "'" : '"',
       this.index_,
     );
-    this.content_ += this.chunk_.slice(
+    const chunk = this.chunk_.slice(
       this.index_,
       index === -1 ? undefined : index,
     );
+    if (this.content_.length + chunk.length > this.maxNameLength_) {
+      throw createSaxError("LIMIT_EXCEEDED");
+    }
+    this.content_ += chunk;
     if (index === -1) {
       this.index_ = this.chunk_.length;
     } else {
@@ -1095,7 +1136,7 @@ export class SaxParser {
 
   // @internal
   private parseInternalSubsetPeRef_() {
-    this.readNameCharacters_();
+    this.readNameCharacters_(0);
     if (this.index_ >= this.chunk_.length) {
       return;
     }
@@ -1140,7 +1181,7 @@ export class SaxParser {
     if (!isNameStartChar(this.chunk_.codePointAt(this.index_)!)) {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
-    return this.readNameCharacters_();
+    return this.readNameCharacters_(0);
   }
 
   // @internal
@@ -1150,11 +1191,11 @@ export class SaxParser {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
         case this.quote_:
-          this.content_ += this.chunk_.slice(start, this.index_);
+          this.appendContent(start, this.maxEntityLength_);
           return;
         case Chars.AMPERSAND:
           if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.HASH) {
-            this.content_ += this.chunk_.slice(start, this.index_);
+            this.appendContent(start, this.maxEntityLength_);
             this.index_ += 2;
             this.otherState_ = this.state_;
             this.parseCharRef_();
@@ -1179,7 +1220,7 @@ export class SaxParser {
       }
       ++this.index_;
     }
-    this.content_ += this.chunk_.slice(start, this.index_);
+    this.appendContent(start, this.maxEntityLength_);
   }
 
   // @internal
@@ -1380,7 +1421,7 @@ export class SaxParser {
           break loop;
       }
     }
-    this.content_ += this.chunk_.slice(start, this.index_);
+    this.appendContent(start, this.maxTextLength_);
     if (this.state_ === State.INTERNAL_SUBSET) {
       this.readInternalSubsetDecl_();
     }
@@ -1399,7 +1440,7 @@ export class SaxParser {
     } else {
       this.index_ = this.chunk_.length;
     }
-    this.content_ += this.chunk_.slice(start, this.index_);
+    this.appendContent(start, this.maxTextLength_);
   }
 
   // @internal
@@ -1445,7 +1486,7 @@ export class SaxParser {
 
   // @internal
   private parsePiTarget_() {
-    this.element_ += this.readNameCharacters_();
+    this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       // Name read to completion
       if (this.element_.length === 3 && this.element_.toLowerCase() === "xml") {
@@ -1494,7 +1535,11 @@ export class SaxParser {
       throw createSaxError("INVALID_CHAR");
     }
     if (this.flags_ & Flags.CAPTURE_PI) {
-      this.content_ += normalizeLineEndings(content);
+      const actualContent = normalizeLineEndings(content);
+      if (this.content_.length + actualContent.length > this.maxTextLength_) {
+        throw createSaxError("LIMIT_EXCEEDED");
+      }
+      this.content_ += actualContent;
     }
     if (index === -1) {
       this.index_ = this.chunk_.length;
@@ -1550,7 +1595,11 @@ export class SaxParser {
       throw createSaxError("INVALID_CHAR");
     }
     if (this.flags_ & Flags.CAPTURE_COMMENT) {
-      this.content_ += normalizeLineEndings(content);
+      const actualContent = normalizeLineEndings(content);
+      if (this.content_.length + actualContent.length > this.maxTextLength_) {
+        throw createSaxError("LIMIT_EXCEEDED");
+      }
+      this.content_ += actualContent;
     }
     if (index === -1) {
       // Chunk is read to completion even on an ending hyphen, it will be
@@ -1653,6 +1702,9 @@ export class SaxParser {
     }
     for (const [attribute, {default_}] of attlist) {
       if (default_ !== undefined && !this.attributes_.has(attribute)) {
+        if (this.attributes_.size >= this.maxAttributes_) {
+          throw createSaxError("LIMIT_EXCEEDED");
+        }
         this.attributes_.set(attribute, default_);
       }
     }
@@ -1671,7 +1723,7 @@ export class SaxParser {
 
   // @internal
   private parseStartTagName_() {
-    this.element_ += this.readNameCharacters_();
+    this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
@@ -1726,7 +1778,7 @@ export class SaxParser {
 
   // @internal
   private parseStartTagAttr_() {
-    this.attribute_ += this.readNameCharacters_();
+    this.attribute_ += this.readNameCharacters_(this.attribute_.length);
     if (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
@@ -1780,7 +1832,8 @@ export class SaxParser {
         case Chars.TAB:
         case Chars.LF:
         case Chars.CR:
-          this.content_ += this.chunk_.slice(start, this.index_) + " ";
+          this.appendContent(start, this.maxTextLength_ - 1);
+          this.content_ += " ";
           if (
             codeUnit === Chars.CR &&
             this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF
@@ -1796,7 +1849,7 @@ export class SaxParser {
           this.otherState_ = State.START_TAG_ATTR_VALUE_QUOTED;
           break loop;
         case quote: {
-          this.content_ += this.chunk_.slice(start, this.index_);
+          this.appendContent(start, this.maxTextLength_);
           ++this.index_;
           this.state_ = State.START_TAG_SPACE;
           if (this.attributes_.has(this.attribute_)) {
@@ -1809,6 +1862,9 @@ export class SaxParser {
           const value = attlist !== undefined && attlist.isTokenized_
             ? normalizeAttributeValue(this.content_)
             : this.content_;
+          if (this.attributes_.size >= this.maxAttributes_) {
+            throw createSaxError("LIMIT_EXCEEDED");
+          }
           this.attributes_.set(this.attribute_, value);
           this.attribute_ = "";
           this.content_ = "";
@@ -1825,7 +1881,7 @@ export class SaxParser {
       }
       ++this.index_;
     }
-    this.content_ += this.chunk_.slice(start, this.index_);
+    this.appendContent(start, this.maxTextLength_);
     ++this.index_;
   }
 
@@ -1848,6 +1904,16 @@ export class SaxParser {
     }
   }
 
+  // @internal
+  private appendTextContent_(start: number) {
+    const chunk = this.chunk_.slice(start, this.index_);
+    this.textLength_ += chunk.length;
+    if (this.textLength_ >= this.maxTextLength_) {
+      throw createSaxError("LIMIT_EXCEEDED");
+    }
+    this.content_ += chunk;
+  }
+
   // This should ideally be somewhere else so that it can be applied to entities
   // This is the hottest part of the parser as most of an XML Document is text
   // content.
@@ -1867,20 +1933,23 @@ export class SaxParser {
           break;
         case Chars.CR:
           // Carriage return requires new-line normalization
-          this.content_ += this.chunk_.slice(start, this.index_) + "\n";
+          this.appendTextContent_(start);
+          this.content_ += "\n";
           if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF) {
             ++this.index_;
           }
           start = this.index_ + 1;
           break;
-          // State changing conditions:
+        // State changing conditions:
         case Chars.AMPERSAND:
           // It was considered to handle references inline but they are not
           // common enough to justify doing more work here
+          this.textLength_ = 0;
           this.state_ = State.REFERENCE;
           this.otherState_ = State.TEXT_CONTENT;
           break loop;
         case Chars.LT:
+          this.textLength_ = 0;
           this.state_ = State.OPEN_ANGLE_BRACKET;
           this.otherState_ = State.TEXT_CONTENT;
           break loop;
@@ -1906,7 +1975,7 @@ export class SaxParser {
     }
     // By the time we get here, the chunk is finished or a special character was
     // reached.
-    this.content_ += this.chunk_.slice(start, this.index_);
+    this.appendTextContent_(start);
     // Emit text content as needed
     if (
       this.state_ !== State.TEXT_CONTENT ||
@@ -1937,7 +2006,7 @@ export class SaxParser {
 
   // @internal
   private parseEntityRef_() {
-    this.entity_ += this.readNameCharacters_();
+    this.entity_ += this.readNameCharacters_(this.entity_.length);
     if (this.index_ >= this.chunk_.length) {
       return;
     }
@@ -2001,10 +2070,12 @@ export class SaxParser {
         this.reader_.entityRef(this.entity_);
       } else {
         this.entityLength_ += entityValue.length;
-        if (this.entityLength_ > this.maxEntityLength_) {
+        if (
+          this.entityLength_ > this.maxEntityLength_ ||
+          this.entityStack_.length >= this.maxEntityDepth_
+        ) {
           throw createSaxError("LIMIT_EXCEEDED");
         }
-
         this.entityStack_.push(this.entity_);
         const index = this.index_;
         const chunk = this.chunk_;
@@ -2213,7 +2284,7 @@ export class SaxParser {
 
   // @internal
   private parseEndTag_() {
-    this.element_ += this.readNameCharacters_();
+    this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       this.state_ = State.END_TAG_END;
       this.parseEndTagEnd_();
@@ -2241,7 +2312,16 @@ export class SaxParser {
   // Internal functions
 
   // @internal
-  private readNameCharacters_() {
+  private appendContent(start: number, limit: number) {
+    const chunk = this.chunk_.slice(start, this.index_);
+    if (this.content_.length + chunk.length > limit) {
+      throw createSaxError("LIMIT_EXCEEDED");
+    }
+    this.content_ += chunk;
+  }
+
+  // @internal
+  private readNameCharacters_(length: number) {
     const start = this.index_;
     while (this.index_ < this.chunk_.length) {
       let char = this.chunk_.charCodeAt(this.index_)!;
@@ -2253,6 +2333,9 @@ export class SaxParser {
         break;
       }
       ++this.index_;
+    }
+    if (length + (this.index_ - start) > this.maxNameLength_) {
+      throw createSaxError("LIMIT_EXCEEDED");
     }
     return this.chunk_.slice(start, this.index_);
   }
