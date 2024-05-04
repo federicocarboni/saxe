@@ -36,7 +36,7 @@ export class CanonicalXmlWriter implements SaxReader {
   // }
   doctype(): void {
   }
-  pi(target: string, content: string): void {
+  processingInstruction(target: string, content: string): void {
     this.output += `<?${target} ${content}?>`;
   }
   // There are no comments in Canonical XML

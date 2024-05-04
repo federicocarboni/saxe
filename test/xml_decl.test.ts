@@ -7,12 +7,12 @@ class XmlDeclReader implements SaxReader {
     this.declaration = declaration;
   }
   doctype?(): void {}
-  pi?(): void {}
+  processingInstruction?(): void {}
   comment?(): void {}
-  replaceEntityRef?(): string | undefined {
+  getGeneralEntity?(): string | undefined {
     return undefined;
   }
-  entityRef(): void {}
+  entityRef?(): void {}
   start(): void {}
   empty(): void {}
   end(): void {}

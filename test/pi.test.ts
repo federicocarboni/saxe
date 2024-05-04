@@ -7,7 +7,7 @@ function getPi(...chunks: string[]) {
     content: string;
   } | undefined;
   const parser = new SaxParser({
-    pi(target, content) {
+    processingInstruction(target, content) {
       pi = {target, content};
     },
     entityRef() {},

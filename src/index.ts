@@ -138,7 +138,7 @@ export interface SaxReader {
    * @param target -
    * @param content -
    */
-  pi?(target: string, content: string): void;
+  processingInstruction?(target: string, content: string): void;
   /**
    * A comment.
    *
@@ -553,7 +553,7 @@ export class SaxParser {
   constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
     this.reader_ = reader;
     // Avoid capturing information that will be ignored
-    if (this.reader_.pi != null) {
+    if (this.reader_.processingInstruction != null) {
       this.flags_ |= Flags.CAPTURE_PI;
     }
     if (this.reader_.comment != null) {
@@ -1507,7 +1507,7 @@ export class SaxParser {
   // @internal
   private piEnd_() {
     if (this.flags_ & Flags.CAPTURE_PI) {
-      this.reader_.pi?.(this.element_, this.content_);
+      this.reader_.processingInstruction?.(this.element_, this.content_);
     }
     this.element_ = "";
     this.content_ = "";

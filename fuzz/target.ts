@@ -4,7 +4,7 @@ import {isSaxError, SaxParser} from "../src/index.ts";
 export function fuzz(data: Buffer) {
   const str = data.toString("utf-8");
   const saxParser = new SaxParser({
-    pi() {},
+    processingInstruction() {},
     comment() {},
     entityRef() {},
     start() {},
