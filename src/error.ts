@@ -32,9 +32,11 @@ const ERRORS = {
   INVALID_CDATA: () => "Content must not appear outside root element",
 
   INVALID_START_TAG: () => "Start tag not well-formed",
+  INVALID_END_TAG: () => "End tag not well-formed",
   LT_IN_ATTRIBUTE: () => "Attribute value must not contain an literal '<'",
-  DUPLICATE_ATTR: () => "Attribute appears more than once in the same tag",
-  INVALID_END_TAG: () => "End tag not well-formed or improper nesting",
+  ATTRIBUTE_REDEFINED: () => "Attribute appears more than once in the same tag",
+  TAG_NAME_MISMATCH: ({element}: {element: string}) =>
+    `End tag '${element}' does not match start tag`,
 
   UNEXPECTED_EOF: () => "Unexpected end of file",
 } as const;
@@ -44,25 +46,31 @@ const ERRORS = {
  * Entity. Error codes may be added in the future so it's not expected to match
  * exhaustively against all possible values.
  *
- * A comprehensive list of all error codes and their meaning as of 1.0.0:
+ * A comprehensive list of all error codes:
  *
+ * - `LIMIT_EXCEEDED`: Limit exceeded
+ * - `ENCODING_NOT_SUPPORTED`: The encoding is not supported
+ * - `ENCODING_INVALID_DATA`: Encoded data is not valid
  * - `INVALID_XML_DECL`: XML Declaration not well-formed
  * - `INVALID_DOCTYPE_DECL`: DOCTYPE Declaration not well-formed
- * - `INVALID_COMMENT`: Comments cannot contain '--'
+ * - `INVALID_INTERNAL_SUBSET`: Internal subset not well-formed
+ * - `INVALID_COMMENT`: Comment must not contain '--'"
  * - `RESERVED_PI`: Processing instruction target 'XML' is reserved
  * - `INVALID_PI`: Processing instruction not well-formed
  * - `INVALID_ENTITY_REF`: Entity reference not well-formed
- * - `UNRESOLVED_ENTITY`: Entity cannot be resolved
- *
- * Define the `replaceEntityRef` and `entityRef` to handle entity references
- * - `INVALID_CHAR_REF`: Character reference to illegal character
+ * - `RECURSIVE_ENTITY`: Entity directly or indirectly references itself
+ * - `UNDECLARED_ENTITY`: Entity not declared
+ * - `UNPARSED_ENTITY`: Entity reference to unparsed entity
+ * - `EXTERNAL_ENTITY`: Attribute references external entity
+ * - `INVALID_CHAR_REF`: Character reference to invalid character
+ * - `INVALID_CHAR`: Invalid character
+ * - `INVALID_CDEND`: Sequence ']]>' not allowed in content
+ * - `INVALID_CDATA`: Content must not appear outside root element
  * - `INVALID_START_TAG`: Start tag not well-formed
- * - `INVALID_ATTRIBUTE_VALUE`: Attribute values cannot contain a literal '\<'
- * - `DUPLICATE_ATTR`: Attribute appears more than once in the same tag
- * - `INVALID_END_TAG`: End tag not well-formed or improper nesting
- * - `INVALID_CHAR`: Input contains illegal characters
- * - `INVALID_CDEND`: Character data cannot contain ']]\>'
- * - `INVALID_CDATA`: Character data cannot appear outside the root element
+ * - `INVALID_END_TAG`: End tag not well-formed
+ * - `LT_IN_ATTRIBUTE`: Attribute value must not contain an literal '<'
+ * - `ATTRIBUTE_REDEFINED`: Attribute appears more than once in the same tag
+ * - `TAG_NAME_MISMATCH`: End tag does not match start tag
  * - `UNEXPECTED_EOF`: Unexpected end of file
  * @since 1.0.0
  */

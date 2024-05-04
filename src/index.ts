@@ -602,10 +602,11 @@ export class SaxParser {
    * @since 1.0.0
    */
   end() {
-    if (this.elements_.length !== 0) {
-      throw createSaxError("INVALID_END_TAG");
-    }
-    if (this.state_ !== State.MISC || !(this.flags_ & Flags.SEEN_ROOT)) {
+    if (
+      this.elements_.length !== 0 ||
+      this.state_ !== State.MISC ||
+      !(this.flags_ & Flags.SEEN_ROOT)
+    ) {
       throw createSaxError("UNEXPECTED_EOF");
     }
   }
@@ -783,14 +784,15 @@ export class SaxParser {
 
   // @internal
   private parseXmlDecl_() {
-    if (this.skipWhiteSpace_()) {
-      const codeUnit = this.chunk_.charCodeAt(this.index_);
-      if (codeUnit === Chars.QUESTION) {
-        ++this.index_;
-        this.state_ = State.XML_DECL_END;
-      } else if (this.readXmlAttribute_()) {
-        this.state_ = State.XML_DECL_VALUE;
-      }
+    if (!this.skipWhiteSpace_()) {
+      return;
+    }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    if (codeUnit === Chars.QUESTION) {
+      ++this.index_;
+      this.state_ = State.XML_DECL_END;
+    } else if (this.readXmlAttribute_()) {
+      this.state_ = State.XML_DECL_VALUE;
     }
   }
 
@@ -806,18 +808,19 @@ export class SaxParser {
 
   // @internal
   private parseXmlDeclValue_() {
-    if (this.skipWhiteSpace_()) {
-      const codeUnit = this.chunk_.charCodeAt(this.index_);
-      switch (codeUnit) {
-        case Chars.APOSTROPHE:
-        case Chars.QUOTE:
-          this.quote_ = codeUnit;
-          this.state_ = State.XML_DECL_VALUE_QUOTED;
-          ++this.index_;
-          break;
-        default:
-          throw createSaxError("INVALID_XML_DECL");
-      }
+    if (!this.skipWhiteSpace_()) {
+      return;
+    }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    switch (codeUnit) {
+      case Chars.APOSTROPHE:
+      case Chars.QUOTE:
+        this.quote_ = codeUnit;
+        this.state_ = State.XML_DECL_VALUE_QUOTED;
+        ++this.index_;
+        break;
+      default:
+        throw createSaxError("INVALID_XML_DECL");
     }
   }
 
@@ -1081,16 +1084,17 @@ export class SaxParser {
 
   // @internal
   private parseDoctypeMaybeInternalSubset_() {
-    if (this.skipWhiteSpace_()) {
-      const codeUnit = this.chunk_.charCodeAt(this.index_);
-      if (codeUnit === Chars.OPEN_BRACKET || codeUnit === Chars.GT) {
-        this.doctypeEnd_();
-        if (codeUnit === Chars.OPEN_BRACKET) {
-          this.state_ = State.INTERNAL_SUBSET;
-        }
-      } else {
-        throw createSaxError("INVALID_DOCTYPE_DECL");
+    if (!this.skipWhiteSpace_()) {
+      return;
+    }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    if (codeUnit === Chars.OPEN_BRACKET || codeUnit === Chars.GT) {
+      this.doctypeEnd_();
+      if (codeUnit === Chars.OPEN_BRACKET) {
+        this.state_ = State.INTERNAL_SUBSET;
       }
+    } else {
+      throw createSaxError("INVALID_DOCTYPE_DECL");
     }
   }
 
@@ -1449,14 +1453,15 @@ export class SaxParser {
 
   // @internal
   private parseMisc_() {
-    if (this.skipWhiteSpace_()) {
-      if (this.chunk_.charCodeAt(this.index_) === Chars.LT) {
-        ++this.index_;
-        this.state_ = State.OPEN_ANGLE_BRACKET;
-        this.otherState_ = State.MISC;
-      } else {
-        throw createSaxError("INVALID_CDATA");
-      }
+    if (!this.skipWhiteSpace_()) {
+      return;
+    }
+    if (this.chunk_.charCodeAt(this.index_) === Chars.LT) {
+      ++this.index_;
+      this.state_ = State.OPEN_ANGLE_BRACKET;
+      this.otherState_ = State.MISC;
+    } else {
+      throw createSaxError("INVALID_CDATA");
     }
   }
 
@@ -1776,30 +1781,32 @@ export class SaxParser {
 
   // @internal
   private parseStartTagAttrEq_() {
-    if (this.skipWhiteSpace_()) {
-      if (this.chunk_.charCodeAt(this.index_) === Chars.EQ) {
-        ++this.index_;
-        this.state_ = State.START_TAG_ATTR_VALUE;
-      } else {
-        throw createSaxError("INVALID_START_TAG");
-      }
+    if (!this.skipWhiteSpace_()) {
+      return;
+    }
+    if (this.chunk_.charCodeAt(this.index_) === Chars.EQ) {
+      ++this.index_;
+      this.state_ = State.START_TAG_ATTR_VALUE;
+    } else {
+      throw createSaxError("INVALID_START_TAG");
     }
   }
 
   // @internal
   private parseStartTagAttrValue_() {
-    if (this.skipWhiteSpace_()) {
-      const codeUnit = this.chunk_.charCodeAt(this.index_);
-      switch (codeUnit) {
-        case Chars.APOSTROPHE:
-        case Chars.QUOTE:
-          this.quote_ = codeUnit;
-          ++this.index_;
-          this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
-          break;
-        default:
-          throw createSaxError("INVALID_START_TAG");
-      }
+    if (!this.skipWhiteSpace_()) {
+      return;
+    }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    switch (codeUnit) {
+      case Chars.APOSTROPHE:
+      case Chars.QUOTE:
+        this.quote_ = codeUnit;
+        ++this.index_;
+        this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
+        break;
+      default:
+        throw createSaxError("INVALID_START_TAG");
     }
   }
 
@@ -1834,7 +1841,7 @@ export class SaxParser {
           ++this.index_;
           this.state_ = State.START_TAG_SPACE;
           if (this.attributes_.has(this.attribute_)) {
-            throw createSaxError("DUPLICATE_ATTR");
+            throw createSaxError("ATTRIBUTE_REDEFINED");
           }
           const attlists = this.attlists_.get(this.element_);
           const attlist = attlists !== undefined
@@ -2249,7 +2256,7 @@ export class SaxParser {
     if (isNameStartChar(codePoint)) {
       this.state_ = State.END_TAG;
       this.element_ = String.fromCodePoint(codePoint);
-      // this.parseEndTag_();
+      this.parseEndTag_();
     } else {
       throw createSaxError("INVALID_END_TAG");
     }
@@ -2266,20 +2273,23 @@ export class SaxParser {
 
   // @internal
   private parseEndTagEnd_() {
-    if (this.skipWhiteSpace_()) {
-      const codeUnit = this.chunk_.charCodeAt(this.index_);
-      if (codeUnit !== Chars.GT || this.elements_.pop() !== this.element_) {
-        throw createSaxError("INVALID_END_TAG");
-      }
-      ++this.index_;
-      this.state_ =
-        this.elements_.length === 0 && this.entityStack_.length === 0
-          ? State.MISC
-          : State.TEXT_CONTENT;
-      this.otherState_ = 0;
-      this.reader_.end(this.element_);
-      this.element_ = "";
+    if (!this.skipWhiteSpace_()) {
+      return;
     }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    if (codeUnit !== Chars.GT) {
+      throw createSaxError("INVALID_END_TAG");
+    }
+    if (this.elements_.pop() !== this.element_) {
+      throw createSaxError("TAG_NAME_MISMATCH", {element: this.element_});
+    }
+    ++this.index_;
+    this.state_ = this.elements_.length === 0 && this.entityStack_.length === 0
+      ? State.MISC
+      : State.TEXT_CONTENT;
+    this.otherState_ = 0;
+    this.reader_.end(this.element_);
+    this.element_ = "";
   }
 
   // Internal functions
