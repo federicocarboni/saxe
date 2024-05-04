@@ -1671,7 +1671,10 @@ export class SaxParser {
     ++this.index_;
     if (codeUnit === Chars.HYPHEN) {
       this.state_ = State.COMMENT_START;
-    } else if (codeUnit === Chars.OPEN_BRACKET && this.elements_.length !== 0) {
+    } else if (
+      codeUnit === Chars.OPEN_BRACKET &&
+      (this.elements_.length !== 0 || this.entityStack_.length !== 0)
+    ) {
       this.state_ = State.CDATA_SECTION_START;
     } else if (codeUnit === 0x44 /* D */) {
       if (this.flags_ & Flags.SEEN_DOCTYPE || this.flags_ & Flags.SEEN_ROOT) {
