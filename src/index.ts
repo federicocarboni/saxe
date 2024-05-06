@@ -402,7 +402,8 @@ function normalizeAttributeValue(s: string) {
 }
 
 const ATT_TYPES = [
-  "CDATA",
+  // CDATA is checked for manually
+  // "CDATA",
   "ID",
   "IDREF",
   "IDREFS",
@@ -410,7 +411,6 @@ const ATT_TYPES = [
   "ENTITIES",
   "NMTOKEN",
   "NMTOKENS",
-  "NOTATION",
 ];
 
 const enum EntityDecl {
@@ -1285,6 +1285,31 @@ export class SaxParser {
   }
 
   // @internal
+  private readNotationOrEnumeration_(isNotation: boolean) {
+    this.skipWhiteSpace_();
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    ++this.index_;
+    while (true) {
+      this.skipWhiteSpace_();
+      const codePoint = this.nextCodePoint_();
+      if (isNotation && !isNameStartChar(codePoint) || !isNameChar(codePoint)) {
+        throw createSaxError("INVALID_INTERNAL_SUBSET");
+      }
+      this.readNameCharacters_(0);
+      this.skipWhiteSpace_();
+      const codeUnit = this.chunk_.charCodeAt(this.index_);
+      ++this.index_;
+      if (codeUnit === Chars.CLOSE_PAREN) {
+        break;
+      } else if (codeUnit !== Chars.VERTICAL_BAR) {
+        throw createSaxError("INVALID_INTERNAL_SUBSET");
+      }
+    }
+  }
+
+  // @internal
   private readAttlistDecl_() {
     this.index_ += 8;
     this.skipWhiteSpace_();
@@ -1308,7 +1333,7 @@ export class SaxParser {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       this.skipWhiteSpace_();
-      let isTokenized_ = false;
+      let isTokenized_ = true;
       if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
         const start = this.index_;
         while (
@@ -1318,15 +1343,12 @@ export class SaxParser {
           ++this.index_;
         }
         const attType = this.chunk_.slice(start, this.index_);
-        if (ATT_TYPES.indexOf(attType) === -1) {
+        if (attType === "CDATA") {
+          isTokenized_ = false;
+        } else if (attType === "NOTATION") {
+          this.readNotationOrEnumeration_(/* isNotation */ true);
+        } else if (ATT_TYPES.indexOf(attType) === -1) {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
-        }
-        if (attType !== "CDATA") {
-          isTokenized_ = true;
-        }
-        if (attType === "NOTATION") {
-          this.skipWhiteSpace_();
-          this.index_ = this.chunk_.indexOf(")", this.index_) + 1;
         }
       } else {
         this.index_ = this.chunk_.indexOf(")", this.index_) + 1;
