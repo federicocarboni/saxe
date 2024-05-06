@@ -9,10 +9,22 @@ describe("ATTLIST", function() {
         "<!DOCTYPE example [" +
           '<!ENTITY % e "">' +
           "%e;" +
-          '<!ATTLIST root attribute CDATA "defaultValue">' +
+          '<!ATTLIST root foo CDATA "bar">' +
           "]><root/>",
       ),
-    ).equals('<root></root>');
+    ).equals("<root></root>");
+  });
+  it("wf: ATTLIST is not ignored after a parameter entity when standalone='yes'", function() {
+    expect(
+      toCanonical(
+        '<?xml version="1.0" standalone="yes"?>' +
+          "<!DOCTYPE example [" +
+          '<!ENTITY % e "">' +
+          "%e;" +
+          '<!ATTLIST root foo CDATA "bar">' +
+          "]><root/>",
+      ),
+    ).equals('<root foo="bar"></root>');
   });
   it("wf: ATTLIST sets default values for attributes", function() {
     expect(
