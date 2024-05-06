@@ -47,6 +47,13 @@ describe("ATTLIST", function() {
       ),
     ).equals('<root foo="bar baz"></root>');
   });
+  it("wf: ATTLIST notation type attribute default value is recognized", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE doc [ <!ATTLIST doc foo NOTATION ( bar | baz | boo ) "baz">]><doc></doc>',
+      ),
+    ).equals('<doc foo="baz"></doc>');
+  });
 });
 
 describe("InternalSubset", function() {
@@ -103,12 +110,5 @@ describe("InternalSubset", function() {
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc>&foo;</doc>',
       )
     ).to.throw().and.have.property("code", "UNPARSED_ENTITY");
-  });
-  it("wf: ATTLIST NOTATION type", function() {
-    expect(
-      toCanonical(
-        '<!DOCTYPE doc [ <!ATTLIST doc foo NOTATION (eggs|bacon | spam ) "spam">]><doc></doc>',
-      ),
-    ).equals('<doc foo="spam"></doc>');
   });
 });
