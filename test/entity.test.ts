@@ -8,7 +8,7 @@ class CanonicalEntityReader implements SaxReader {
   constructor(private entities: Record<string, string>) {
     this.canonical = new CanonicalXmlWriter();
   }
-  replaceEntityRef(entity: string): string | undefined {
+  getGeneralEntity(entity: string): string | undefined {
     return this.entities.hasOwnProperty(entity)
       ? this.entities[entity]
       : undefined;
@@ -44,6 +44,14 @@ describe("general entity reference", function() {
   it("wf: general entity reference in content", function() {
     expect(getEntity({}, "<root>&entity;</root>").entity).equals("entity");
   });
+  it("wf: declared general entity reference in content", function() {
+    expect(
+      getEntity(
+        {},
+        "<!DOCTYPE root [<!ENTITY entity '<element attribute=&#34;value&#34;></element>'>]><root>&entity;</root>",
+      ).output,
+    ).equals('<root><element attribute="value"></element></root>');
+  });
   it("wf: general entity reference in attribute value", function() {
     expect(
       getEntity({
@@ -51,9 +59,9 @@ describe("general entity reference", function() {
       }, '<root value="&entity;"></root>').output,
     ).equals('<root value="entity value"></root>');
   });
-  it("not-wf: general entity reference in attribute value is unresolved", function() {
+  it("not-wf: undeclared general entity reference in attribute value", function() {
     expect(() => getEntity({}, '<root value="&entity;"></root>'))
-      .to.throw().and.have.property("code", "UNRESOLVED_ENTITY");
+      .to.throw().and.have.property("code", "UNDECLARED_ENTITY");
   });
   it("not-wf: general entity reference starting with invalid character", function() {
     expect(() => getEntity({}, '<root value="&.entity;"></root>'))
