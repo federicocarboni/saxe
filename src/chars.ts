@@ -28,6 +28,7 @@ export const enum Chars {
   LOWER_L = 0x6C,
   LOWER_M = 0x6D,
   LOWER_X = 0x78,
+  VERTICAL_BAR = 0x7C,
 }
 
 // https://www.w3.org/TR/REC-xml/#NT-S
