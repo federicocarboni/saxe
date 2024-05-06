@@ -1396,7 +1396,9 @@ export class SaxParser {
           this.index_ = index + 1;
         }
       }
-      attlist.set(attribute, {default_, isTokenized_});
+      if (!(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL)) {
+        attlist.set(attribute, {default_, isTokenized_});
+      }
     }
     this.skipWhiteSpace_();
   }
