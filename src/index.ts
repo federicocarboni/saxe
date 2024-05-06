@@ -1333,7 +1333,7 @@ export class SaxParser {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       this.skipWhiteSpace_();
-      let isTokenized_ = true;
+      let isTokenized = true;
       if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
         const start = this.index_;
         while (
@@ -1344,7 +1344,7 @@ export class SaxParser {
         }
         const attType = this.chunk_.slice(start, this.index_);
         if (attType === "CDATA") {
-          isTokenized_ = false;
+          isTokenized = false;
         } else if (attType === "NOTATION") {
           this.readNotationOrEnumeration_(/* isNotation */ true);
         } else if (ATT_TYPES.indexOf(attType) === -1) {
@@ -1357,7 +1357,7 @@ export class SaxParser {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
       }
       this.skipWhiteSpace_();
-      let canHaveDefault = true;
+      let hasDefault = true;
       const hash = this.chunk_.charCodeAt(this.index_);
       if (hash === Chars.HASH) {
         const start = this.index_;
@@ -1376,28 +1376,40 @@ export class SaxParser {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
         }
         if (defaultDecl !== "#FIXED") {
-          canHaveDefault = false;
+          hasDefault = false;
         }
       }
-      let default_;
-      if (canHaveDefault) {
+      let defaultValue;
+      if (hasDefault) {
         this.skipWhiteSpace_();
         const quote = this.chunk_.charCodeAt(this.index_);
         if (quote === Chars.APOSTROPHE || quote === Chars.QUOTE) {
           ++this.index_;
-          const index = this.chunk_.indexOf(
+          const quoteIndex = this.chunk_.indexOf(
             quote === Chars.APOSTROPHE ? "'" : '"',
             this.index_,
           );
-          if (index === -1) {
-            throw createSaxError("INVALID_INTERNAL_SUBSET");
+          const chunk = this.chunk_;
+          this.chunk_ = this.chunk_.slice(this.index_, quoteIndex);
+          this.index_ = 0;
+          this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
+          while (this.index_ < this.chunk_.length) {
+            this.parseStep_();
           }
-          default_ = this.chunk_.slice(this.index_, index);
-          this.index_ = index + 1;
+          this.index_ = quoteIndex + 1;
+          this.chunk_ = chunk;
+          this.state_ = State.INTERNAL_SUBSET;
+          defaultValue = this.content_;
+          this.content_ = "";
+        } else {
+          throw createSaxError("INVALID_INTERNAL_SUBSET");
         }
       }
       if (!(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL)) {
-        attlist.set(attribute, {default_, isTokenized_});
+        attlist.set(attribute, {
+          default_: defaultValue,
+          isTokenized_: isTokenized,
+        });
       }
     }
     this.skipWhiteSpace_();
@@ -1458,6 +1470,7 @@ export class SaxParser {
     if (index !== -1) {
       this.index_ = index + 1;
       this.state_ = State.INTERNAL_SUBSET_DECL;
+      this.quote_ = -1;
     } else {
       this.index_ = this.chunk_.length;
     }
