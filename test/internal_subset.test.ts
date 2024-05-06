@@ -1,8 +1,7 @@
 import {expect} from "chai";
-import {SaxParser} from "../src/index.ts";
 import {toCanonical} from "./template.ts";
 
-describe("ATTLIST", function() {
+describe("Attribute-list Declaration", function() {
   it("wf: ATTLIST is ignored after a parameter entity", function() {
     expect(
       toCanonical(
@@ -56,34 +55,18 @@ describe("ATTLIST", function() {
   });
 });
 
-describe("InternalSubset", function() {
-  it("parses ENTITY declaration", function() {
-    const parser = new SaxParser({
-      start(name, attributes) {
-        console.log("start", name, attributes);
-      },
-      empty(name, attributes) {
-        console.log("empty", name, attributes);
-      },
-      end(name) {
-        console.log("end", name);
-      },
-      text(text) {
-        console.log("text", JSON.stringify(text));
-      },
-    });
-    parser.write(
-      "<!DOCTYPE example [ <!ENTITY hello \"<hello hello='hello world'/>\"> ]><example>&hello;</example> ",
-    );
-  });
-  it("wf: markup declarations are ignored after a parameter entity", function() {
+describe("Entity Declaration", function() {
+  it("wf: entity declaration is ignored after parameter entity reference", function() {
     expect(() =>
       toCanonical(
-        '<!DOCTYPE doc [ %something; <!ENTITY foo "&amp;">]><doc>&foo;</doc>',
+        "<!DOCTYPE doc [" +
+          "%something;" +
+          '<!ENTITY foo "&amp;">' +
+          "]><doc>&foo;</doc>",
       )
     ).to.throw().and.have.property("code", "UNDECLARED_ENTITY");
   });
-  it("wf: markup declarations are not ignored after a parameter entity when standalone='yes'", function() {
+  it("wf: entity declaration is recognized after parameter entity reference when standalone='yes'", function() {
     expect(
       toCanonical(
         '<?xml version="1.0" standalone="yes" ?><!DOCTYPE doc [ %something; <!ENTITY foo "&amp;">]><doc>&foo;</doc>',
