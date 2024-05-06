@@ -33,12 +33,19 @@ describe("ATTLIST", function() {
       ),
     ).equals('<root attribute="defaultValue"></root>');
   });
-  it("wf: ATTLIST tokenized attributes are normalized correctly", function() {
+  it("wf: ATTLIST tokenized type attributes are normalized correctly", function() {
     expect(
       toCanonical(
         '<!DOCTYPE example [<!ATTLIST root attribute2 CDATA #IMPLIED attribute ID #IMPLIED>]><root attribute="  \r\n many \t\n so-many   \t very-many spaces \n\r "/>',
       ),
     ).equals('<root attribute="many so-many very-many spaces"></root>');
+  });
+  it("wf: ATTLIST enumerated type attributes are normalized correctly", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE example [<!ATTLIST root foo ( bar | baz ) #IMPLIED>]><root foo="  \r\n bar \t\n baz    \n\r "/>',
+      ),
+    ).equals('<root foo="bar baz"></root>');
   });
 });
 
