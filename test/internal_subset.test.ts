@@ -2,6 +2,34 @@ import {expect} from "chai";
 import {SaxParser} from "../src/index.ts";
 import {toCanonical} from "./template.ts";
 
+describe("ATTLIST", function() {
+  it("wf: ATTLIST is ignored after a parameter entity", function() {
+    expect(
+      toCanonical(
+        "<!DOCTYPE example [" +
+          '<!ENTITY % e "">' +
+          "%e;" +
+          '<!ATTLIST root attribute CDATA "defaultValue">' +
+          "]><root/>",
+      ),
+    ).equals('<root></root>');
+  });
+  it("wf: ATTLIST sets default values for attributes", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE example [<!ATTLIST root attribute CDATA "defaultValue">]><root/>',
+      ),
+    ).equals('<root attribute="defaultValue"></root>');
+  });
+  it("wf: ATTLIST tokenized attributes are normalized correctly", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE example [<!ATTLIST root attribute2 CDATA #IMPLIED attribute ID #IMPLIED>]><root attribute="  \r\n many \t\n so-many   \t very-many spaces \n\r "/>',
+      ),
+    ).equals('<root attribute="many so-many very-many spaces"></root>');
+  });
+});
+
 describe("InternalSubset", function() {
   it("parses ENTITY declaration", function() {
     const parser = new SaxParser({
@@ -21,20 +49,6 @@ describe("InternalSubset", function() {
     parser.write(
       "<!DOCTYPE example [ <!ENTITY hello \"<hello hello='hello world'/>\"> ]><example>&hello;</example> ",
     );
-  });
-  it("wf: ATTLIST sets default values for attributes", function() {
-    expect(
-      toCanonical(
-        '<!DOCTYPE example [<!ATTLIST root attribute CDATA "defaultValue">]><root/>',
-      ),
-    ).equals('<root attribute="defaultValue"></root>');
-  });
-  it("wf: tokenized attributes are normalized correctly", function() {
-    expect(
-      toCanonical(
-        '<!DOCTYPE example [<!ATTLIST root attribute ID #IMPLIED>]><root attribute="  \r\n many \t\n so-many   \t very-many spaces \n\r "/>',
-      ),
-    ).equals('<root attribute="many so-many very-many spaces"></root>');
   });
   it("wf: markup declarations are ignored after a parameter entity", function() {
     expect(() =>
@@ -70,5 +84,12 @@ describe("InternalSubset", function() {
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc>&foo;</doc>',
       )
     ).to.throw().and.have.property("code", "UNPARSED_ENTITY");
+  });
+  it("wf: ATTLIST NOTATION type", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE doc [ <!ATTLIST doc foo NOTATION (eggs|bacon | spam ) "spam">]><doc></doc>',
+      ),
+    ).equals('<doc foo="spam"></doc>');
   });
 });
