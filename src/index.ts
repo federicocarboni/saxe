@@ -1351,7 +1351,7 @@ export class SaxParser {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
         }
       } else {
-        this.index_ = this.chunk_.indexOf(")", this.index_) + 1;
+        this.readNotationOrEnumeration_(/* isNotation */ false);
       }
       if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         throw createSaxError("INVALID_INTERNAL_SUBSET");
