@@ -370,8 +370,8 @@ const enum Flags {
   // Runtime flags:
   SEEN_DOCTYPE = 1 << 4,
   SEEN_ROOT = 1 << 5,
-  DOCTYPE_PUBLIC = 1 << 6,
-  DOCTYPE_SYSTEM = 1 << 7,
+  EXTERNAL_ID_PUBLIC = 1 << 6,
+  EXTERNAL_ID_SYSTEM = 1 << 7,
   IGNORE_INT_SUBSET_DECL = 1 << 8,
 }
 
@@ -430,6 +430,28 @@ const PREDEFINED_ENTITIES = {
   apos: "'",
   quot: '"',
 } as const;
+
+function escapeChar(c: string) {
+  switch (c) {
+    case "&":
+      return "&amp;";
+    case "<":
+      return "&lt;";
+    case ">":
+      return "&gt;";
+    case "'":
+      return "&apos;";
+    case '"':
+      return "&quot;";
+    default: {
+      return `&#${c.codePointAt(0)};`;
+    }
+  }
+}
+
+export function escape(s: string) {
+  return s.replace(/[&<>'"\t\n\r]/g, escapeChar);
+}
 
 /**
  * Streaming non-validating XML Parser, it makes no attempt to recover
@@ -948,10 +970,10 @@ export class SaxParser {
 
   // @internal
   private getNameAndExternalId_() {
-    const systemId = this.flags_ & Flags.DOCTYPE_SYSTEM
+    const systemId = this.flags_ & Flags.EXTERNAL_ID_SYSTEM
       ? normalizeLineEndings(this.content_)
       : undefined;
-    const publicId = this.flags_ & Flags.DOCTYPE_PUBLIC
+    const publicId = this.flags_ & Flags.EXTERNAL_ID_PUBLIC
       // [..] all strings of white space in the public identifier MUST be
       // normalized to single space characters (#x20), and leading and trailing
       // white space MUST be removed
@@ -960,6 +982,9 @@ export class SaxParser {
         .replace(/^[\n\r ]*|[\n\r ]*$|[\n\r ]+/g, " ")
         .slice(1, -1)
       : undefined;
+    this.content_ = "";
+    this.attribute_ = "";
+    this.flags_ &= ~(Flags.EXTERNAL_ID_PUBLIC | Flags.EXTERNAL_ID_SYSTEM);
     // [11] SystemLiteral	::= ('"' [^"]* '"') | ("'" [^']* "'")
     // [12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'
     // [13] PubidChar	::= #x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]
@@ -984,8 +1009,6 @@ export class SaxParser {
     }
     this.reader_.doctype?.(doctype);
     this.element_ = "";
-    this.content_ = "";
-    this.attribute_ = "";
     this.state_ = State.MISC;
   }
 
@@ -1018,13 +1041,13 @@ export class SaxParser {
     const externalId = this.content_.slice(0, 6);
     const isS = isWhiteSpace(this.content_.charCodeAt(6));
     if (externalId === "PUBLIC" && isS) {
-      this.flags_ |= Flags.DOCTYPE_PUBLIC;
-      this.flags_ |= Flags.DOCTYPE_SYSTEM;
+      this.flags_ |= Flags.EXTERNAL_ID_PUBLIC;
+      this.flags_ |= Flags.EXTERNAL_ID_SYSTEM;
       this.otherState_ = State.EXTERNAL_ID_SYSTEM_SPACE;
       this.state_ = State.EXTERNAL_ID_QUOTED_START;
       this.content_ = "";
     } else if (externalId === "SYSTEM" && isS) {
-      this.flags_ |= Flags.DOCTYPE_SYSTEM;
+      this.flags_ |= Flags.EXTERNAL_ID_SYSTEM;
       this.otherState_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
       this.state_ = State.EXTERNAL_ID_QUOTED_START;
       this.content_ = "";
@@ -1181,6 +1204,40 @@ export class SaxParser {
   }
 
   // @internal
+  private readExternalId_(isNotation: boolean) {
+    this.otherState_ = State.INTERNAL_SUBSET;
+    this.parseDoctypeExternalId_();
+    this.parseStep_(); // start
+    this.parseStep_(); // quoted
+    let hasSystemId = false;
+    if (this.state_ === State.EXTERNAL_ID_SYSTEM_SPACE) {
+      if (isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+        this.skipWhiteSpace_();
+        const codeUnit = this.chunk_.charCodeAt(this.index_);
+        if (codeUnit === Chars.APOSTROPHE || codeUnit === Chars.QUOTE) {
+          this.state_ = State.EXTERNAL_ID_QUOTED_START;
+          hasSystemId = true;
+        }
+      }
+      this.attribute_ = this.content_;
+      if (hasSystemId) {
+        this.state_ = State.EXTERNAL_ID_QUOTED_START;
+        this.otherState_ = State.INTERNAL_SUBSET;
+        this.parseStep_(); // start
+        this.parseStep_(); // quoted
+      } else {
+        this.flags_ &= ~Flags.EXTERNAL_ID_SYSTEM;
+        if (!isNotation) {
+          throw createSaxError("INVALID_INTERNAL_SUBSET");
+        }
+      }
+    }
+    if (this.getNameAndExternalId_() === undefined) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+  }
+
+  // @internal
   private readEntityValue_() {
     let start = this.index_;
     while (this.index_ < this.chunk_.length) {
@@ -1248,16 +1305,7 @@ export class SaxParser {
       this.content_ = "";
     } else {
       decl = EntityDecl.EXTERNAL;
-      this.parseDoctypeExternalId_();
-      while (
-        this.index_ < this.chunk_.length &&
-        this.state_ !== State.DOCTYPE_MAYBE_INTERNAL_SUBSET
-      ) {
-        this.parseStep_();
-      }
-      if (this.getNameAndExternalId_() === undefined) {
-        throw createSaxError("INVALID_INTERNAL_SUBSET");
-      }
+      this.readExternalId_(/* isNotation */ false);
       this.state_ = State.INTERNAL_SUBSET;
       if (isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         this.skipWhiteSpace_();
@@ -1416,6 +1464,18 @@ export class SaxParser {
   }
 
   // @internal
+  private readNotationDecl_() {
+    this.index_ += 9;
+    this.skipWhiteSpace_();
+    this.readName_();
+    if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    this.skipWhiteSpace_();
+    this.readExternalId_(/* isNotation */ true);
+  }
+
+  // @internal
   private readInternalSubsetDecl_() {
     const index = this.index_;
     const chunk = this.chunk_;
@@ -1432,6 +1492,18 @@ export class SaxParser {
       isWhiteSpace(this.chunk_.charCodeAt(7))
     ) {
       this.readAttlistDecl_();
+    } else if (
+      this.chunk_.slice(0, 8) === "NOTATION" &&
+      isWhiteSpace(this.chunk_.charCodeAt(8))
+    ) {
+      this.readNotationDecl_();
+    } else if (
+      this.chunk_.slice(0, 7) === "ELEMENT" &&
+      isWhiteSpace(this.chunk_.charCodeAt(7))
+    ) {
+      //
+    } else {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
     this.index_ = index;
     this.chunk_ = chunk;
