@@ -1307,7 +1307,7 @@ export class SaxParser {
       decl = EntityDecl.EXTERNAL;
       this.readExternalId_(/* isNotation */ false);
       this.state_ = State.INTERNAL_SUBSET;
-      if (isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+      if (!isParameter && isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         this.skipWhiteSpace_();
         if (
           this.chunk_.slice(this.index_, this.index_ + 5) === "NDATA" &&
