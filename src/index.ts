@@ -1947,6 +1947,7 @@ export class SaxParser {
           this.appendContent_(start, this.maxTextLength_ - 1);
           this.content_ += " ";
           if (
+            this.entityStack_.length === 0 &&
             codeUnit === Chars.CR &&
             this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF
           ) {
