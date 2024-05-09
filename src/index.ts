@@ -1243,6 +1243,17 @@ export class SaxParser {
     while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       switch (codeUnit) {
+        case Chars.TAB:
+        case Chars.LF:
+          break;
+        case Chars.CR:
+          this.appendContent_(start, this.maxEntityLength_);
+          this.content_ += "\n";
+          if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF) {
+            ++this.index_;
+          }
+          start = this.index_ + 1;
+          break;
         case this.quote_:
           this.appendContent_(start, this.maxEntityLength_);
           return;
@@ -2033,13 +2044,15 @@ export class SaxParser {
           // TODO: add significant white space handler?
           break;
         case Chars.CR:
-          // Carriage return requires new-line normalization
-          this.appendTextContent_(start);
-          this.content_ += "\n";
-          if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF) {
-            ++this.index_;
+          if (this.entityStack_.length === 0) {
+            // Carriage return requires new-line normalization
+            this.appendTextContent_(start);
+            this.content_ += "\n";
+            if (this.chunk_.charCodeAt(this.index_ + 1) === Chars.LF) {
+              ++this.index_;
+            }
+            start = this.index_ + 1;
           }
-          start = this.index_ + 1;
           break;
         // State changing conditions:
         case Chars.AMPERSAND:
