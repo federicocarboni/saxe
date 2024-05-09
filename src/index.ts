@@ -1464,7 +1464,10 @@ export class SaxParser {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
         }
       }
-      if (!(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL)) {
+      if (
+        !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
+        !attlist.has(attribute)
+      ) {
         attlist.set(attribute, {
           default_: defaultValue,
           isTokenized_: isTokenized,
