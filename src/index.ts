@@ -1232,6 +1232,7 @@ export class SaxParser {
         }
       }
     }
+    this.state_ = State.INTERNAL_SUBSET;
     if (this.getNameAndExternalId_() === undefined) {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
@@ -1463,6 +1464,9 @@ export class SaxParser {
         } else {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
         }
+        if (isTokenized) {
+          defaultValue = normalizeAttributeValue(defaultValue);
+        }
       }
       if (
         !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
@@ -1487,6 +1491,10 @@ export class SaxParser {
     }
     this.skipWhiteSpace_();
     this.readExternalId_(/* isNotation */ true);
+    this.skipWhiteSpace_();
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
   }
 
   // @internal
