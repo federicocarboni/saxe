@@ -18,4 +18,4 @@ node_modules
 lib
 
 # W3C conformance suite
-test/xmlts
+xmlconf
