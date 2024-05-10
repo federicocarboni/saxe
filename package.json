@@ -37,6 +37,7 @@
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-jsdoc": "^48.2.3",
     "mocha": "^10.4.0",
+    "tar": "^7.1.0",
     "tsm": "^2.3.0",
     "typedoc": "^0.25.13",
     "typescript": "^5.4.5",
