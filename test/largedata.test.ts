@@ -10,6 +10,7 @@ use(chaiAsPromised);
 
 const DATASET = [
   "lolz.xml",
+  "quadratic_blowup.xml",
   "aaaaaa_attr.xml",
   "aaaaaa_cdata.xml",
   "aaaaaa_comment.xml",

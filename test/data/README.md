@@ -7,6 +7,10 @@ protected from denial-of-service attacks based on sheer brute force.
   - properties: deeply nest entity expanding to a huge value (billion laughs attack)
   - purpose: regression test
 
+- quadratic_blowup.xml (391 KB):
+  - properties: huge entity expanded multiple times
+  - purpose: regression test
+
 - recursive.xml (<1 KB):
   - properties: entity indirectly referencing itself
   - purpose: regression test
