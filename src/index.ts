@@ -2398,7 +2398,12 @@ export class SaxParser {
     if (hasInvalidChar(content)) {
       throw createSaxError("INVALID_CHAR");
     }
-    this.content_ += normalizeLineEndings(content);
+    const chunk = normalizeLineEndings(content);
+    this.textLength_ += chunk.length;
+    if (this.textLength_ >= this.maxTextLength_) {
+      throw createSaxError("LIMIT_EXCEEDED");
+    }
+    this.content_ += chunk;
     if (index === -1) {
       // Chunk is read to completion even on an ending hyphen, it will be
       // removed after the fact if the comment is ending.
