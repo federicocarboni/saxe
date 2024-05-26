@@ -257,6 +257,26 @@ export interface SaxOptions {
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
+  /**
+   * Customize behavior for Document Type Declarations. Users may want to
+   * disable doctypes because certain protocols prohibit them or for safer
+   * processing.
+   *
+   * - `"process"` - internal DTD is processed, i.e. attribute lists are read
+   * and processed to set default attribute values and normalize attributes
+   * correctly, internal entities are read and expanded as needed.
+   * External DTD identifiers are passed to the application. External entities
+   * and external declarations are not read or processed.
+   * - `"prohibit"` - throw an error if the document has any DTD, including
+   * external DTDs, i.e. `<!DOCTYPE any>` immediately aborts parsing. Throws
+   * `INVALID_DOCTYPE_DECL`.
+   * - `"ignore"` - internal DTD is not processed but is still checked for
+   * well-formedness, i.e. internal entity references are not expanded
+   * automatically but a syntax error still throws. External DTD identifiers are
+   * still passed to the application.
+   * @default "process"
+   */
+  dtd?: "process" | "prohibit" | "ignore" | undefined;
   // Limiting the memory usage of the parser is one of, if not the, most
   // important security proofing step for XML.
   // https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
@@ -373,6 +393,7 @@ const enum Flags {
   EXTERNAL_ID_PUBLIC = 1 << 6,
   EXTERNAL_ID_SYSTEM = 1 << 7,
   IGNORE_INT_SUBSET_DECL = 1 << 8,
+  PROHIBIT_DOCTYPE_DECL = 1 << 9,
 }
 
 // Normalize XML line endings.
@@ -583,6 +604,11 @@ export class SaxParser {
     }
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
+    }
+    if (options?.dtd === "ignore") {
+      this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
+    } else if (options?.dtd === "prohibit") {
+      this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
     }
     this.maxNameLength_ = options?.maxNameLength ?? 2_000;
     this.maxAttributes_ = options?.maxAttributes ?? 2_000;
@@ -938,6 +964,9 @@ export class SaxParser {
       this.element_.slice(0, 6) === "OCTYPE" &&
       isWhiteSpace(this.element_.charCodeAt(6))
     ) {
+      if (this.flags_ & Flags.PROHIBIT_DOCTYPE_DECL) {
+        throw createSaxError("INVALID_DOCTYPE_DECL");
+      }
       this.flags_ |= Flags.SEEN_DOCTYPE;
       this.state_ = State.DOCTYPE_DECL;
       this.element_ = "";
