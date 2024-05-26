@@ -2140,7 +2140,6 @@ export class SaxParser {
         case Chars.AMPERSAND:
           // It was considered to handle references inline but they are not
           // common enough to justify doing more work here
-          this.textLength_ = 0;
           this.state_ = State.REFERENCE;
           this.otherState_ = State.TEXT_CONTENT;
           break loop;
