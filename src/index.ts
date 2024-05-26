@@ -728,17 +728,17 @@ export class SaxParser {
         return this.parseEmptyTag_();
       case State.TEXT_CONTENT:
         return this.parseTextContent_();
-        // &amp; &#38; general entity reference or character reference
+      // &amp; &#38; general entity reference or character reference
       case State.REFERENCE:
         return this.parseReference_();
       case State.ENTITY_REF:
         return this.parseEntityRef_();
       case State.CHAR_REF:
         return this.parseCharRef_();
-        // &#38;
+      // &#38;
       case State.CHAR_REF_DEC:
         return this.parseCharRefDec_();
-        // &#x26;
+      // &#x26;
       case State.CHAR_REF_HEX:
         return this.parseCharRefHex_();
       case State.CDATA_SECTION_START:
@@ -1429,10 +1429,7 @@ export class SaxParser {
           ++this.index_;
         }
         const defaultDecl = this.chunk_.slice(start, this.index_);
-        if (
-          ["#REQUIRED", "#IMPLIED", "#FIXED"]
-            .indexOf(defaultDecl) === -1
-        ) {
+        if (["#REQUIRED", "#IMPLIED", "#FIXED"].indexOf(defaultDecl) === -1) {
           throw createSaxError("INVALID_INTERNAL_SUBSET");
         }
         if (defaultDecl !== "#FIXED") {
@@ -1498,6 +1495,50 @@ export class SaxParser {
   }
 
   // @internal
+  private readElementDecl_() {
+    this.index_ += 8;
+    this.skipWhiteSpace_();
+    this.readName_();
+    if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+    this.skipWhiteSpace_();
+    if (this.chunk_.charCodeAt(this.index_) === Chars.OPEN_PAREN) {
+      ++this.index_;
+      this.skipWhiteSpace_();
+      if (this.chunk_.slice(this.index_, this.index_ + 7) === "#PCDATA") {
+        this.index_ += 7;
+        while (this.index_ < this.chunk_.length) {
+          this.skipWhiteSpace_();
+          const codeUnit = this.chunk_.charCodeAt(this.index_);
+          ++this.index_;
+          if (codeUnit === Chars.CLOSE_PAREN) {
+            break;
+          }
+          if (codeUnit !== Chars.VERTICAL_BAR) {
+            throw createSaxError("INVALID_INTERNAL_SUBSET");
+          }
+          this.skipWhiteSpace_();
+          this.readName_();
+        }
+      } else {
+        //
+        return;
+      }
+      this.skipWhiteSpace_();
+    } else if (this.chunk_.slice(this.index_, this.index_ + 5) === "EMPTY") {
+      this.index_ += 5;
+      this.skipWhiteSpace_();
+    } else if (this.chunk_.slice(this.index_, this.index_ + 3) === "ANY") {
+      this.index_ += 3;
+      this.skipWhiteSpace_();
+    }
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
+      throw createSaxError("INVALID_INTERNAL_SUBSET");
+    }
+  }
+
+  // @internal
   private readInternalSubsetDecl_() {
     const index = this.index_;
     const chunk = this.chunk_;
@@ -1523,7 +1564,7 @@ export class SaxParser {
       this.chunk_.slice(0, 7) === "ELEMENT" &&
       isWhiteSpace(this.chunk_.charCodeAt(7))
     ) {
-      //
+      this.readElementDecl_();
     } else {
       throw createSaxError("INVALID_INTERNAL_SUBSET");
     }
@@ -2105,7 +2146,7 @@ export class SaxParser {
     // Emit text content as needed
     if (
       this.state_ !== State.TEXT_CONTENT ||
-      (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES)
+      this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES
     ) {
       this.reader_.text(this.content_);
       this.content_ = "";
@@ -2163,10 +2204,7 @@ export class SaxParser {
       }
       // Allow the application to set a default value for an entity not
       // declared in internal markup declarations.
-      if (
-        entityValue === EntityDecl.EXTERNAL ||
-        entityValue === undefined
-      ) {
+      if (entityValue === EntityDecl.EXTERNAL || entityValue === undefined) {
         entityValue = this.reader_.getGeneralEntity?.(this.entity_);
       }
       if (entityValue == null) {
