@@ -2,6 +2,6 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "rootDir": "../",
-    "types": ["mocha", "@types/chai", "@types/node"]
+    "types": ["mocha", "@types/chai", "@types/chai-as-promised", "@types/node"]
   }
 }
