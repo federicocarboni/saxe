@@ -371,7 +371,7 @@ const enum State {
   END_TAG_END,
 }
 
-// A bit of an abuse of const enum but needed to ensure perf
+// A bit of an abuse of const enum
 const enum Flags {
   INIT = 0,
 
@@ -1524,6 +1524,52 @@ export class SaxParser {
   }
 
   // @internal
+  private readChoiceOrSeq_() {
+    this.skipWhiteSpace_();
+    this.readCp_(false);
+    this.skipWhiteSpace_();
+    const sep = this.chunk_.charCodeAt(this.index_);
+    if (sep !== Chars.VERTICAL_BAR && sep !== Chars.COMMA) {
+      if (sep === Chars.CLOSE_PAREN) {
+        ++this.index_;
+      }
+      return;
+    }
+    while (this.chunk_.charCodeAt(this.index_) === sep) {
+      ++this.index_;
+
+      this.skipWhiteSpace_();
+      this.readCp_(false);
+      this.skipWhiteSpace_();
+    }
+    if (this.chunk_.charCodeAt(this.index_) === Chars.CLOSE_PAREN) {
+      ++this.index_;
+    }
+  }
+
+  // @internal
+  private readCp_(isChildren: boolean) {
+    if (
+      isChildren || this.chunk_.charCodeAt(this.index_) === Chars.OPEN_PAREN
+    ) {
+      if (!isChildren) {
+        ++this.index_;
+      }
+      // choice or seq
+      this.readChoiceOrSeq_();
+    } else {
+      this.readName_();
+    }
+    const codeUnit = this.chunk_.charCodeAt(this.index_);
+    if (
+      codeUnit === Chars.QUESTION || codeUnit === Chars.ASTERISK ||
+      codeUnit === Chars.PLUS
+    ) {
+      ++this.index_;
+    }
+  }
+
+  // @internal
   private readElementDecl_() {
     this.index_ += 8;
     this.skipWhiteSpace_();
@@ -1535,6 +1581,7 @@ export class SaxParser {
     if (this.chunk_.charCodeAt(this.index_) === Chars.OPEN_PAREN) {
       ++this.index_;
       this.skipWhiteSpace_();
+      // Mixed
       if (this.chunk_.slice(this.index_, this.index_ + 7) === "#PCDATA") {
         this.index_ += 7;
         while (this.index_ < this.chunk_.length) {
@@ -1551,8 +1598,7 @@ export class SaxParser {
           this.readName_();
         }
       } else {
-        //
-        return;
+        this.readCp_(true);
       }
       this.skipWhiteSpace_();
     } else if (this.chunk_.slice(this.index_, this.index_ + 5) === "EMPTY") {
