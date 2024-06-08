@@ -621,10 +621,10 @@ export class SaxParser {
    *
    * Input string must be well-formed (have no lone surrogates) as most common
    * XML sources (`fetch`, `TextDecoder`) already verify this is the case.
-   * Note however that a string coming from `JSON.parse` for example is not
-   * guaranteed to be well-formed. Use `isWellFormed` to check if you are
-   * unsure.
-   * @param input - string contents to parse
+   * Note however that a string coming from other source may not be guaranteed
+   * to be well-formed. Use `isWellFormed` to check if you are unsure.
+   *
+   * @param input
    * @throws {@link SaxError}
    * @since 1.0.0
    */
