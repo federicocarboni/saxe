@@ -9,6 +9,7 @@ import {
   isWhiteSpace,
 } from "./chars.ts";
 import {createSaxError} from "./error.ts";
+import {parseXmlDecl} from "./xml_decl.ts";
 
 export {isSaxError, type SaxError, type SaxErrorCode} from "./error.ts";
 
@@ -314,9 +315,6 @@ export interface SaxOptions {
 const enum State {
   INIT,
   XML_DECL,
-  XML_DECL_SPACE,
-  XML_DECL_VALUE,
-  XML_DECL_VALUE_QUOTED,
   XML_DECL_END,
   DOCTYPE_DECL_START,
   DOCTYPE_DECL,
@@ -581,10 +579,10 @@ export class SaxParser {
 
   // XML Declaration attributes are held onto because they may be useful
   // (e.g. XML 1.1) in the future?
-  // @internal
-  private version_: string | undefined = undefined;
-  // @internal
-  private encoding_: string | undefined = undefined;
+  // // @internal
+  // private version_: string | undefined = undefined;
+  // // @internal
+  // private encoding_: string | undefined = undefined;
   // @internal
   private standalone_: boolean | undefined = undefined;
 
@@ -668,12 +666,12 @@ export class SaxParser {
         return this.parseInit_();
       case State.XML_DECL:
         return this.parseXmlDecl_();
-      case State.XML_DECL_SPACE:
-        return this.parseXmlDeclSpace_();
-      case State.XML_DECL_VALUE:
-        return this.parseXmlDeclValue_();
-      case State.XML_DECL_VALUE_QUOTED:
-        return this.parseXmlDeclValueQuoted_();
+      // case State.XML_DECL_SPACE:
+      //   return this.parseXmlDeclSpace_();
+      // case State.XML_DECL_VALUE:
+      //   return this.parseXmlDeclValue_();
+      // case State.XML_DECL_VALUE_QUOTED:
+      //   return this.parseXmlDeclValueQuoted_();
       case State.XML_DECL_END:
         return this.parseXmlDeclEnd_();
       case State.DOCTYPE_DECL_START:
@@ -799,7 +797,6 @@ export class SaxParser {
       isWhiteSpace(this.element_.charCodeAt(5))
     ) {
       this.state_ = State.XML_DECL;
-      this.element_ = "";
     } else if (this.element_.length === 6) {
       this.chunk_ = this.element_ + this.chunk_.slice(newChunk.length);
       this.index_ = 0;
@@ -809,148 +806,34 @@ export class SaxParser {
   }
 
   // @internal
-  private readXmlAttribute_() {
-    const index = this.chunk_.indexOf("=", this.index_);
-    let end = index;
-    if (end === -1) {
-      end = this.chunk_.length;
-    } else {
-      // Remove white space from the end
-      while (isWhiteSpace(this.chunk_.charCodeAt(--end)));
-      end++;
-    }
-    // "standalone" is the longest XMLDecl attribute, if this is longer then
-    // it's not valid, catches invalid XML early and prevents using an excessive
-    // amount of memory for very large values.
-    if (this.attribute_.length + end - this.index_ > 10) {
-      throw createSaxError("INVALID_XML_DECL");
-    }
-    this.attribute_ += this.chunk_.slice(this.index_, end);
-    this.index_ = index === -1 ? this.chunk_.length : index + 1;
-    return index !== -1;
-  }
-
-  // @internal
   private parseXmlDecl_() {
-    if (!this.skipWhiteSpace_()) {
-      return;
-    }
-    const codeUnit = this.chunk_.charCodeAt(this.index_);
-    if (codeUnit === Chars.QUESTION) {
-      ++this.index_;
-      this.state_ = State.XML_DECL_END;
-    } else if (this.readXmlAttribute_()) {
-      this.state_ = State.XML_DECL_VALUE;
-    }
-  }
-
-  // @internal
-  private parseXmlDeclSpace_() {
-    const codeUnit = this.chunk_.charCodeAt(this.index_);
-    if (!isWhiteSpace(codeUnit) && codeUnit !== Chars.QUESTION) {
-      throw createSaxError("INVALID_XML_DECL");
-    }
-    this.state_ = State.XML_DECL;
-    this.parseXmlDecl_();
-  }
-
-  // @internal
-  private parseXmlDeclValue_() {
-    if (!this.skipWhiteSpace_()) {
-      return;
-    }
-    const codeUnit = this.chunk_.charCodeAt(this.index_);
-    switch (codeUnit) {
-      case Chars.APOSTROPHE:
-      case Chars.QUOTE:
-        this.quote_ = codeUnit;
-        this.state_ = State.XML_DECL_VALUE_QUOTED;
-        ++this.index_;
-        break;
-      default:
-        throw createSaxError("INVALID_XML_DECL");
-    }
-  }
-
-  // @internal
-  private handleXmlDeclAttribute_() {
-    // Regex are slower but more compact.
-    switch (this.attribute_) {
-      case "version":
-        if (this.version_ !== undefined || !/^1\.[0-9]$/.test(this.content_)) {
-          return true;
-        }
-        this.version_ = this.content_;
-        break;
-      case "encoding":
-        // XML standard doesn't define a maximum length for any construct, but
-        // IANA Charsets never go above 45 characters (including aliases).
-        // TODO: it's a good a idea to limit encoding labels as large values
-        //  are very unlikely correct. Is 256 fine?
-        if (
-          this.version_ === undefined || this.encoding_ !== undefined ||
-          this.standalone_ !== undefined || this.content_.length > 256 ||
-          !/^[A-Za-z][A-Za-z0-9._-]*$/.test(this.content_)
-        ) {
-          return true;
-        }
-        this.encoding_ = this.content_.toLowerCase();
-        break;
-      case "standalone":
-        if (
-          this.version_ === undefined || this.standalone_ !== undefined ||
-          this.content_ !== "yes" && this.content_ !== "no"
-        ) {
-          return true;
-        }
-        this.standalone_ = this.content_ === "yes";
-        break;
-      default:
-        return true;
-    }
-    this.attribute_ = "";
-    this.content_ = "";
-    return false;
-  }
-
-  // @internal
-  private parseXmlDeclValueQuoted_() {
-    const index = this.chunk_.indexOf(
-      this.quote_ === Chars.APOSTROPHE ? "'" : '"',
-      this.index_,
-    );
-    const end = index === -1 ? this.chunk_.length : index;
+    const question = this.chunk_.indexOf("?", this.index_);
+    const end = question === -1 ? this.chunk_.length : question + 1;
     const chunk = this.chunk_.slice(this.index_, end);
-    if (this.content_.length + chunk.length > this.maxNameLength_) {
+    if (this.element_.length + chunk.length + 1 > this.maxNameLength_) {
       throw createSaxError("LIMIT_EXCEEDED");
     }
-    this.content_ += chunk;
-    this.index_ = end + 1;
-    if (index !== -1) {
-      this.quote_ = -1;
-      if (this.handleXmlDeclAttribute_()) {
-        throw createSaxError("INVALID_XML_DECL");
-      }
-      this.state_ = State.XML_DECL_SPACE;
+    this.element_ += chunk;
+    this.index_ = end;
+    if (question !== -1) {
+      this.state_ = State.XML_DECL_END;
     }
   }
 
   // @internal
   private parseXmlDeclEnd_() {
-    if (
-      this.chunk_.charCodeAt(this.index_) === Chars.GT &&
-      this.version_ !== undefined
-    ) {
-      ++this.index_;
-      this.state_ = State.MISC;
-      this.reader_.xml?.({
-        version: this.version_,
-        encoding: this.encoding_,
-        standalone: this.standalone_,
-      });
-    } else {
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
       throw createSaxError("INVALID_XML_DECL");
     }
+    ++this.index_;
+    this.element_ += ">";
+    const xmlDecl = parseXmlDecl(this.element_, false);
+    // this.version_ = xmlDecl.version;
+    // this.encoding_ = xmlDecl.encoding;
+    this.standalone_ = xmlDecl.standalone;
+    this.reader_.xml?.(xmlDecl);
+    this.state_ = State.MISC;
+    this.element_ = "";
   }
 
   // @internal
