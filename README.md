@@ -31,6 +31,50 @@ for (const chunk of INPUT_STREAM) {
 parser.end();
 ```
 
+## Runtime Support
+
+Basic XML parsing is supported on any ES2017 runtime. Older runtimes can still
+run `saxe` after transpilation and polyfilling any missing functionality.
+
+Encoding support requires [`TextDecoder`]; most runtimes support it natively,
+but it may be polyfilled.
+
+## Encoding Support
+
+XML allows documents to specify their encoding through the XML or Text
+Declarations.
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+```
+
+Parsing XML from raw binary data in unknown encoding is supported by the
+`SaxDecoder` class, which parses XML from `Uint8Array` chunks.
+
+Do not use `SaxDecoder` when encoding information is provided externally, e.g.
+`Content-Type` MIME type or another specification, e.g. EPUB specifies all XML
+files MUST be `UTF-8`.
+
+### Supported Encodings
+
+`SaxDecoder` uses [`TextDecoder`] so it supports all encodings defined by the
+[Encoding Standard].
+
+A polyfill may only implement a subset of the [Encoding Standard § 4.
+Encodings]. For full compliance ensure at least `UTF-8`
+and `UTF-16` are supported, as they are required by the XML standard.
+
+**Notes:**
+
+- If a document specifies an unknown or unsupported encoding a
+  `SaxError` with code `ENCODING_NOT_SUPPORTED` is thrown.
+- If a document contains data which is invalid for the declared encoding a
+  `SaxError` with code `ENCODING_INVALID_DATA` is thrown.
+
+[`TextDecoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder
+[Encoding Standard]: https://encoding.spec.whatwg.org/
+[Encoding Standard § 4. Encodings]: https://encoding.spec.whatwg.org/#encodings
+
 ## Security
 
 XML Parsers may be subject to a number of possible vulnerabilities, most common
