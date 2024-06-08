@@ -50,7 +50,7 @@ even checking for well-formedness or ignore most declarations.
 This parser checks the whole internal DTD subset for well-formedness and
 recognizes `ATTLIST` and `ENTITY` declarations, so attributes are normalized
 appropriately and entities are expanded correctly. This process has [security
-implications](#security), if the default behavior is undesirable it may be
+implications](#security); if the default behavior is undesirable it may be
 changed.
 
 Internal DTD subset parsing is required even for non-validating[^2] parsers.
