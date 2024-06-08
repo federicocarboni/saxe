@@ -1507,6 +1507,9 @@ export class SaxParser {
           this.skipWhiteSpace_();
           this.readName_();
         }
+        if (this.chunk_.charCodeAt(this.index_) === Chars.ASTERISK) {
+          ++this.index_;
+        }
       } else {
         this.readCp_(true);
       }
