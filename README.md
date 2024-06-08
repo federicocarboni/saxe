@@ -47,15 +47,17 @@ but it may be polyfilled.
 Most[^1] JavaScript XML parsers skip Document Type Declarations (DTD) without
 even checking for well-formedness or ignore most declarations.
 
-This parser checks the whole internal DTD subset for well-formedness and
-recognizes `ATTLIST` and `ENTITY` declarations, so attributes are normalized
-appropriately and entities are expanded correctly. This process has [security
-implications](#security); if the default behavior is undesirable it may be
-changed.
+Internal DTD subset parsing is required even for non-validating[^2] processors.
+So most JavaScript implementations are not compliant. Even if one were to
+manually parse the internal DTD and provide the entity values to
+[isaacs/sax-js] or [lddubeau/saxes] proper entity expansion cannot be
+replicated. This is fine where the DTDs are prohibited or explicitly ignored
+but is incorrect for any other protocol or format.
 
-Internal DTD subset parsing is required even for non-validating[^2] parsers.
-External markup declarations and external entities are not supported and will
-never be.
+This parser checks the whole internal DTD subset for well-formedness and recognizes `ATTLIST` and `ENTITY` declarations. Attributes declared in the internal subset are normalized appropriately and entities are expanded correctly. This process has [security implications](#security); if the default behavior is undesirable it may be configured.
+
+External markup declarations and external entities are not required for
+non-validating[^2] processors and are explicitly not supported.
 
 [^1]: Other JavaScript XML parser inspected include [isaacs/sax-js],
   [NaturalIntelligence/fast-xml-parser] and [lddubeau/saxes]
