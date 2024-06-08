@@ -469,6 +469,32 @@ function escapeChar(c: string) {
   }
 }
 
+/**
+ * Escapes XML markup characters in the given string.
+ *
+ * XML markup is escaped using their predefined entity if there is one, or a
+ * decimal character reference.
+ *
+ * - `&` -> `&amp;`
+ * - `<` -> `&lt;`
+ * - `>` -> `&gt;`
+ * - `'` -> `&apos;`
+ * - `"` -> `&quot;`
+ * - `\t` (TAB) -> `&#9;`
+ * - `\n` (LF) -> `&#10;`
+ * - `\r` (CR) -> `&#13;`
+ *
+ * @param s - Input string to be escaped.
+ * @returns - A new string where all XML markup characters are replaced with
+ * their escape sequence.
+ *
+ * @example
+ * ```ts
+ * const unsafe = "<div>This & that</div>";
+ * const safe = escape(unsafe);
+ * console.log(safe); // &lt;div&gt;This &amp; that&lt;/div&gt;
+ * ```
+ */
 export function escape(s: string) {
   return s.replace(/[&<>'"\t\n\r]/g, escapeChar);
 }
