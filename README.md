@@ -16,10 +16,13 @@ import {SaxParser} from "saxe";
 let textContent = "";
 const parser = new SaxParser({
   start(name, attributes) {
+    // element start tag
   },
   empty(name, attributes) {
+    // empty element
   },
   end(name, attributes) {
+    // element end tag
   },
   text(text) {
     textContent += text;
@@ -38,6 +41,34 @@ run `saxe` after transpilation and polyfilling any missing functionality.
 
 Encoding support requires [`TextDecoder`]; most runtimes support it natively,
 but it may be polyfilled.
+
+## Document Type Declaration
+
+Most[^1] JavaScript XML parsers skip Document Type Declarations (DTD) without
+even checking for well-formedness or ignore most declarations.
+
+This parser checks the whole internal DTD subset for well-formedness and
+recognizes `ATTLIST` and `ENTITY` declarations, so attributes are normalized
+appropriately and entities are expanded correctly. This process has [security
+implications](#security), if the default behavior is undesirable it may be
+changed.
+
+Internal DTD subset parsing is required even for non-validating[^2] parsers.
+External markup declarations and external entities are not supported and will
+never be.
+
+[^1]: Other JavaScript XML parser inspected include [isaacs/sax-js],
+  [NaturalIntelligence/fast-xml-parser] and [lddubeau/saxes]
+[^2]: Non-validating XML processors (parsers) do not validate documents, but
+  must still recognize and report well-formedness (syntax) errors.
+  Non-validating processors are not required to fetch and parse external markup
+  declarations and external entities.
+  [XML Standard § 5.1 Validating and Non-Validating Processors][xml proc types]
+
+[lddubeau/saxes]: https://github.com/lddubeau/saxes
+[isaacs/sax-js]: https://github.com/isaacs/sax-js
+[NaturalIntelligence/fast-xml-parser]: https://github.com/NaturalIntelligence/fast-xml-parser
+[xml proc types]: https://www.w3.org/TR/REC-xml/#proc-types
 
 ## Encoding Support
 
@@ -81,8 +112,8 @@ XML Parsers may be subject to a number of possible vulnerabilities, most common
 attacks exploit external entity resolution and entity expansion.
 
 This parser is strictly non-validating, so by design it should not be vulnerable
-to any XXE[^1] based attack. Additionally the length of strings collected during
-parsing is capped to limit the efficacy of other denial-of-service attacks[^2].
+to any XXE[^3] based attack. Additionally the length of strings collected during
+parsing is capped to limit the efficacy of other denial-of-service attacks[^4].
 
 Document Type Declaration processing may (at user option) be disabled altogether
 to prevent any attack based on them.
@@ -99,8 +130,8 @@ tests and the parser is [fuzz tested](/fuzz/) regularly. Despite this being the
 case, for very sensible or security oriented apps you may want to conduct your
 own security audit.
 
-[^1]: [XML External Entity (XXE) Processing OWASP | Foundation][xxe owasp]
-[^2]: [XML Denial of Service Attacks and Defenses | Microsoft Learn][msdn xml dos]
+[^3]: [XML External Entity (XXE) Processing OWASP | Foundation][xxe owasp]
+[^4]: [XML Denial of Service Attacks and Defenses | Microsoft Learn][msdn xml dos]
 
 <!-- https://web.archive.org/web/20240515024616/https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing -->
 [xxe owasp]: https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
