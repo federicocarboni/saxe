@@ -1,11 +1,12 @@
 # Saxe
 
-Light-weight and efficient SAX parser for JavaScript (~5.87KB minified and gzipped).
+Light-weight and efficient SAX parser for JavaScript (~6.6KB minified and gzipped).
 
 ## Goals
 
 - Complete XML standard conformance
 - Simple and terse API
+- Reduced code footprint
 - Set a base for other standards built on XML, e.g. XHTML
 
 ## Example
