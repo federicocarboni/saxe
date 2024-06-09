@@ -308,7 +308,7 @@ export interface SaxOptions {
   maxEntityLength?: number | undefined;
   /**
    * Maximum nesting depth allowed for entities.
-   * @default 20
+   * @default 10
    */
   maxEntityDepth?: number | undefined;
 }
@@ -639,7 +639,7 @@ export class SaxParser {
     this.maxAttributes_ = options?.maxAttributes ?? 2_000;
     this.maxTextLength_ = options?.maxTextLength ?? 10_000_000;
     this.maxEntityLength_ = options?.maxEntityLength ?? 1_000_000;
-    this.maxEntityDepth_ = options?.maxEntityDepth ?? 20;
+    this.maxEntityDepth_ = options?.maxEntityDepth ?? 10;
   }
 
   /**
