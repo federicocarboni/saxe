@@ -1,0 +1,19 @@
+{
+  "name": "bench",
+  "type": "module",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.4.0",
+    "sax": "^1.4.1",
+    "saxe": "file:..",
+    "saxes": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/sax": "^1.2.7",
+    "tsm": "^2.3.0"
+  }
+}
