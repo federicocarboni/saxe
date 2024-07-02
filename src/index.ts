@@ -630,9 +630,10 @@ export class SaxParser {
     if (options?.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
-    if (options?.dtd === "ignore") {
+    const dtd = options?.dtd;
+    if (dtd === "ignore") {
       this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
-    } else if (options?.dtd === "prohibit") {
+    } else if (dtd === "prohibit") {
       this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
     }
     this.maxNameLength_ = options?.maxNameLength ?? 2_000;
