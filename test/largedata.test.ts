@@ -23,7 +23,9 @@ function testRecursive(data: string) {
   expect(() => {
     parser.write(data);
     parser.end();
-  }).to.throw().and.have.property("code", "RECURSIVE_ENTITY");
+  })
+    .to.throw()
+    .and.have.property("code", "RECURSIVE_ENTITY");
 }
 
 describe("Large files", function() {
@@ -32,17 +34,15 @@ describe("Large files", function() {
       const parser = new SaxParser(new CanonicalXmlWriter(), {
         maxTextLength: 5_000_000,
       });
-      const data = fs.createReadStream(
-        path.join("test/data", xmlFile),
-        "utf-8",
-      );
-      await expect((async () => {
-        for await (const chunk of data) {
-          parser.write(chunk as string);
-        }
-        parser.end();
-      })())
-        .to.eventually.be.rejected
+      expect(
+        () => {
+          parser.write(
+            fs.readFileSync(path.join("test/data", xmlFile), "utf-8"),
+          );
+          parser.end();
+        },
+      )
+        .to.throw()
         .and.have.property("code", "LIMIT_EXCEEDED");
     });
   }

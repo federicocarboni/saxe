@@ -26,7 +26,19 @@ describe("CDATA sections", function() {
       .equals("<root> [[[[[[[[]]]]]]]]</root>");
   });
   it("wf: CDATA section split across multiple chunks", function() {
-    expect(toCanonical("<root><![CDATA[", "]", "]", "content", "]]", "]]>", "content]", "]", "</root>"))
+    expect(
+      toCanonical(
+        "<root><![CDATA[",
+        "]",
+        "]",
+        "content",
+        "]]",
+        "]]>",
+        "content]",
+        "]",
+        "</root>",
+      ),
+    )
       .equals("<root>]]content]]content]]</root>");
   });
 });

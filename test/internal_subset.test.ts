@@ -95,3 +95,19 @@ describe("Entity Declaration", function() {
     ).to.throw().and.have.property("code", "UNPARSED_ENTITY");
   });
 });
+
+describe("ElementDecl", function() {
+  it("wf: ELEMENT seq", function() {
+    expect(toCanonical(
+      `<!DOCTYPE doc [
+        <!ELEMENT ent_seq (#PCDATA)>
+        <!ELEMENT k_ele (keb, ke_inf*, ke_pri*)>
+        <!ELEMENT keb (#PCDATA)>
+        <!ELEMENT ke_inf (#PCDATA)>
+        <!ELEMENT r_ele (reb, re_nokanji?, re_restr*, re_inf*, re_pri*)>
+        <!ELEMENT gloss (#PCDATA | pri)*>
+
+        <!ELEMENT doc (hello?, world*, opt+)>]><doc></doc>`,
+    ));
+  });
+});

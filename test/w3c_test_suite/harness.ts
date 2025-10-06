@@ -62,7 +62,9 @@ class TestCaseReader implements SaxReader {
     if (name === "TEST" && attributes.get("ENTITIES") === "none") {
       this.currentType = attributes.get("TYPE");
       this.currentUri = path.join(this.baseUri, attributes.get("URI")!);
-      this.output = attributes.has("OUTPUT") ? path.join(this.baseUri, attributes.get("OUTPUT")!) : undefined;
+      this.output = attributes.has("OUTPUT")
+        ? path.join(this.baseUri, attributes.get("OUTPUT")!)
+        : undefined;
       this.currentId = attributes.get("ID");
     }
   }
@@ -145,9 +147,6 @@ for (const xmlconf of TEST_SUITE) {
 
 export function runTest(testCase: TestCase) {
   return async function() {
-    if (testCase.id === "valid-sa-090") {
-      console.log(testCase)
-    }
     // TODO: not all files are utf-8!
     const content = await fs.promises.readFile(testCase.uri, "utf-8");
     const output = testCase.output !== undefined
@@ -156,7 +155,9 @@ export function runTest(testCase: TestCase) {
     const toCanonical = () => {
       const canonicalizer = new CanonicalXmlWriter();
       const parser = new SaxParser(canonicalizer);
-      parser.write(content);
+      for (const c of content) {
+        parser.write(c);
+      }
       parser.end();
       return canonicalizer.output;
     };
