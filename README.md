@@ -37,25 +37,26 @@ parser.end();
 
 ## Runtime Support
 
-Basic XML parsing is supported on any ES2017 runtime. Older runtimes can still
-run `saxe` after transpilation and polyfilling any missing functionality.
+- Basic XML parsing: any ES2017 runtime. For older runtimes transpiling and
+  polyfilling is enough.
 
-Encoding support requires [`TextDecoder`]; most runtimes support it natively,
-but it may be polyfilled.
+- Encoding support: requires [`TextDecoder`]; most runtimes support it natively,
+  but it can be polyfilled if not available.
 
 ## Document Type Declaration
 
-Most[^1] JavaScript XML parsers skip Document Type Declarations (DTD) without
-even checking for well-formedness or ignore most declarations.
+Many[^1] JavaScript XML parsers skip DTDs without checking for well-formedness
+or ignore most declarations.
 
-Internal DTD subset parsing is required even for non-validating[^2] processors.
-So most JavaScript implementations are not compliant. Even if one were to
-manually parse the internal DTD and provide the entity values to
-[isaacs/sax-js] or [lddubeau/saxes] proper entity expansion cannot be
-replicated. This is fine where the DTDs are prohibited or explicitly ignored
-but is incorrect for any other protocol or format.
+Internal DTD subset parsing is required even for non-validating[^2] processors,
+this parser implements the entire specification:
 
-This parser checks the whole internal DTD subset for well-formedness and recognizes `ATTLIST` and `ENTITY` declarations. Attributes declared in the internal subset are normalized appropriately and entities are expanded correctly. This process has [security implications](#security); if the default behavior is undesirable it may be configured.
+- Internal DTD subset is parsed and checked for well-formedness.
+- `ATTLIST` and `ENTITY` declarations are recognized to normalize attributes and
+  expand entities.
+
+This process has [security implications](#security); so if the default behavior
+is undesirable it may be configured.
 
 External markup declarations and external entities are not required for
 non-validating[^2] processors and are explicitly not supported.
@@ -75,39 +76,24 @@ non-validating[^2] processors and are explicitly not supported.
 
 ## Encoding Support
 
-XML allows documents to specify their encoding through the XML or Text
-Declarations.
+XML documents can specify their encoding through the XML or Text Declarations:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
 ```
 
-Parsing XML from raw binary data in unknown encoding is supported by the
-`SaxDecoder` class, which parses XML from `Uint8Array` chunks.
-
-Do not use `SaxDecoder` when encoding information is provided externally, e.g.
-`Content-Type` MIME type or another specification, e.g. EPUB specifies all XML
-files MUST be `UTF-8`.
+The SaxDecoder class supports parsing XML from `Uint8Array` chunks. Do not use
+`SaxDecoder` when the encoding is specified externally (e.g. via `Content-Type`
+or higher priority protocols).
 
 ### Supported Encodings
 
-`SaxDecoder` uses [`TextDecoder`] so it supports all encodings defined by the
-[Encoding Standard].
-
-A polyfill may only implement a subset of the [Encoding Standard § 4.
-Encodings]. For full compliance ensure at least `UTF-8`
-and `UTF-16` are supported, as they are required by the XML standard.
-
-**Notes:**
-
-- If a document specifies an unknown or unsupported encoding a
-  `SaxError` with code `ENCODING_NOT_SUPPORTED` is thrown.
-- If a document contains data which is invalid for the declared encoding a
-  `SaxError` with code `ENCODING_INVALID_DATA` is thrown.
+`SaxDecoder` uses [`TextDecoder`], supporting all encodings defined in the
+[Encoding Standard]. If a polyfill is used, ensure at least `UTF-8` and `UTF-16`
+decoders are supported.
 
 [`TextDecoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder
 [Encoding Standard]: https://encoding.spec.whatwg.org/
-[Encoding Standard § 4. Encodings]: https://encoding.spec.whatwg.org/#encodings
 
 ## Security
 
@@ -133,8 +119,30 @@ tests and the parser is [fuzz tested](/fuzz/) regularly. Despite this being the
 case, for very sensible or security oriented apps you may want to conduct your
 own security audit.
 
+### Security Comparison Table
+
+The following table provides an overview of the most common XML vulnerabilities
+and whether comparable libraries are vulnerable to them.
+
+This table is provided in the hope it be useful, it does not guarantee to be
+exhaustive or to be kept up-to-date for any of the mentioned libraries.
+
+| XML Parser                            | DTD retrieval | XXE[^3] | Billion laughs[^4] | Quadratic Blowup[^4] |
+|---------------------------------------|---------------|---------|--------------------|----------------------|
+| saxe                                  | Safe          | Safe    | Mitigated[^5]      | Mitigated[^5]        |
+| saxe (dtd ignore)                     | Safe          | Safe    | Safe (entity)[^7]  | Safe (entity)[^7]    |
+| [isaacs/sax-js]                       | Safe          | Safe    | Not applicable[^6] | Safe (entity)[^7]    |
+| [lddubeau/saxes]                      | Safe          | Safe    | Not applicable[^6] | Safe (entity)[^7]    |
+| [NaturalIntelligence/fast-xml-parser] | Safe          | Safe    | Not applicable[^6] | Throws RangeError    |
+
 [^3]: [XML External Entity (XXE) Processing OWASP | Foundation][xxe owasp]
 [^4]: [XML Denial of Service Attacks and Defenses | Microsoft Learn][msdn xml dos]
+[^5]: Attack is mitigated against, crashes should be prevented, but depending on
+  the attack it still may require more processing time than expected.
+[^6]: Attack is prevented because entity expansion is not implemented or is not
+  compliant.
+[^7]: Safe assuming the user of the library does not define entities from
+  untrusted values.
 
 <!-- https://web.archive.org/web/20240515024616/https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing -->
 [xxe owasp]: https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
@@ -142,16 +150,5 @@ own security audit.
 
 ## License
 
-Copyright 2024 Federico Carboni
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-<http://www.apache.org/licenses/LICENSE-2.0>
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Licensed under the Apache License, Version 2.0. See the LICENSE file for
+details.
