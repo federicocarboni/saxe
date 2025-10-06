@@ -4,7 +4,6 @@
 /// <reference lib="dom" />
 
 import {Chars, isWhiteSpace} from "./chars.ts";
-import {createSaxError} from "./error.ts";
 import {SaxParser} from "./index.ts";
 import {parseXmlDecl} from "./xml_decl.ts";
 
@@ -31,6 +30,9 @@ export class SaxDecoder {
   constructor(parser: SaxParser) {
     this.parser_ = parser;
   }
+  /**
+   * Returns the encoding of the XML document if known
+   */
   get encoding() {
     return this.encodingDetected_ ? this.textDecoder_!.encoding : undefined;
   }
@@ -80,7 +82,7 @@ export class SaxDecoder {
     );
     if (question !== -1) {
       if (this.isXmlDeclEnd_ || question !== input.length - 1) {
-        const {encoding} = parseXmlDecl(this.xmlDecl_!, false);
+        const {encoding} = parseXmlDecl(this.xmlDecl_!);
         this.setTextDecoder_(encoding);
         this.parser_.write(this.xmlDecl_!);
         this.xmlDecl_ = undefined;
@@ -94,7 +96,7 @@ export class SaxDecoder {
     try {
       return this.textDecoder_!.decode(input, options);
     } catch {
-      throw createSaxError("ENCODING_INVALID_DATA", {
+      throw this.parser_.createSaxError_("ENCODING_INVALID_DATA", {
         encoding: this.textDecoder_!.encoding,
       });
     }
@@ -112,7 +114,9 @@ export class SaxDecoder {
         ignoreBOM: true,
       });
     } catch {
-      throw createSaxError("ENCODING_NOT_SUPPORTED", {encoding: encoding!});
+      throw this.parser_.createSaxError_("ENCODING_NOT_SUPPORTED", {
+        encoding: encoding!,
+      });
     }
     this.encodingDetected_ = true;
   }
@@ -131,28 +135,28 @@ export class SaxDecoder {
     const b1 = chunk[1]!;
     const b2 = chunk[2]!;
     const b3 = chunk[3]!;
-    if (b0 === 0xEF && b1 === 0xBB && b2 === 0xBF) {
+    if (b0 === 0xef && b1 === 0xbb && b2 === 0xbf) {
       // UTF-8 BOM
       start = 3;
       encoding = "utf-8";
-    } else if (b0 === 0xFF && b1 === 0xFE && (b2 | b3) !== 0x00) {
+    } else if (b0 === 0xff && b1 === 0xfe && (b2 | b3) !== 0x00) {
       // UTF-16 BOM little-endian (byte 2 and 3 must not be zero to avoid
       // UTF-32) even if it were a UTF-16 file, NUL characters are not allowed
       // in XML.
       start = 2;
       encoding = "utf-16le";
-    } else if (b0 === 0xFE && b1 === 0xFF) {
+    } else if (b0 === 0xfe && b1 === 0xff) {
       // UTF-16 BOM big-endian
       start = 2;
       encoding = "utf-16be";
     } else if (
       // UTF-32 BOM
-      (b0 | b1) === 0x00 && b2 === 0xFE && b3 === 0xFF ||
-      b0 === 0xFF && b1 === 0xFE && (b2 | b3) === 0x00 ||
+      ((b0 | b1) === 0x00 && b2 === 0xfe && b3 === 0xff) ||
+      (b0 === 0xff && b1 === 0xfe && (b2 | b3) === 0x00) ||
       // UTF-32 < character (NUL characters are not allowed in XML so it won't
       // change behavior)
-      (b0 | b1 | b2) === 0x00 && b3 === Chars.LT ||
-      b0 === Chars.LT && (b1 | b2 | b3) === 0x00
+      ((b0 | b1 | b2) === 0x00 && b3 === Chars.LT) ||
+      (b0 === Chars.LT && (b1 | b2 | b3) === 0x00)
     ) {
       // Late check for UTF-32; it is not supported by the encoding standard so
       // TextDecoder is not able to handle it and decoding it is out of the
@@ -163,14 +167,19 @@ export class SaxDecoder {
     }
     chunk = chunk.subarray(start);
     if (
-      chunk[0] === Chars.LT && chunk[1] === Chars.QUESTION &&
-      chunk[2] === Chars.LOWER_X && chunk[3] === Chars.LOWER_M &&
-      chunk[4] === Chars.LOWER_L && isWhiteSpace(chunk[5]!)
+      chunk[0] === Chars.LT &&
+      chunk[1] === Chars.QUESTION &&
+      chunk[2] === Chars.LOWER_X &&
+      chunk[3] === Chars.LOWER_M &&
+      chunk[4] === Chars.LOWER_L &&
+      isWhiteSpace(chunk[5]!)
     ) {
       // UTF-8 decoder
-      this.textDecoder_ = new TextDecoder(undefined, {
-        ignoreBOM: true,
-      });
+      if (this.textDecoder_ === undefined) {
+        this.textDecoder_ = new TextDecoder(undefined, {
+          ignoreBOM: true,
+        });
+      }
       this.xmlDecl_ = "";
       this.handleXmlDecl_(chunk, 2);
       return;

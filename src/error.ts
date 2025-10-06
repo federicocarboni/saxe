@@ -33,7 +33,7 @@ const ERRORS = {
 
   INVALID_START_TAG: () => "Start tag not well-formed",
   INVALID_END_TAG: () => "End tag not well-formed",
-  LT_IN_ATTRIBUTE: () => "Attribute value must not contain an literal '<'",
+  LT_IN_ATTRIBUTE: () => "Attribute value must not contain a literal '<'",
   ATTRIBUTE_REDEFINED: () => "Attribute appears more than once in the same tag",
   TAG_NAME_MISMATCH: ({element}: {element: string}) =>
     `End tag '${element}' does not match start tag`,
@@ -54,7 +54,7 @@ const ERRORS = {
  * - `INVALID_XML_DECL`: XML Declaration not well-formed
  * - `INVALID_DOCTYPE_DECL`: DOCTYPE Declaration not well-formed
  * - `INVALID_INTERNAL_SUBSET`: Internal subset not well-formed
- * - `INVALID_COMMENT`: Comment must not contain '--'"
+ * - `INVALID_COMMENT`: Comment must not contain '--'
  * - `RESERVED_PI`: Processing instruction target 'XML' is reserved
  * - `INVALID_PI`: Processing instruction not well-formed
  * - `INVALID_ENTITY_REF`: Entity reference not well-formed
@@ -97,7 +97,7 @@ export interface SaxError extends Error {
   // TODO: add the offset character that originated the error?
   //  Tracking lines and columns is not possible with the current design but
   //  even basic UTF-16 offset tracking is more useful than not, right?
-  // offset: number;
+  offset: number;
 }
 
 /**
@@ -114,18 +114,25 @@ export function isSaxError(error: unknown): error is SaxError {
   // `Object.prototype.toString` was crippled by the standards when
   // `@@toStringTag` was introduced.
   // So... if it quacks like a duck...
-  return error === Object(error) &&
+  return (
+    error === Object(error) &&
     (error as SaxError).name === "SaxError" &&
-    ERRORS.hasOwnProperty((error as SaxError).code);
+    ERRORS.hasOwnProperty((error as SaxError).code)
+  );
 }
 
 //
 // @internal
 export function createSaxError<T extends SaxErrorCode>(
   code: T,
-  ...args: Parameters<typeof ERRORS[T]>
+  offset: number,
+  ...args: Parameters<(typeof ERRORS)[T]>
 ): SaxError;
-export function createSaxError(code: SaxErrorCode, info?: unknown): SaxError {
+export function createSaxError(
+  code: SaxErrorCode,
+  offset: number,
+  info?: unknown,
+): SaxError {
   // @ts-expect-error -- TypeScript is not able to prove that T is actually a
   // single value and not a union so it can't infer args correctly.
   const message = ERRORS[code](info);
@@ -142,5 +149,12 @@ export function createSaxError(code: SaxErrorCode, info?: unknown): SaxError {
   // language makes little to no sense.
   // - Using a code property on errors is a tried-and-true way to handle many
   // different error conditions (see Node.js).
-  return Object.assign(new Error(message), {name: "SaxError", code} as const);
+  return Object.assign(
+    new Error(message),
+    {
+      name: "SaxError",
+      code,
+      offset,
+    } as const,
+  ) satisfies SaxError;
 }
