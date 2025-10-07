@@ -8,11 +8,11 @@ import {
   isNameStartChar,
   isWhiteSpace,
 } from "./chars.ts";
-import { SaxError, SaxErrorCode, SaxErrorOptions } from "./error.ts";
-import { parseXmlDecl } from "./xml_decl.ts";
+import {SaxError, SaxErrorCode, SaxErrorOptions} from "./error.ts";
+import {parseXmlDecl} from "./xml_decl.ts";
 
-export { SaxDecoder } from "./encoding.ts";
-export { SaxError, type SaxErrorCode } from "./error.ts";
+export {SaxDecoder} from "./encoding.ts";
+export {SaxError, type SaxErrorCode} from "./error.ts";
 
 /**
  * XML Declaration (XMLDecl).
@@ -508,7 +508,7 @@ export function escape(s: string) {
 export function parse(
   input: string,
   reader: SaxReader,
-  options: SaxOptions | undefined = undefined
+  options: SaxOptions | undefined = undefined,
 ) {
   const parser = new SaxParser(reader, options);
   parser.write(input);
@@ -942,20 +942,18 @@ export class SaxParser {
 
   // @internal
   private getNameAndExternalId_() {
-    const systemId =
-      this.flags_ & Flags.EXTERNAL_ID_SYSTEM
-        ? normalizeLineEndings(this.content_)
-        : undefined;
-    const publicId =
-      this.flags_ & Flags.EXTERNAL_ID_PUBLIC
-        ? // [..] all strings of white space in the public identifier MUST be
-          // normalized to single space characters (#x20), and leading and trailing
-          // white space MUST be removed
-          // TAB is not allowed in public identifiers
-          this.attribute_
-            .replace(/^[\n\r ]*|[\n\r ]*$|[\n\r ]+/g, " ")
-            .slice(1, -1)
-        : undefined;
+    const systemId = this.flags_ & Flags.EXTERNAL_ID_SYSTEM
+      ? normalizeLineEndings(this.content_)
+      : undefined;
+    const publicId = this.flags_ & Flags.EXTERNAL_ID_PUBLIC
+      // [..] all strings of white space in the public identifier MUST be
+      // normalized to single space characters (#x20), and leading and trailing
+      // white space MUST be removed
+      // TAB is not allowed in public identifiers
+      ? this.attribute_
+        .replace(/^[\n\r ]*|[\n\r ]*$|[\n\r ]+/g, " ")
+        .slice(1, -1)
+      : undefined;
     this.content_ = "";
     this.attribute_ = "";
     this.flags_ &= ~(Flags.EXTERNAL_ID_PUBLIC | Flags.EXTERNAL_ID_SYSTEM);
@@ -971,7 +969,7 @@ export class SaxParser {
     ) {
       return undefined;
     }
-    return { name: this.element_, publicId, systemId };
+    return {name: this.element_, publicId, systemId};
   }
 
   // @internal
@@ -1008,7 +1006,7 @@ export class SaxParser {
   private parseDoctypeExternalId_() {
     const newChunk = this.chunk_.slice(
       this.index_,
-      this.index_ + 7 - this.content_.length
+      this.index_ + 7 - this.content_.length,
     );
     this.index_ += newChunk.length;
     this.content_ += newChunk;
@@ -1060,11 +1058,11 @@ export class SaxParser {
   private parseDoctypeExternalIdQuoted_() {
     const index = this.chunk_.indexOf(
       this.quote_ === Chars.APOSTROPHE ? "'" : '"',
-      this.index_
+      this.index_,
     );
     const chunk = this.chunk_.slice(
       this.index_,
-      index === -1 ? undefined : index
+      index === -1 ? undefined : index,
     );
     if (this.content_.length + chunk.length > this.maxNameLength_) {
       throw this.error_("LIMIT_EXCEEDED");
@@ -1403,7 +1401,7 @@ export class SaxParser {
         const start = this.index_;
         let codeUnit;
         while (
-          !isWhiteSpace((codeUnit = this.chunk_.charCodeAt(this.index_))) &&
+          !isWhiteSpace(codeUnit = this.chunk_.charCodeAt(this.index_)) &&
           codeUnit !== Chars.GT
         ) {
           ++this.index_;
@@ -1424,7 +1422,7 @@ export class SaxParser {
           ++this.index_;
           const quoteIndex = this.chunk_.indexOf(
             quote === Chars.APOSTROPHE ? "'" : '"',
-            this.index_
+            this.index_,
           );
           const chunk = this.chunk_;
           this.chunk_ = this.chunk_.slice(this.index_, quoteIndex);
@@ -1630,7 +1628,7 @@ export class SaxParser {
   private parseInternalSubsetDeclQuoted_() {
     const index = this.chunk_.indexOf(
       this.quote_ === Chars.APOSTROPHE ? "'" : '"',
-      this.index_
+      this.index_,
     );
     const start = this.index_;
     if (index !== -1) {
@@ -1726,7 +1724,7 @@ export class SaxParser {
     const index = this.chunk_.indexOf("?>", this.index_);
     const content = this.chunk_.slice(
       this.index_,
-      index === -1 ? undefined : index
+      index === -1 ? undefined : index,
     );
     if (hasInvalidChar(content)) {
       throw this.error_("INVALID_CHAR");
@@ -1786,7 +1784,7 @@ export class SaxParser {
     const index = this.chunk_.indexOf("--", this.index_);
     const content = this.chunk_.slice(
       this.index_,
-      index === -1 ? undefined : index
+      index === -1 ? undefined : index,
     );
     if (hasInvalidChar(content)) {
       throw this.error_("INVALID_CHAR");
@@ -1896,7 +1894,7 @@ export class SaxParser {
     if (attlist === undefined) {
       return;
     }
-    for (const [attribute, { default_ }] of attlist) {
+    for (const [attribute, {default_}] of attlist) {
       if (default_ !== undefined && !this.attributes_.has(attribute)) {
         if (this.attributes_.size >= this.maxAttributes_) {
           throw this.error_("LIMIT_EXCEEDED");
@@ -2054,12 +2052,12 @@ export class SaxParser {
             });
           }
           const attlists = this.attlists_.get(this.element_);
-          const attlist =
-            attlists !== undefined ? attlists.get(this.attribute_) : undefined;
-          const value =
-            attlist !== undefined && attlist.isTokenized_
-              ? normalizeAttributeValue(this.content_)
-              : this.content_;
+          const attlist = attlists !== undefined
+            ? attlists.get(this.attribute_)
+            : undefined;
+          const value = attlist !== undefined && attlist.isTokenized_
+            ? normalizeAttributeValue(this.content_)
+            : this.content_;
           if (this.attributes_.size >= this.maxAttributes_) {
             throw this.error_("LIMIT_EXCEEDED");
           }
@@ -2226,7 +2224,7 @@ export class SaxParser {
       // Unparsed entities cannot be referenced anywhere.
       // WFC: Parsed Entity
       if (entityValue === EntityDecl.UNPARSED) {
-        throw this.error_("UNPARSED_ENTITY", { entity: this.entity_ });
+        throw this.error_("UNPARSED_ENTITY", {entity: this.entity_});
       }
       // Attribute values
       // WFC: No External Entity References
@@ -2234,7 +2232,7 @@ export class SaxParser {
         this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED &&
         entityValue === EntityDecl.EXTERNAL
       ) {
-        throw this.error_("EXTERNAL_ENTITY", { entity: this.entity_ });
+        throw this.error_("EXTERNAL_ENTITY", {entity: this.entity_});
       }
       // Allow the application to set a default value for an entity not
       // declared in internal markup declarations.
@@ -2400,7 +2398,7 @@ export class SaxParser {
     const index = this.chunk_.indexOf("]]>", this.index_);
     const content = this.chunk_.slice(
       this.index_,
-      index === -1 ? undefined : index
+      index === -1 ? undefined : index,
     );
     if (hasInvalidChar(content)) {
       throw this.error_("INVALID_CHAR");
@@ -2504,10 +2502,9 @@ export class SaxParser {
       });
     }
     ++this.index_;
-    this.state_ =
-      this.elements_.length === 0 && this.entityStack_.length === 0
-        ? State.MISC
-        : State.TEXT_CONTENT;
+    this.state_ = this.elements_.length === 0 && this.entityStack_.length === 0
+      ? State.MISC
+      : State.TEXT_CONTENT;
     this.otherState_ = 0;
     this.reader_.end(this.element_);
     this.element_ = "";
@@ -2529,8 +2526,8 @@ export class SaxParser {
     let codePoint = this.chunk_.charCodeAt(this.index_);
     if (codePoint >= 0xd800 && codePoint <= 0xdbff) {
       // https://unicode.org/faq/utf_bom.html#utf16-3
-      codePoint =
-        (codePoint << 10) + this.chunk_.charCodeAt(++this.index_) - 0x35fdc00;
+      codePoint = (codePoint << 10) + this.chunk_.charCodeAt(++this.index_) -
+        0x35fdc00;
     }
     ++this.index_;
     return codePoint;
