@@ -108,8 +108,6 @@ export interface Doctype {
   systemId?: string | undefined;
 }
 
-export interface Attributes {}
-
 /**
  * https://www.w3.org/TR/REC-xml/
  * @since 1.0.0
@@ -1121,12 +1119,14 @@ export class SaxParser {
     if (!isNameStartChar(codePoint)) {
       throw this.error_("INVALID_INTERNAL_SUBSET");
     }
+    this.textLength_ = 0;
     this.state_ = State.INTERNAL_SUBSET_PE_REF;
   }
 
   // @internal
   private parseInternalSubsetPeRef_() {
-    this.readNameCharacters_(0);
+    // PE references are not expanded but the name is still capped.
+    this.textLength_ += this.readNameCharacters_(this.textLength_).length;
     if (this.index_ >= this.chunk_.length) {
       return;
     }
@@ -2452,13 +2452,12 @@ export class SaxParser {
     } else if (codeUnit === Chars.CLOSE_BRACKET) {
       ++this.index_;
       this.textLength_ += 1;
-      if (this.textLength_ > this.maxTextLength_)
+      if (this.textLength_ > this.maxTextLength_) {
         throw this.error_("LIMIT_EXCEEDED");
+      }
       this.content_ += "]";
     } else {
-      this.textLength_ += 2;
-      if (this.textLength_ > this.maxTextLength_)
-        throw this.error_("LIMIT_EXCEEDED");
+      // ]] was already included in content before
       this.content_ += "]]";
       this.state_ = State.CDATA_SECTION;
     }
