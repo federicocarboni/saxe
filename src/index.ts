@@ -318,7 +318,6 @@ export interface SaxOptions {
 const enum State {
   INIT,
   XML_DECL,
-  XML_DECL_END,
   DOCTYPE_DECL_START,
   DOCTYPE_DECL,
   DOCTYPE_NAME,
@@ -453,7 +452,7 @@ const PREDEFINED_ENTITIES = {
   quot: '"',
 } as const;
 
-function escapeChar(c: string) {
+function escapeChar(c: string): string {
   switch (c) {
     case "&":
       return "&amp;";
@@ -465,9 +464,14 @@ function escapeChar(c: string) {
       return "&apos;";
     case '"':
       return "&quot;";
-    default: {
-      return `&#${c.codePointAt(0)};`;
-    }
+    case "\t":
+      return "&#9;";
+    case "\n":
+      return "&#10;";
+    case "\r":
+      return "&#13;";
+    default:
+      return `${c.codePointAt(0)}`;
   }
 }
 
@@ -726,8 +730,8 @@ export class SaxParser {
       //   return this.parseXmlDeclValue_();
       // case State.XML_DECL_VALUE_QUOTED:
       //   return this.parseXmlDeclValueQuoted_();
-      case State.XML_DECL_END:
-        return this.parseXmlDeclEnd_();
+      // case State.XML_DECL_END:
+      //   return this.parseXmlDeclEnd_();
       case State.DOCTYPE_DECL_START:
         return this.parseDoctypeDeclStart_();
       case State.DOCTYPE_DECL:
@@ -862,26 +866,27 @@ export class SaxParser {
 
   // @internal
   private parseXmlDecl_() {
-    const question = this.chunk_.indexOf("?", this.index_);
-    const end = question === -1 ? this.chunk_.length : question + 1;
-    const chunk = this.chunk_.slice(this.index_, end);
-    if (this.element_.length + chunk.length + 1 > 2000) {
-      throw new SaxError("LIMIT_EXCEEDED");
+    if (this.element_.charCodeAt(this.element_.length - 1) === Chars.QUESTION) {
+      // Edge case, last chunk ended in ? so this chunk must start with >
+      this.element_ += this.chunk_.charAt(this.index_);
+      ++this.index_;
+    } else {
+      // Fast path: jump to the end of the XML Decl, we only search for ?
+      // because we know the character after that is either a > or the document
+      // is not well-formed.
+      const question = this.chunk_.indexOf("?", this.index_);
+      const end = question === -1 ? this.chunk_.length : question + 2;
+      const chunk = this.chunk_.slice(this.index_, end);
+      if (this.element_.length + (end - this.index_) > 2000) {
+        throw new SaxError("LIMIT_EXCEEDED");
+      }
+      this.element_ += chunk;
+      this.index_ = end;
+      // XML Decl did not end in this chunk.
+      if (question === -1 || end > this.chunk_.length) {
+        return;
+      }
     }
-    this.element_ += chunk;
-    this.index_ = end;
-    if (question !== -1) {
-      this.state_ = State.XML_DECL_END;
-    }
-  }
-
-  // @internal
-  private parseXmlDeclEnd_() {
-    if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
-      throw this.error_("INVALID_XML_DECL");
-    }
-    ++this.index_;
-    this.element_ += ">";
     const xmlDecl = parseXmlDecl(this.element_);
     // this.version_ = xmlDecl.version;
     // this.encoding_ = xmlDecl.encoding;
