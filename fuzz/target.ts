@@ -1,5 +1,5 @@
-import { SaxError, SaxParser } from "../src/index.ts";
-import { CanonicalXmlWriter } from "../test/canonical_xml.ts";
+import {SaxError, SaxParser} from "../src/index.ts";
+import {CanonicalXmlWriter} from "../test/canonical_xml.ts";
 
 export function fuzz(data: Buffer) {
   const str = data.toString("utf-8");
@@ -31,7 +31,7 @@ export function fuzz(data: Buffer) {
   }
   if (writer1.output !== writer2.output || error1?.code !== error2?.code) {
     throw new Error(
-      `--- FULL: ---\n${writer1.output}\n${error1}\n\n--- CHAR BY CHAR: ---\n${writer2.output}\n${error2}`
+      `--- FULL: ---\n${writer1.output}\n${error1}\n\n--- CHAR BY CHAR: ---\n${writer2.output}\n${error2}`,
     );
   }
 }
