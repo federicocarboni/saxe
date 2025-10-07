@@ -1,6 +1,6 @@
 # Saxe
 
-Light-weight and efficient SAX parser for JavaScript (~6.6KB minified and gzipped).
+Light-weight and efficient SAX-style XML parser for JavaScript.
 
 ## Goals
 
@@ -8,6 +8,10 @@ Light-weight and efficient SAX parser for JavaScript (~6.6KB minified and gzippe
 - Simple and terse API
 - Reduced code footprint
 - Set a base for other standards built on XML, e.g. XHTML
+
+### Non-Goals
+
+- XML validation of DTDs
 
 ## Example
 
@@ -38,15 +42,14 @@ parser.end();
 ## Runtime Support
 
 - Basic XML parsing: any ES2017 runtime. For older runtimes transpiling and
-  polyfilling is enough.
+  polyfilling should be enough.
 
 - Encoding support: requires [`TextDecoder`]; most runtimes support it natively,
-  but it can be polyfilled if not available.
+  but it may be polyfilled if not available.
 
 ## Document Type Declaration
 
-Many[^1] JavaScript XML parsers skip DTDs without checking for well-formedness
-or ignore most declarations.
+Many[^1] JavaScript XML parsers ignore the internal DTD subset.
 
 Internal DTD subset parsing is required even for non-validating[^2] processors,
 this parser implements the entire specification:
@@ -82,7 +85,7 @@ XML documents can specify their encoding through the XML or Text Declarations:
 <?xml version="1.0" encoding="UTF-8" ?>
 ```
 
-The SaxDecoder class supports parsing XML from `Uint8Array` chunks. Do not use
+The `SaxDecoder` class supports parsing XML from `Uint8Array` chunks. Do not use
 `SaxDecoder` when the encoding is specified externally (e.g. via `Content-Type`
 or higher priority protocols).
 
