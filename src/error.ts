@@ -1,5 +1,5 @@
-// For ErrorOptions and Error.cause, in older runtimes those values are safely
-// ignored.
+// For ErrorOptions and Error.cause, in older runtimes those options are safely
+// ignored without any further action.
 /// <reference lib="ES2022.Error" />
 
 const ERRORS = {
@@ -51,6 +51,9 @@ const ERRORS = {
   INVALID_QNAME: () => "QName is not well-formed",
   INVALID_NCNAME: () => "NCName contains colon ':'",
   UNDECLARED_PREFIX: () => "Namespace prefix is not declared",
+  PREFIX_UNDECLARING: () => "Namespace URI is empty",
+  RESERVED_PREFIX: () => "Namespace prefix starting with 'XML' is reserved",
+  RESERVED_NAMESPACE: () => "Namespace URI is reserved",
 } as const;
 
 /**
@@ -84,42 +87,19 @@ const ERRORS = {
  * - `ATTRIBUTE_REDEFINED` Attribute appears multiple times
  * - `TAG_NAME_MISMATCH` End tag does not match start tag
  * - `UNEXPECTED_EOF` Unexpected end of file
- * @since 1.0.0
  */
 export type SaxErrorCode = keyof typeof ERRORS;
 
-// /**
-//  * A parsing or decoding error in an XML Document.
-//  *
-//  * The parser cannot resume after an error as it represents a fatal error in the
-//  * XML specification. It means that the document is is not well-formed and contains
-//  * syntax errors.
-//  *
-//  * Since this error type is intended to be handled by the user of the library it
-//  * provides a {@link code} string property to distinguish different errors.
-//  * @since 1.0.0
-//  */
-// export interface SaxError extends Error {
-//   name: "SaxError";
-//   /**
-//    * A string representing a specific error.
-//    * @see {@link SaxErrorCode}
-//    */
-//   code: SaxErrorCode;
-//   // TODO: add the offset character that originated the error?
-//   //  Tracking lines and columns is not possible with the current design but
-//   //  even basic UTF-16 offset tracking is more useful than not, right?
-//   offset: number;
-// }
-
-export interface SaxErrorOptions {
+/**
+ *
+ */
+export interface SaxErrorOptions extends ErrorOptions {
   /** @internal */
   offset?: number | undefined;
   encoding?: string | undefined;
   element?: string | undefined;
   attribute?: string | undefined;
   entity?: string | undefined;
-  cause?: unknown;
 }
 
 export class SaxError extends Error {
@@ -151,7 +131,10 @@ export class SaxError extends Error {
   entity?: string | undefined;
   constructor(code: SaxErrorCode, options: SaxErrorOptions = {}) {
     super(
-      !ERRORS.hasOwnProperty(code) ? undefined : ERRORS[code](options),
+      ERRORS.hasOwnProperty(code) ? ERRORS[code](options) : undefined,
+      // Only pass cause through, if any option names happen to overlap with
+      // any future ErrorOptions it might accidentally change behavior.
+      // Use in here because `cause` is allowed to be null or undefined.
       "cause" in options ? {cause: options.cause} : undefined,
     );
     this.code = code;
