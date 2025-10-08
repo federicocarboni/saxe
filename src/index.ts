@@ -1374,8 +1374,8 @@ export class SaxParser {
       this.skipWhiteSpace_();
       if (isNotation) {
         this.checkNCName_(this.readName_());
-      } else {
-        this.readNameCharacters_(0);
+      } else if (this.readNameCharacters_(0).length === 0) {
+        throw new SaxError("InvalidInternalSubset");
       }
       this.skipWhiteSpace_();
       const codeUnit = this.chunk_.charCodeAt(this.index_);
