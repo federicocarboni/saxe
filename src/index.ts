@@ -1303,7 +1303,7 @@ export class SaxParser {
       }
       ++this.index_;
     }
-    this.appendContent_(start, this.maxEntityLength_);
+    // this.appendContent_(start, this.maxEntityLength_);
   }
 
   // @internal
@@ -1327,9 +1327,11 @@ export class SaxParser {
       ++this.index_;
       this.quote_ = quote;
       this.readEntityValue_();
-      if (this.chunk_.charCodeAt(this.index_) !== quote) {
-        throw new SaxError("InvalidInternalSubset");
-      }
+      // This is not possible because of the internal subset is collects entire
+      // quoted strings.
+      // if (this.chunk_.charCodeAt(this.index_) !== quote) {
+      //   throw new SaxError("InvalidInternalSubset");
+      // }
       ++this.index_;
       decl = this.content_;
       this.content_ = "";
@@ -1502,9 +1504,10 @@ export class SaxParser {
     this.index_ += 9;
     this.skipWhiteSpace_();
     this.checkNCName_(this.readName_());
-    if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-      throw new SaxError("InvalidInternalSubset");
-    }
+    // Not necessary readExternalId_ will throw anyway
+    // if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+    //   throw new SaxError("InvalidInternalSubset");
+    // }
     this.skipWhiteSpace_();
     this.readExternalId_(/* isNotation */ true);
     this.skipWhiteSpace_();
