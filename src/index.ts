@@ -12,15 +12,13 @@ import {SaxError, SaxErrorCode, SaxErrorOptions} from "./error.ts";
 import {parseXmlDecl} from "./xml_decl.ts";
 
 export {SaxError, type SaxErrorCode} from "./error.ts";
-export {type AttributesNs, SaxParserNs, type SaxReaderNs} from "./namespace.ts";
 
 /**
- * XML Declaration (XMLDecl).
+ * XML declaration (XMLDecl).
  *
  * ```xml
  * <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
  * ```
- * @since 1.0.0
  */
 export interface XmlDeclaration {
   /**
@@ -39,7 +37,6 @@ export interface XmlDeclaration {
    *
    * [IANA Character Sets]:
    * https://www.iana.org/assignments/character-sets/character-sets.xhtml
-   * @since 1.0.0
    */
   encoding?: string | undefined;
   /**
@@ -63,18 +60,16 @@ export interface XmlDeclaration {
    *   declaration, or
    * - element types with element content, if white space occurs directly within
    *   any instance of those types.
-   * @since 1.0.0
    */
   standalone?: boolean | undefined;
 }
 
 /**
- * Document type declaration.
+ * Document type declaration (doctypedecl).
  *
  * ```xml
  * <!DOCTYPE example PUBLIC "-//Example//example doc" "http://example.org/example.dtd">
  * ```
- * @since 1.0.0
  */
 export interface Doctype {
   /**
@@ -107,10 +102,13 @@ export interface Doctype {
    */
   systemId?: string | undefined;
 }
+
 /**
  * An immutable view of the attributes of an XML tag.
  *
- * Attributes are iterable.
+ * Attributes are iterable and ordered as specified in the XML tag. Default
+ * attributes from internal declarations are positioned after explicitly
+ * specified attributes.
  */
 export interface Attributes {
   /** The number of attributes. */
@@ -127,6 +125,15 @@ export interface Attributes {
    * specified name is present.
    */
   has(name: string): boolean;
+  /**
+   * Executes `callbackfn` for each attribute.
+   * @param callbackfn -
+   * @param thisArg -
+   */
+  forEach(
+    callbackfn: (value: string, name: string, attributes: Attributes) => void,
+    thisArg?: unknown,
+  ): void;
   /** @returns - Returns an iterator over the names of the attributes. */
   keys(): IterableIterator<string>;
   /** @returns - Returns an iterator over the values of the attributes. */
@@ -137,6 +144,7 @@ export interface Attributes {
   entries(): IterableIterator<[string, string]>;
   [Symbol.iterator](): IterableIterator<[string, string]>;
 }
+
 /**
  * https://www.w3.org/TR/REC-xml/
  * @since 1.0.0
@@ -2619,5 +2627,367 @@ export class SaxParser {
       ++this.index_;
     }
     return this.index_ !== this.chunk_.length;
+  }
+}
+/** A qualified XML name for elements or attributes. */
+export interface QName {
+  /** Qualified name of the element or attribute. */
+  name: string;
+  /** Local part of the name. */
+  localName: string;
+  /** Prefix part of the name, if any. */
+  prefix?: string | undefined;
+  /** Namespace URI, if any. */
+  uri?: string | undefined;
+}
+/**
+ * A namespace-aware, immutable view of the attributes of an XML tag.
+ *
+ * @see {@linkcode Attributes}
+ */
+export interface AttributesNs {
+  /** The number of attributes. */
+  readonly size: number;
+  /**
+   * @param name - Local name of the attribute. Qualified names are not
+   * supported.
+   * @param uri - Namespace URI for attributes with a namespace.
+   * @returns - Returns the value of the attribute with the specified name and
+   * namespace. If there is no attribute with the specified name and namespace
+   * `undefined` is returned.
+   */
+  get(name: string, uri?: string | undefined): string | undefined;
+  /**
+   * @param name - Local name of the attribute.
+   * @param uri - Namespace URI for attributes with a namespace.
+   * @returns - Returns a boolean value indicating whether an attribute with the
+   * specified name and namespace is present.
+   */
+  has(name: string, uri?: string | undefined): boolean;
+  /**
+   * Executes `callbackfn` for each attribute.
+   * @param callbackfn -
+   * @param thisArg -
+   */
+  forEach(
+    callbackfn: (value: string, name: QName, attributes: AttributesNs) => void,
+    thisArg?: unknown,
+  ): void;
+  /** @returns - Returns an iterator over the names of the attributes. */
+  keys(): IterableIterator<QName>;
+  /** @returns - Returns an iterator over the values of the attributes. */
+  values(): IterableIterator<string>;
+  /**
+   * @returns - Returns an iterator over the names and values of the attributes.
+   */
+  entries(): IterableIterator<[QName, string]>;
+  [Symbol.iterator](): IterableIterator<[QName, string]>;
+}
+
+export interface SaxReaderNs
+  extends Omit<SaxReader, "start" | "empty" | "end">
+{
+  /**
+   * @param prefix - Prefix to look for. Can be set to `undefined` to lookup the
+   * default namespace.
+   * @returns - Returns the namespace URI associated with the specified prefix.
+   * Returns `undefined` if the prefix is not found.
+   */
+  lookupNamespace?(prefix: string | undefined): string | undefined;
+  /**
+   * Start tag.
+   *
+   * ```xml
+   * <element attr="value">
+   * ```
+   * @param name - Name of the element.
+   * @param attributes - Attributes of the tag. Only valid for the
+   * duration of this call, implementors should make a copy to persist
+   * attributes.
+   */
+  start(name: QName, attributes: AttributesNs): void;
+  /**
+   * An empty tag.
+   *
+   * ```xml
+   * <element attr="value" />
+   * ```
+   * @param name - Name of the element.
+   * @param attributes - Attributes of the tag. Only valid for the
+   * duration of this call, implementors should make a copy to persist
+   * attributes.
+   */
+  empty(name: QName, attributes: AttributesNs): void;
+  /**
+   * An end tag.
+   *
+   * ```xml
+   * </element>
+   * ```
+   * @param name - Name of the element.
+   */
+  end(name: QName): void;
+}
+
+// @internal
+interface AttributeNs extends QName {
+  value: string;
+}
+
+// @internal
+class AttributesNs_ implements AttributesNs {
+  // @internal
+  private map_ = new Map<string, AttributeNs>();
+  // @internal
+  clear_() {
+    this.map_.clear();
+  }
+  // @internal
+  add_(attribute: AttributeNs) {
+    const key = attribute.uri !== undefined
+      ? `${attribute.uri}:${attribute.localName}`
+      : attribute.localName;
+    this.map_.set(key, attribute);
+  }
+  iter_() {
+    return this.map_.values();
+  }
+  get size() {
+    return this.map_.size;
+  }
+  get(name: string, uri?: string | undefined): string | undefined {
+    // Name must be an NCName
+    if (name.indexOf(":") !== -1) {
+      return undefined;
+    }
+    return this.map_.get(uri != null ? `${uri}:${name}` : name)?.value;
+  }
+  has(name: string, uri?: string | undefined): boolean {
+    return this.get(name, uri) !== undefined;
+  }
+  forEach(
+    callbackfn: (value: string, name: QName, attributes: AttributesNs) => void,
+    thisArg: unknown = undefined,
+  ) {
+    for (const attribute of this.iter_()) {
+      callbackfn.call(thisArg, attribute.value, attribute, this);
+    }
+  }
+  keys(): IterableIterator<QName> {
+    return this.iter_();
+  }
+  *values(): Generator<string> {
+    for (const attribute of this.iter_()) {
+      yield attribute.value;
+    }
+  }
+  *entries(): Generator<[QName, string]> {
+    for (const attribute of this.iter_()) {
+      yield [attribute, attribute.value];
+    }
+  }
+  [Symbol.iterator]() {
+    return this.entries();
+  }
+}
+
+function checkQName(name: string) {
+  const colon = name.indexOf(":");
+  if (
+    colon !== -1 &&
+    (colon === 0 ||
+      colon === name.length - 1 ||
+      name.indexOf(":", colon + 1) !== -1)
+  ) {
+    throw new SaxError("INVALID_QNAME");
+  }
+}
+
+const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
+
+// @internal
+class NamespaceReader implements SaxReader {
+  // prefix name -> URI (the last is the most recent)
+  // @internal
+  private namespaces_ = new Map<string, string[]>([
+    ["xml", [XML_NAMESPACE]],
+    ["xmlns", [XMLNS_NAMESPACE]],
+  ]);
+  // Depth number -> prefix names
+  // @internal
+  private nsPrefixes_ = new Map<number, string[]>();
+  // @internal
+  private depth_ = 0;
+  // Reused across calls
+  // @internal
+  private attributes_ = new AttributesNs_();
+  // @internal
+  private reader_: SaxReaderNs;
+  constructor(reader: SaxReaderNs) {
+    this.reader_ = reader;
+    // @ts-expect-error -- exactOptionalPropertyTypes does not allow setting optional methods to undefined
+    this.processingInstruction = this.reader_.processingInstruction != null
+      ? this.processingInstruction
+      : undefined;
+    // @ts-expect-error -- exactOptionalPropertyTypes does not allow setting optional methods to undefined
+    this.comment = this.reader_.comment != null ? this.comment : undefined;
+    // @ts-expect-error -- exactOptionalPropertyTypes does not allow setting optional methods to undefined
+    this.entityRef = this.reader_.entityRef != null
+      ? this.entityRef
+      : undefined;
+  }
+  xml?(declaration: XmlDeclaration) {
+    return this.reader_.xml?.(declaration);
+  }
+  doctype?(doctype: Doctype) {
+    // doctype name must match QName syntactically but it is not resolved
+    // because it is not an element or attribute name
+    checkQName(doctype.name);
+    return this.reader_.doctype?.(doctype);
+  }
+  processingInstruction?(target: string, content: string) {
+    return this.reader_.processingInstruction!(target, content);
+  }
+  comment?(text: string) {
+    return this.reader_.comment!(text);
+  }
+  getGeneralEntity?(entityName: string) {
+    return this.reader_.getGeneralEntity?.(entityName);
+  }
+  entityRef?(entityName: string) {
+    return this.reader_.entityRef!(entityName);
+  }
+  // @internal
+  private parseQName_(name: string, isAttribute: boolean): QName {
+    const colon = name.indexOf(":");
+    if (
+      colon === 0 || colon === name.length - 1 ||
+      name.indexOf(":", colon + 1) !== -1
+    ) {
+      throw new SaxError("INVALID_QNAME");
+    }
+    const prefix = colon === -1 ? undefined : name.slice(0, colon);
+    if (!isAttribute && prefix === "xmlns") {
+      // xmlns must not appear as the prefix of element names
+      throw new SaxError("RESERVED_PREFIX", {element: name});
+    }
+    const localName = name.slice(colon + 1);
+    const uris = prefix === undefined && isAttribute
+      ? undefined
+      : this.namespaces_.get(prefix ?? "");
+    let uri = uris?.[uris.length - 1];
+    if (uri === undefined && (prefix !== undefined || !isAttribute)) {
+      uri = this.reader_.lookupNamespace?.(prefix);
+    }
+    if (prefix !== undefined && uri == null) {
+      throw new SaxError("UNDECLARED_PREFIX");
+    }
+    return {name, localName, prefix, uri};
+  }
+  // @internal
+  private handleAttributes_(attributes: Attributes): AttributesNs {
+    this.attributes_.clear_();
+    const prefixes = [];
+    // Collect namespaces first.
+    for (const [name, value] of attributes) {
+      if (
+        name !== "xmlns" && name.slice(0, 6) !== "xmlns:" ||
+        // Invalid prefixes will throw later.
+        name.indexOf(":", 6) !== -1
+      ) {
+        continue;
+      }
+      const prefix = name.slice(6);
+      if (prefix.slice(0, 3).toLowerCase() === "xml") {
+        // xmlns must not be declared, xml may be declared but must be bound to
+        // the same namespace.
+        if (prefix === "xmlns" || prefix === "xml" && value !== XML_NAMESPACE) {
+          throw new SaxError("RESERVED_PREFIX", {attribute: name});
+        }
+        // Attempting to set a prefix starting with XML (case-insensitive) is
+        // not allowed but they should not be used unless defined by other
+        // specifications.
+        continue;
+      }
+      // These namespaces are reserved and must not be bound to any other
+      // prefix.
+      if (value === XML_NAMESPACE || value === XMLNS_NAMESPACE) {
+        throw new SaxError("RESERVED_NAMESPACE", {attribute: name});
+      }
+      if (value === "") {
+        throw new SaxError("PREFIX_UNDECLARING", {attribute: name});
+      }
+      let ns = this.namespaces_.get(prefix);
+      if (ns === undefined) {
+        ns = [value];
+        this.namespaces_.set(prefix, ns);
+      }
+      prefixes.push(prefix);
+    }
+    if (prefixes.length !== 0) {
+      this.nsPrefixes_.set(this.depth_, prefixes);
+    }
+    for (const [name, value] of attributes) {
+      const attribute = Object.assign({value}, this.parseQName_(name, true));
+      this.attributes_.add_(attribute);
+    }
+    return this.attributes_;
+  }
+  // @internal
+  private popPrefixes_() {
+    const prefixes = this.nsPrefixes_.get(this.depth_);
+    this.nsPrefixes_.delete(this.depth_);
+    this.depth_--;
+    if (prefixes !== undefined) {
+      for (const prefix of prefixes) {
+        const uris = this.namespaces_.get(prefix)!;
+        uris.pop();
+        if (uris.length === 0) {
+          this.namespaces_.delete(prefix);
+        }
+      }
+    }
+  }
+  start(name: string, attributes: Attributes) {
+    this.depth_ += 1;
+    const attributesNs = this.handleAttributes_(attributes);
+    const qName = this.parseQName_(name, false);
+    this.reader_.start(qName, attributesNs);
+  }
+  empty(name: string, attributes: Attributes) {
+    this.depth_ += 1;
+    const attributesNs = this.handleAttributes_(attributes);
+    const qName = this.parseQName_(name, false);
+    this.reader_.empty(qName, attributesNs);
+    this.popPrefixes_();
+  }
+  end(name: string) {
+    this.reader_.end(this.parseQName_(name, false));
+    this.popPrefixes_();
+  }
+  text(text: string) {
+    return this.reader_.text(text);
+  }
+}
+
+export class SaxParserNs extends SaxParser {
+  constructor(
+    reader: SaxReaderNs,
+    options: SaxOptions | undefined = undefined,
+  ) {
+    super(new NamespaceReader(reader), options);
+  }
+  // @internal
+  protected override readName_(): string {
+    const name = super.readName_();
+    checkQName(name);
+    return name;
+  }
+  // @internal
+  protected override checkNCName_(name: string): void {
+    if (name.indexOf(":") !== -1) {
+      throw new SaxError("INVALID_NCNAME");
+    }
   }
 }
