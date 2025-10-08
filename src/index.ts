@@ -2865,7 +2865,10 @@ class NamespaceReader implements SaxReader {
       colon === 0 || colon === name.length - 1 ||
       name.indexOf(":", colon + 1) !== -1
     ) {
-      throw new SaxError("INVALID_QNAME");
+      throw new SaxError("INVALID_QNAME", {
+        attribute: isAttribute ? name : undefined,
+        element: isAttribute ? undefined : name,
+      });
     }
     const prefix = colon === -1 ? undefined : name.slice(0, colon);
     if (!isAttribute && prefix === "xmlns") {
@@ -2881,7 +2884,10 @@ class NamespaceReader implements SaxReader {
       uri = this.reader_.lookupNamespace?.(prefix);
     }
     if (prefix !== undefined && uri == null) {
-      throw new SaxError("UNDECLARED_PREFIX");
+      throw new SaxError("UNDECLARED_PREFIX", {
+        attribute: isAttribute ? name : undefined,
+        element: isAttribute ? undefined : name,
+      });
     }
     return {name, localName, prefix, uri};
   }
@@ -2920,9 +2926,10 @@ class NamespaceReader implements SaxReader {
       }
       let ns = this.namespaces_.get(prefix);
       if (ns === undefined) {
-        ns = [value];
+        ns = [];
         this.namespaces_.set(prefix, ns);
       }
+      ns.push(value);
       prefixes.push(prefix);
     }
     if (prefixes.length !== 0) {
