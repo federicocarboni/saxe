@@ -25,7 +25,7 @@ function testRecursive(data: string) {
     parser.end();
   })
     .to.throw()
-    .and.have.property("code", "RECURSIVE_ENTITY");
+    .and.have.property("name", "RecursiveEntity");
 }
 
 describe("Large files", function() {
@@ -43,7 +43,7 @@ describe("Large files", function() {
         },
       )
         .to.throw()
-        .and.have.property("code", "LIMIT_EXCEEDED");
+        .and.have.property("name", "LimitExceeded");
     });
   }
   it("recursive.xml", function() {

@@ -8,10 +8,10 @@ import {
   isNameStartChar,
   isWhiteSpace,
 } from "./chars.ts";
-import {SaxError, SaxErrorCode, SaxErrorOptions} from "./error.ts";
+import {SaxError} from "./error.ts";
 import {parseXmlDecl} from "./xml_decl.ts";
 
-export {SaxError, type SaxErrorCode} from "./error.ts";
+export {SaxError, type SaxErrorName} from "./error.ts";
 
 /**
  * XML declaration (XMLDecl).
@@ -315,7 +315,7 @@ export interface SaxOptions {
    * and external declarations are not read or processed.
    * - `"prohibit"` - throw an error if the document has any DTD, including
    * external DTDs, i.e. `<!DOCTYPE any>` immediately aborts parsing. Throws
-   * `INVALID_DOCTYPE_DECL`.
+   * `InvalidDoctypeDecl`.
    * - `"ignore"` - internal DTD is not processed but is still checked for
    * well-formedness, i.e. internal entity references are not expanded
    * automatically but a syntax error still throws. External DTD identifiers are
@@ -748,15 +748,10 @@ export class SaxParser {
       this.state_ !== State.MISC ||
       !(this.flags_ & Flags.SEEN_ROOT)
     ) {
-      throw this.error_("UNEXPECTED_EOF");
+      throw new SaxError("UnexpectedEof");
     }
   }
 
-  // @internal
-  private error_(code: SaxErrorCode, options: SaxErrorOptions = {}) {
-    options.offset = this.offset_ + this.index_;
-    return new SaxError(code, options);
-  }
   // Strings are assumed to be well-formed, meaning they do not contain any
   // lone surrogates code units.
   // @internal
@@ -920,7 +915,7 @@ export class SaxParser {
       const end = question === -1 ? this.chunk_.length : question + 2;
       const chunk = this.chunk_.slice(this.index_, end);
       if (this.element_.length + (end - this.index_) > 2000) {
-        throw new SaxError("LIMIT_EXCEEDED");
+        throw new SaxError("LimitExceeded");
       }
       this.element_ += chunk;
       this.index_ = end;
@@ -950,13 +945,13 @@ export class SaxParser {
       isWhiteSpace(this.element_.charCodeAt(6))
     ) {
       if (this.flags_ & Flags.PROHIBIT_DOCTYPE_DECL) {
-        throw this.error_("INVALID_DOCTYPE_DECL");
+        throw new SaxError("InvalidDoctypeDecl");
       }
       this.flags_ |= Flags.SEEN_DOCTYPE;
       this.state_ = State.DOCTYPE_DECL;
       this.element_ = "";
     } else if (this.element_.length === 7) {
-      throw this.error_("INVALID_CDATA");
+      throw new SaxError("InvalidCData");
     }
   }
 
@@ -967,7 +962,7 @@ export class SaxParser {
     }
     const char = this.nextCodePoint_();
     if (!isNameStartChar(char)) {
-      throw this.error_("INVALID_DOCTYPE_DECL");
+      throw new SaxError("InvalidDoctypeDecl");
     }
     this.element_ = String.fromCodePoint(char);
     this.state_ = State.DOCTYPE_NAME;
@@ -1019,7 +1014,7 @@ export class SaxParser {
     ++this.index_;
     const doctype = this.getNameAndExternalId_();
     if (doctype === undefined) {
-      throw this.error_("INVALID_DOCTYPE_DECL");
+      throw new SaxError("InvalidDoctypeDecl");
     }
     this.reader_.doctype?.(doctype);
     this.element_ = "";
@@ -1066,7 +1061,7 @@ export class SaxParser {
       this.state_ = State.EXTERNAL_ID_QUOTED_START;
       this.content_ = "";
     } else if (this.content_.length === 7) {
-      throw this.error_("INVALID_DOCTYPE_DECL");
+      throw new SaxError("InvalidDoctypeDecl");
     }
   }
 
@@ -1075,7 +1070,7 @@ export class SaxParser {
     this.attribute_ = this.content_;
     this.content_ = "";
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-      throw this.error_("INVALID_DOCTYPE_DECL");
+      throw new SaxError("InvalidDoctypeDecl");
     }
     ++this.index_;
     this.otherState_ = State.DOCTYPE_MAYBE_INTERNAL_SUBSET;
@@ -1090,7 +1085,7 @@ export class SaxParser {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     ++this.index_;
     if (codeUnit !== Chars.QUOTE && codeUnit !== Chars.APOSTROPHE) {
-      throw this.error_("INVALID_DOCTYPE_DECL");
+      throw new SaxError("InvalidDoctypeDecl");
     }
     this.state_ = State.EXTERNAL_ID_QUOTED;
     this.quote_ = codeUnit;
@@ -1107,7 +1102,7 @@ export class SaxParser {
       index === -1 ? undefined : index,
     );
     if (this.content_.length + chunk.length > this.maxNameLength_) {
-      throw this.error_("LIMIT_EXCEEDED");
+      throw new SaxError("LimitExceeded");
     }
     this.content_ += chunk;
     if (index === -1) {
@@ -1131,7 +1126,7 @@ export class SaxParser {
         this.state_ = State.INTERNAL_SUBSET;
       }
     } else {
-      throw this.error_("INVALID_DOCTYPE_DECL");
+      throw new SaxError("InvalidDoctypeDecl");
     }
   }
 
@@ -1152,7 +1147,7 @@ export class SaxParser {
           break loop;
         default:
           if (!isWhiteSpace(codeUnit)) {
-            throw this.error_("INVALID_DOCTYPE_DECL");
+            throw new SaxError("InvalidDoctypeDecl");
           }
       }
     }
@@ -1162,7 +1157,7 @@ export class SaxParser {
   private parseInternalSubsetPeRefStart_() {
     const codePoint = this.nextCodePoint_();
     if (!isNameStartChar(codePoint)) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     this.textLength_ = 0;
     this.state_ = State.INTERNAL_SUBSET_PE_REF;
@@ -1178,7 +1173,7 @@ export class SaxParser {
     this.checkNCName_(this.element_);
     this.element_ = "";
     if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     ++this.index_;
     this.state_ = State.INTERNAL_SUBSET;
@@ -1197,7 +1192,7 @@ export class SaxParser {
       this.otherState_ = State.INTERNAL_SUBSET;
       this.state_ = State.PI_TARGET_START;
     } else {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
   }
 
@@ -1216,7 +1211,7 @@ export class SaxParser {
   // @internal
   protected readName_() {
     if (!isNameStartChar(this.chunk_.codePointAt(this.index_)!)) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     return this.readNameCharacters_(0);
   }
@@ -1250,13 +1245,13 @@ export class SaxParser {
       } else {
         this.flags_ &= ~Flags.EXTERNAL_ID_SYSTEM;
         if (!isNotation) {
-          throw this.error_("INVALID_INTERNAL_SUBSET");
+          throw new SaxError("InvalidInternalSubset");
         }
       }
     }
     this.state_ = State.INTERNAL_SUBSET;
     if (this.getNameAndExternalId_() === undefined) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
   }
 
@@ -1294,16 +1289,16 @@ export class SaxParser {
             // Entities must not be expanded but must parse correctly.
             this.checkNCName_(this.readName_());
             if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
-              throw this.error_("INVALID_INTERNAL_SUBSET");
+              throw new SaxError("InvalidInternalSubset");
             }
           }
           break;
         case Chars.PERCENT:
-          throw this.error_("INVALID_INTERNAL_SUBSET");
+          throw new SaxError("InvalidInternalSubset");
         default:
           // Other characters still need to be validated:
           if (codeUnit < 0x20 || codeUnit > 0xfffd) {
-            throw this.error_("INVALID_CHAR");
+            throw new SaxError("InvalidChar");
           }
       }
       ++this.index_;
@@ -1323,7 +1318,7 @@ export class SaxParser {
     const entityName = this.readName_();
     this.checkNCName_(entityName);
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     this.skipWhiteSpace_();
     let decl: string | EntityDecl;
@@ -1333,7 +1328,7 @@ export class SaxParser {
       this.quote_ = quote;
       this.readEntityValue_();
       if (this.chunk_.charCodeAt(this.index_) !== quote) {
-        throw this.error_("INVALID_INTERNAL_SUBSET");
+        throw new SaxError("InvalidInternalSubset");
       }
       ++this.index_;
       decl = this.content_;
@@ -1357,7 +1352,7 @@ export class SaxParser {
     }
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     if (
       !(this.flags_ & Flags.IGNORE_INT_SUBSET_DECL) &&
@@ -1372,7 +1367,7 @@ export class SaxParser {
   private readNotationOrEnumeration_(isNotation: boolean) {
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     ++this.index_;
     while (true) {
@@ -1382,7 +1377,7 @@ export class SaxParser {
         (isNotation && !isNameStartChar(codePoint)) ||
         !isNameChar(codePoint)
       ) {
-        throw this.error_("INVALID_INTERNAL_SUBSET");
+        throw new SaxError("InvalidInternalSubset");
       }
       this.readNameCharacters_(0);
       this.skipWhiteSpace_();
@@ -1391,7 +1386,7 @@ export class SaxParser {
       if (codeUnit === Chars.CLOSE_PAREN) {
         break;
       } else if (codeUnit !== Chars.VERTICAL_BAR) {
-        throw this.error_("INVALID_INTERNAL_SUBSET");
+        throw new SaxError("InvalidInternalSubset");
       }
     }
   }
@@ -1409,7 +1404,7 @@ export class SaxParser {
     while (true) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       if (!isWhiteSpace(codeUnit) && codeUnit !== Chars.GT) {
-        throw this.error_("INVALID_INTERNAL_SUBSET");
+        throw new SaxError("InvalidInternalSubset");
       }
       this.skipWhiteSpace_();
       if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
@@ -1417,7 +1412,7 @@ export class SaxParser {
       }
       const attribute = this.readName_();
       if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-        throw this.error_("INVALID_INTERNAL_SUBSET");
+        throw new SaxError("InvalidInternalSubset");
       }
       this.skipWhiteSpace_();
       let isTokenized = true;
@@ -1435,13 +1430,13 @@ export class SaxParser {
         } else if (attType === "NOTATION") {
           this.readNotationOrEnumeration_(/* isNotation */ true);
         } else if (ATT_TYPES.indexOf(attType) === -1) {
-          throw this.error_("INVALID_INTERNAL_SUBSET");
+          throw new SaxError("InvalidInternalSubset");
         }
       } else {
         this.readNotationOrEnumeration_(/* isNotation */ false);
       }
       if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-        throw this.error_("INVALID_INTERNAL_SUBSET");
+        throw new SaxError("InvalidInternalSubset");
       }
       this.skipWhiteSpace_();
       let hasDefault = true;
@@ -1457,7 +1452,7 @@ export class SaxParser {
         }
         const defaultDecl = this.chunk_.slice(start, this.index_);
         if (["#REQUIRED", "#IMPLIED", "#FIXED"].indexOf(defaultDecl) === -1) {
-          throw this.error_("INVALID_INTERNAL_SUBSET");
+          throw new SaxError("InvalidInternalSubset");
         }
         if (defaultDecl !== "#FIXED") {
           hasDefault = false;
@@ -1486,7 +1481,7 @@ export class SaxParser {
           defaultValue = this.content_;
           this.content_ = "";
         } else {
-          throw this.error_("INVALID_INTERNAL_SUBSET");
+          throw new SaxError("InvalidInternalSubset");
         }
         if (isTokenized) {
           defaultValue = normalizeAttributeValue(defaultValue);
@@ -1511,13 +1506,13 @@ export class SaxParser {
     this.skipWhiteSpace_();
     this.checkNCName_(this.readName_());
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     this.skipWhiteSpace_();
     this.readExternalId_(/* isNotation */ true);
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
   }
 
@@ -1575,7 +1570,7 @@ export class SaxParser {
     this.skipWhiteSpace_();
     this.readName_();
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) === Chars.OPEN_PAREN) {
@@ -1592,7 +1587,7 @@ export class SaxParser {
             break;
           }
           if (codeUnit !== Chars.VERTICAL_BAR) {
-            throw this.error_("INVALID_INTERNAL_SUBSET");
+            throw new SaxError("InvalidInternalSubset");
           }
           this.skipWhiteSpace_();
           this.readName_();
@@ -1612,7 +1607,7 @@ export class SaxParser {
       this.skipWhiteSpace_();
     }
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
   }
 
@@ -1644,7 +1639,7 @@ export class SaxParser {
     ) {
       this.readElementDecl_();
     } else {
-      throw this.error_("INVALID_INTERNAL_SUBSET");
+      throw new SaxError("InvalidInternalSubset");
     }
     this.index_ = index;
     this.chunk_ = chunk;
@@ -1696,7 +1691,7 @@ export class SaxParser {
       return;
     }
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
-      throw this.error_("INVALID_DOCTYPE_DECL");
+      throw new SaxError("InvalidDoctypeDecl");
     }
     ++this.index_;
     this.state_ = State.MISC;
@@ -1712,7 +1707,7 @@ export class SaxParser {
       this.state_ = State.OPEN_ANGLE_BRACKET;
       this.otherState_ = State.MISC;
     } else {
-      throw this.error_("INVALID_CDATA");
+      throw new SaxError("InvalidCData");
     }
   }
 
@@ -1724,7 +1719,7 @@ export class SaxParser {
       this.state_ = State.PI_TARGET;
       this.element_ = String.fromCodePoint(codePoint);
     } else {
-      throw this.error_("INVALID_PI");
+      throw new SaxError("InvalidPI");
     }
   }
 
@@ -1735,7 +1730,7 @@ export class SaxParser {
       // Name read to completion
       this.checkNCName_(this.element_);
       if (this.element_.length === 3 && this.element_.toLowerCase() === "xml") {
-        throw this.error_("RESERVED_PI");
+        throw new SaxError("ReservedPI");
       }
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
@@ -1744,7 +1739,7 @@ export class SaxParser {
       } else if (codeUnit === Chars.QUESTION) {
         this.state_ = State.PI_END;
       } else {
-        throw this.error_("INVALID_PI");
+        throw new SaxError("InvalidPI");
       }
     }
   }
@@ -1777,12 +1772,12 @@ export class SaxParser {
       index === -1 ? undefined : index,
     );
     if (hasInvalidChar(content)) {
-      throw this.error_("INVALID_CHAR");
+      throw new SaxError("InvalidChar");
     }
     if (this.flags_ & Flags.CAPTURE_PI) {
       const actualContent = normalizeLineEndings(content);
       if (this.content_.length + actualContent.length > this.maxTextLength_) {
-        throw this.error_("LIMIT_EXCEEDED");
+        throw new SaxError("LimitExceeded");
       }
       this.content_ += actualContent;
     }
@@ -1815,14 +1810,14 @@ export class SaxParser {
       ++this.index_;
       this.piEnd_();
     } else {
-      throw this.error_("INVALID_PI");
+      throw new SaxError("InvalidPI");
     }
   }
 
   // @internal
   private parseCommentStart_() {
     if (this.chunk_.charCodeAt(this.index_) !== Chars.HYPHEN) {
-      throw this.error_("INVALID_CDATA");
+      throw new SaxError("InvalidCData");
     }
     ++this.index_;
     this.state_ = State.COMMENT;
@@ -1837,12 +1832,12 @@ export class SaxParser {
       index === -1 ? undefined : index,
     );
     if (hasInvalidChar(content)) {
-      throw this.error_("INVALID_CHAR");
+      throw new SaxError("InvalidChar");
     }
     if (this.flags_ & Flags.CAPTURE_COMMENT) {
       const actualContent = normalizeLineEndings(content);
       if (this.content_.length + actualContent.length > this.maxTextLength_) {
-        throw this.error_("LIMIT_EXCEEDED");
+        throw new SaxError("LimitExceeded");
       }
       this.content_ += actualContent;
     }
@@ -1887,7 +1882,7 @@ export class SaxParser {
       this.state_ = this.otherState_;
       this.otherState_ = 0;
     } else {
-      throw this.error_("INVALID_COMMENT");
+      throw new SaxError("InvalidComment");
     }
   }
 
@@ -1902,7 +1897,7 @@ export class SaxParser {
         this.entityStack_.length === 0 &&
         this.flags_ & Flags.SEEN_ROOT
       ) {
-        throw this.error_("INVALID_START_TAG");
+        throw new SaxError("InvalidStartTag");
       }
       this.flags_ |= Flags.SEEN_ROOT;
       this.state_ = State.START_TAG_NAME;
@@ -1913,7 +1908,7 @@ export class SaxParser {
     } else if (codePoint === Chars.QUESTION) {
       this.state_ = State.PI_TARGET_START;
     } else {
-      throw this.error_("INVALID_START_TAG");
+      throw new SaxError("InvalidStartTag");
     }
   }
 
@@ -1930,11 +1925,11 @@ export class SaxParser {
       this.state_ = State.CDATA_SECTION_START;
     } else if (codeUnit === 0x44 /* D */) {
       if (this.flags_ & Flags.SEEN_DOCTYPE || this.flags_ & Flags.SEEN_ROOT) {
-        throw this.error_("INVALID_DOCTYPE_DECL");
+        throw new SaxError("InvalidDoctypeDecl");
       }
       this.state_ = State.DOCTYPE_DECL_START;
     } else {
-      throw this.error_("INVALID_CDATA");
+      throw new SaxError("InvalidCData");
     }
   }
 
@@ -1947,7 +1942,7 @@ export class SaxParser {
     for (const [attribute, {default_}] of attlist) {
       if (default_ !== undefined && !this.attributes_.has(attribute)) {
         if (this.attributes_.size >= this.maxAttributes_) {
-          throw this.error_("LIMIT_EXCEEDED");
+          throw new SaxError("LimitExceeded");
         }
         this.attributes_.set(attribute, default_);
       }
@@ -1978,7 +1973,7 @@ export class SaxParser {
       } else if (codeUnit === Chars.SLASH) {
         this.state_ = State.EMPTY_TAG;
       } else {
-        throw this.error_("INVALID_START_TAG");
+        throw new SaxError("InvalidStartTag");
       }
     }
   }
@@ -1997,7 +1992,7 @@ export class SaxParser {
     } else if (codePoint === Chars.SLASH) {
       this.state_ = State.EMPTY_TAG;
     } else {
-      throw this.error_("INVALID_START_TAG");
+      throw new SaxError("InvalidStartTag");
     }
   }
 
@@ -2013,7 +2008,7 @@ export class SaxParser {
     } else if (codeUnit === Chars.SLASH) {
       this.state_ = State.EMPTY_TAG;
     } else {
-      throw this.error_("INVALID_START_TAG");
+      throw new SaxError("InvalidStartTag");
     }
   }
 
@@ -2029,7 +2024,7 @@ export class SaxParser {
       } else if (isWhiteSpace(codeUnit)) {
         this.state_ = State.START_TAG_ATTR_EQ;
       } else {
-        throw this.error_("INVALID_START_TAG");
+        throw new SaxError("InvalidStartTag");
       }
     }
   }
@@ -2043,7 +2038,7 @@ export class SaxParser {
       ++this.index_;
       this.state_ = State.START_TAG_ATTR_VALUE;
     } else {
-      throw this.error_("INVALID_START_TAG");
+      throw new SaxError("InvalidStartTag");
     }
   }
 
@@ -2061,7 +2056,7 @@ export class SaxParser {
         this.state_ = State.START_TAG_ATTR_VALUE_QUOTED;
         break;
       default:
-        throw this.error_("INVALID_START_TAG");
+        throw new SaxError("InvalidStartTag");
     }
   }
 
@@ -2097,7 +2092,7 @@ export class SaxParser {
           ++this.index_;
           this.state_ = State.START_TAG_SPACE;
           if (this.attributes_.has(this.attribute_)) {
-            throw this.error_("ATTRIBUTE_REDEFINED", {
+            throw new SaxError("AttributeRedefined", {
               attribute: this.attribute_,
             });
           }
@@ -2109,7 +2104,7 @@ export class SaxParser {
             ? normalizeAttributeValue(this.content_)
             : this.content_;
           if (this.attributes_.size >= this.maxAttributes_) {
-            throw this.error_("LIMIT_EXCEEDED");
+            throw new SaxError("LimitExceeded");
           }
           this.attributes_.set(this.attribute_, value);
           this.attribute_ = "";
@@ -2118,11 +2113,11 @@ export class SaxParser {
         }
         case Chars.LT:
           // < is not allowed inside attribute values
-          throw this.error_("LT_IN_ATTRIBUTE");
+          throw new SaxError("InvalidAttributeValue");
         default:
           // Other characters still need to be validated:
           if (codeUnit < 0x20 || codeUnit > 0xfffd) {
-            throw this.error_("INVALID_CHAR");
+            throw new SaxError("InvalidChar");
           }
       }
       ++this.index_;
@@ -2146,7 +2141,7 @@ export class SaxParser {
       this.element_ = "";
       this.attributes_.clear();
     } else {
-      throw this.error_("INVALID_START_TAG");
+      throw new SaxError("InvalidStartTag");
     }
   }
 
@@ -2155,7 +2150,7 @@ export class SaxParser {
     const chunk = this.chunk_.slice(start, this.index_);
     this.textLength_ += chunk.length;
     if (this.textLength_ >= this.maxTextLength_) {
-      throw this.error_("LIMIT_EXCEEDED");
+      throw new SaxError("LimitExceeded");
     }
     this.content_ += chunk;
   }
@@ -2204,13 +2199,13 @@ export class SaxParser {
           // Catch ]]>, this.otherState_ just stores the number of consecutive
           // brackets found.
           if (this.otherState_ > 1) {
-            throw this.error_("INVALID_CDEND");
+            throw new SaxError("InvalidCDEnd");
           }
           break;
         default:
           // Other characters still need to be validated:
           if (codeUnit < 0x20 || codeUnit > 0xfffd) {
-            throw this.error_("INVALID_CHAR");
+            throw new SaxError("InvalidChar");
           }
       }
       if (codeUnit === Chars.CLOSE_BRACKET) {
@@ -2243,7 +2238,7 @@ export class SaxParser {
     } else if (codePoint === Chars.HASH) {
       this.state_ = State.CHAR_REF;
     } else {
-      throw this.error_("INVALID_ENTITY_REF");
+      throw new SaxError("InvalidEntityRef");
     }
   }
   // @internal
@@ -2254,7 +2249,7 @@ export class SaxParser {
     }
     this.checkNCName_(this.entity_);
     if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
-      throw this.error_("INVALID_ENTITY_REF");
+      throw new SaxError("InvalidEntityRef");
     }
     ++this.index_;
     if (PREDEFINED_ENTITIES.hasOwnProperty(this.entity_)) {
@@ -2263,7 +2258,7 @@ export class SaxParser {
     } else {
       // WFC: No Recursion
       if (this.entityStack_.indexOf(this.entity_) !== -1) {
-        throw this.error_("RECURSIVE_ENTITY", {
+        throw new SaxError("RecursiveEntity", {
           entity: this.entity_,
         });
       }
@@ -2274,7 +2269,7 @@ export class SaxParser {
       // Unparsed entities cannot be referenced anywhere.
       // WFC: Parsed Entity
       if (entityValue === EntityDecl.UNPARSED) {
-        throw this.error_("UNPARSED_ENTITY", {entity: this.entity_});
+        throw new SaxError("UnparsedEntity", {entity: this.entity_});
       }
       // Attribute values
       // WFC: No External Entity References
@@ -2282,7 +2277,7 @@ export class SaxParser {
         this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED &&
         entityValue === EntityDecl.EXTERNAL
       ) {
-        throw this.error_("EXTERNAL_ENTITY", {entity: this.entity_});
+        throw new SaxError("ExternalEntity", {entity: this.entity_});
       }
       // Allow the application to set a default value for an entity not
       // declared in internal markup declarations.
@@ -2306,7 +2301,7 @@ export class SaxParser {
           // error
           this.reader_.entityRef == null
         ) {
-          throw this.error_("UNDECLARED_ENTITY", {
+          throw new SaxError("UndeclaredEntity", {
             entity: this.entity_,
           });
         }
@@ -2318,7 +2313,7 @@ export class SaxParser {
           this.entityLength_ > this.maxEntityLength_ ||
           this.entityStack_.length >= this.maxEntityDepth_
         ) {
-          throw this.error_("LIMIT_EXCEEDED");
+          throw new SaxError("LimitExceeded");
         }
         this.entityStack_.push(this.entity_);
         const index = this.index_;
@@ -2348,7 +2343,7 @@ export class SaxParser {
         // }
         // Entity value must match content production
         if (this.elements_.length !== 0 || this.state_ !== otherState) {
-          throw this.error_("UNEXPECTED_EOF");
+          throw new SaxError("UnexpectedEof");
         }
 
         this.entityStack_.pop();
@@ -2384,7 +2379,7 @@ export class SaxParser {
     // TODO: 0 is not allowed so both explicit zero &#0; and zero size number
     //  &#; end up throwing here, but there's no way to know which one it is now
     if (!isChar(this.charRef_)) {
-      throw this.error_("INVALID_CHAR_REF");
+      throw new SaxError("InvalidCharRef");
     }
     this.content_ += String.fromCodePoint(this.charRef_);
     this.charRef_ = 0;
@@ -2402,7 +2397,7 @@ export class SaxParser {
       }
       const digit = (codeUnit - 0x30) >>> 0;
       if (digit > 9) {
-        throw this.error_("INVALID_CHAR_REF");
+        throw new SaxError("InvalidCharRef");
       }
       this.charRef_ = this.charRef_ * 10 + digit;
       ++this.index_;
@@ -2421,7 +2416,7 @@ export class SaxParser {
       if (digit > 9) {
         digit = ((codeUnit | 0x20) - 0x57) >>> 0;
         if (digit < 10 || digit > 15) {
-          throw this.error_("INVALID_CHAR_REF");
+          throw new SaxError("InvalidCharRef");
         }
       }
       this.charRef_ = this.charRef_ * 16 + digit;
@@ -2438,7 +2433,7 @@ export class SaxParser {
       this.state_ = State.CDATA_SECTION;
       this.element_ = "";
     } else if (this.element_.length === 6) {
-      throw this.error_("INVALID_CDATA");
+      throw new SaxError("InvalidCData");
     }
   }
 
@@ -2451,12 +2446,12 @@ export class SaxParser {
       index === -1 ? undefined : index,
     );
     if (hasInvalidChar(content)) {
-      throw this.error_("INVALID_CHAR");
+      throw new SaxError("InvalidChar");
     }
     const chunk = normalizeLineEndings(content);
     this.textLength_ += chunk.length;
     if (this.textLength_ >= this.maxTextLength_) {
-      throw this.error_("LIMIT_EXCEEDED");
+      throw new SaxError("LimitExceeded");
     }
     this.content_ += chunk;
     if (index === -1) {
@@ -2506,7 +2501,7 @@ export class SaxParser {
       ++this.index_;
       this.textLength_ += 1;
       if (this.textLength_ > this.maxTextLength_) {
-        throw this.error_("LIMIT_EXCEEDED");
+        throw new SaxError("LimitExceeded");
       }
       this.content_ += "]";
     } else {
@@ -2524,7 +2519,7 @@ export class SaxParser {
       this.element_ = String.fromCodePoint(codePoint);
       this.parseEndTag_();
     } else {
-      throw this.error_("INVALID_END_TAG");
+      throw new SaxError("InvalidEndTag");
     }
   }
 
@@ -2544,10 +2539,10 @@ export class SaxParser {
     }
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit !== Chars.GT) {
-      throw this.error_("INVALID_END_TAG");
+      throw new SaxError("InvalidEndTag");
     }
     if (this.elements_.pop() !== this.element_) {
-      throw this.error_("TAG_NAME_MISMATCH", {
+      throw new SaxError("TagNameMismatch", {
         element: this.element_,
       });
     }
@@ -2566,7 +2561,7 @@ export class SaxParser {
   private appendContent_(start: number, limit: number) {
     const chunk = this.chunk_.slice(start, this.index_);
     if (this.content_.length + chunk.length > limit) {
-      throw this.error_("LIMIT_EXCEEDED");
+      throw new SaxError("LimitExceeded");
     }
     this.content_ += chunk;
   }
@@ -2613,7 +2608,7 @@ export class SaxParser {
     }
     const name = this.chunk_.slice(start, this.index_);
     if (length + name.length > this.maxNameLength_) {
-      throw this.error_("LIMIT_EXCEEDED");
+      throw new SaxError("LimitExceeded");
     }
     return name;
   }
@@ -2799,7 +2794,7 @@ function checkQName(name: string) {
       colon === name.length - 1 ||
       name.indexOf(":", colon + 1) !== -1)
   ) {
-    throw new SaxError("INVALID_QNAME");
+    throw new SaxError("InvalidQName");
   }
 }
 
@@ -2865,7 +2860,7 @@ class NamespaceReader implements SaxReader {
       colon === 0 || colon === name.length - 1 ||
       name.indexOf(":", colon + 1) !== -1
     ) {
-      throw new SaxError("INVALID_QNAME", {
+      throw new SaxError("InvalidQName", {
         attribute: isAttribute ? name : undefined,
         element: isAttribute ? undefined : name,
       });
@@ -2873,7 +2868,7 @@ class NamespaceReader implements SaxReader {
     const prefix = colon === -1 ? undefined : name.slice(0, colon);
     if (!isAttribute && prefix === "xmlns") {
       // xmlns must not appear as the prefix of element names
-      throw new SaxError("RESERVED_PREFIX", {element: name});
+      throw new SaxError("ReservedPrefix", {element: name});
     }
     const localName = name.slice(colon + 1);
     const uris = prefix === undefined && isAttribute
@@ -2884,7 +2879,7 @@ class NamespaceReader implements SaxReader {
       uri = this.reader_.lookupNamespace?.(prefix);
     }
     if (prefix !== undefined && uri == null) {
-      throw new SaxError("UNDECLARED_PREFIX", {
+      throw new SaxError("UndeclaredPrefix", {
         attribute: isAttribute ? name : undefined,
         element: isAttribute ? undefined : name,
       });
@@ -2909,7 +2904,7 @@ class NamespaceReader implements SaxReader {
         // xmlns must not be declared, xml may be declared but must be bound to
         // the same namespace.
         if (prefix === "xmlns" || prefix === "xml" && value !== XML_NAMESPACE) {
-          throw new SaxError("RESERVED_PREFIX", {attribute: name});
+          throw new SaxError("ReservedPrefix", {attribute: name});
         }
         // Attempting to set a prefix starting with XML (case-insensitive) is
         // not allowed but they should not be used unless defined by other
@@ -2919,10 +2914,10 @@ class NamespaceReader implements SaxReader {
       // These namespaces are reserved and must not be bound to any other
       // prefix.
       if (value === XML_NAMESPACE || value === XMLNS_NAMESPACE) {
-        throw new SaxError("RESERVED_NAMESPACE", {attribute: name});
+        throw new SaxError("ReservedNamespace", {attribute: name});
       }
       if (value === "") {
-        throw new SaxError("PREFIX_UNDECLARING", {attribute: name});
+        throw new SaxError("PrefixUndeclaring", {attribute: name});
       }
       let ns = this.namespaces_.get(prefix);
       if (ns === undefined) {
@@ -2994,7 +2989,7 @@ export class SaxParserNs extends SaxParser {
   // @internal
   protected override checkNCName_(name: string): void {
     if (name.indexOf(":") !== -1) {
-      throw new SaxError("INVALID_NCNAME");
+      throw new SaxError("InvalidNCName");
     }
   }
 }

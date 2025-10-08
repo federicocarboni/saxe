@@ -61,10 +61,10 @@ describe("general entity reference", function() {
   });
   it("not-wf: undeclared general entity reference in attribute value", function() {
     expect(() => getEntity({}, '<root value="&entity;"></root>'))
-      .to.throw().and.have.property("code", "UNDECLARED_ENTITY");
+      .to.throw().and.have.property("name", "UndeclaredEntity");
   });
   it("not-wf: general entity reference starting with invalid character", function() {
     expect(() => getEntity({}, '<root value="&.entity;"></root>'))
-      .to.throw().and.have.property("code", "INVALID_ENTITY_REF");
+      .to.throw().and.have.property("name", "InvalidEntityRef");
   });
 });

@@ -49,18 +49,18 @@ describe("comment", function() {
   });
   it("not-wf: comment with invalid start", function() {
     expect(() => getComment("<!-Hello--><root/>"))
-      .to.throw().and.have.property("code", "INVALID_CDATA");
+      .to.throw().and.have.property("name", "InvalidCData");
   });
   it("not-wf: comment with invalid character", function() {
     expect(() => getComment("<!--\uFFFF--><root/>"))
-      .to.throw().and.have.property("code", "INVALID_CHAR");
+      .to.throw().and.have.property("name", "InvalidChar");
   });
   it("not-wf: comment with '--'", function() {
     expect(() => getComment("<!-- comment -- comment --><root/>"))
-      .to.throw().and.have.property("code", "INVALID_COMMENT");
+      .to.throw().and.have.property("name", "InvalidComment");
   });
   it("not-wf: comment with '--' split across multiple chunks", function() {
     expect(() => getComment("<!-- comment -", "-", " comment --><root/>"))
-      .to.throw().and.have.property("code", "INVALID_COMMENT");
+      .to.throw().and.have.property("name", "InvalidComment");
   });
 });

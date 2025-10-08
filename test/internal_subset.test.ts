@@ -64,7 +64,7 @@ describe("Entity Declaration", function() {
           '<!ENTITY foo "&amp;">' +
           "]><doc>&foo;</doc>",
       )
-    ).to.throw().and.have.property("code", "UNDECLARED_ENTITY");
+    ).to.throw().and.have.property("name", "UndeclaredEntity");
   });
   it("wf: entity declaration is recognized after parameter entity reference when standalone='yes'", function() {
     expect(
@@ -78,21 +78,21 @@ describe("Entity Declaration", function() {
       toCanonical(
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent">]><doc attribute="&foo;"></doc>',
       )
-    ).to.throw().and.have.property("code", "EXTERNAL_ENTITY");
+    ).to.throw().and.have.property("name", "ExternalEntity");
   });
   it("not-wf: unparsed entity reference in attribute", function() {
     expect(() =>
       toCanonical(
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc attribute="&foo;"></doc>',
       )
-    ).to.throw().and.have.property("code", "UNPARSED_ENTITY");
+    ).to.throw().and.have.property("name", "UnparsedEntity");
   });
   it("not-wf: unparsed entity reference in content", function() {
     expect(() =>
       toCanonical(
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc>&foo;</doc>',
       )
-    ).to.throw().and.have.property("code", "UNPARSED_ENTITY");
+    ).to.throw().and.have.property("name", "UnparsedEntity");
   });
 });
 

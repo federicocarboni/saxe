@@ -88,31 +88,31 @@ describe("doctypedecl", function() {
   });
   it("not-wf: doctypedecl with no name", function() {
     expect(() => getDoctypeDecl("<!DOCTYPE  >"))
-      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with invalid start", function() {
     expect(() => getDoctypeDecl("<!DOCTYP doctypName >"))
-      .to.throw().and.have.property("code", "INVALID_CDATA");
+      .to.throw().and.have.property("name", "InvalidCData");
   });
   it("not-wf: more than one doctypedecl", function() {
     expect(() =>
       getDoctypeDecl("<!DOCTYPE doctypeName ><!DOCTYPE doctypeName >")
     )
-      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl after root element", function() {
     expect(() => getDoctypeDecl("<root/><!DOCTYPE doctypeName >"))
-      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with unquoted ExternalID", function() {
     expect(() => getDoctypeDecl("<!DOCTYPE doctypeName PUBLIC pubid><root/>"))
-      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with no space after Pubid", function() {
     expect(() =>
       getDoctypeDecl('<!DOCTYPE doctypeName PUBLIC "pubid""system"><root/>')
     )
-      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with invalid PubidChar", function() {
     expect(() =>
@@ -120,12 +120,12 @@ describe("doctypedecl", function() {
         '<!DOCTYPE doctypeName PUBLIC "{{pubid}}" "system"><root/>',
       )
     )
-      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with malformed ExternalID", function() {
     expect(() =>
       getDoctypeDecl('<!DOCTYPE doctypeName PUBLIK "pubid" "system"><root/>')
     )
-      .to.throw().and.have.property("code", "INVALID_DOCTYPE_DECL");
+      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
   });
 });

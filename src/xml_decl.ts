@@ -6,7 +6,7 @@ const XML_DECL_REGEX =
 export function parseXmlDecl(input: string) {
   const matches = input.match(XML_DECL_REGEX);
   if (matches == null) {
-    throw new SaxError("INVALID_XML_DECL");
+    throw new SaxError("InvalidXMLDecl");
   }
   const version = matches[2]!;
   const encoding = matches[4];

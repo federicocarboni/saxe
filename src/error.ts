@@ -3,57 +3,58 @@
 /// <reference lib="ES2022.Error" />
 
 const ERRORS = {
-  LIMIT_EXCEEDED: () => "Limit exceeded",
+  LimitExceeded: () => "Limit exceeded",
 
   // Encoding errors
-  ENCODING_NOT_SUPPORTED: ({encoding}: SaxErrorOptions) =>
-    `Encoding '${encoding}' is not supported`,
-  ENCODING_INVALID_DATA: ({encoding}: SaxErrorOptions) =>
-    `Data is not valid for encoding '${encoding}'`,
+  // TODO: encoding support?
+  // EncodingNotSupported: ({encoding}: SaxErrorOptions) =>
+  //   `Encoding '${encoding}' is not supported`,
+  // EncodingInvalidData: ({encoding}: SaxErrorOptions) =>
+  //   `Data is not valid for encoding '${encoding}'`,
 
   // XMLDecl
-  INVALID_XML_DECL: () => "XML declaration is not well-formed",
+  InvalidXMLDecl: () => "XML declaration is not well-formed",
   // doctypedecl
-  INVALID_DOCTYPE_DECL: () => "DOCTYPE declaration is not well-formed",
+  InvalidDoctypeDecl: () => "DOCTYPE declaration is not well-formed",
   // All well-formed-ness errors in the internal subset are grouped here
-  INVALID_INTERNAL_SUBSET: () => "Internal subset is not well-formed",
+  InvalidInternalSubset: () => "Internal subset is not well-formed",
 
-  INVALID_COMMENT: () => "Comment contains '--'",
-  INVALID_PI: () => "Processing instruction is not well-formed",
-  RESERVED_PI: () => "Processing instruction target 'XML' is reserved",
+  InvalidComment: () => "Comment contains '--'",
+  InvalidPI: () => "Processing instruction is not well-formed",
+  ReservedPI: () => "Processing instruction target 'XML' is reserved",
   // Entities
-  INVALID_ENTITY_REF: () => "Entity reference is not well-formed",
-  RECURSIVE_ENTITY: ({entity}: SaxErrorOptions) =>
+  InvalidEntityRef: () => "Entity reference is not well-formed",
+  RecursiveEntity: ({entity}: SaxErrorOptions) =>
     `Entity '${entity}' directly or indirectly references itself`,
-  UNDECLARED_ENTITY: ({entity}: SaxErrorOptions) =>
+  UndeclaredEntity: ({entity}: SaxErrorOptions) =>
     `Entity '${entity}' is not declared`,
-  UNPARSED_ENTITY: ({entity}: SaxErrorOptions) =>
+  UnparsedEntity: ({entity}: SaxErrorOptions) =>
     `Entity reference to unparsed entity '${entity}'`,
-  EXTERNAL_ENTITY: ({entity}: SaxErrorOptions) =>
+  ExternalEntity: ({entity}: SaxErrorOptions) =>
     `Attribute references external entity '${entity}'`,
   // Character data (CDATA) errors
-  INVALID_CHAR_REF: () => "Character reference to invalid character",
-  INVALID_CHAR: () => "Content contains an invalid character",
-  INVALID_CDEND: () => "Content contains ']]>' sequence",
-  INVALID_CDATA: () => "Content appears outside root element",
+  InvalidCharRef: () => "Character reference to invalid character",
+  InvalidChar: () => "Content contains an invalid character",
+  InvalidCDEnd: () => "Content contains ']]>' sequence",
+  InvalidCData: () => "Content appears outside root element",
   // Tag errors
-  INVALID_START_TAG: () => "Start tag is not well-formed",
-  INVALID_END_TAG: () => "End tag is not well-formed",
-  LT_IN_ATTRIBUTE: () => "Attribute value contains a literal '<'",
-  ATTRIBUTE_REDEFINED: ({attribute}: SaxErrorOptions) =>
+  InvalidStartTag: () => "Start tag is not well-formed",
+  InvalidEndTag: () => "End tag is not well-formed",
+  InvalidAttributeValue: () => "Attribute value contains a literal '<'",
+  AttributeRedefined: ({attribute}: SaxErrorOptions) =>
     `Attribute '${attribute}' appears multiple times`,
-  TAG_NAME_MISMATCH: ({element}: SaxErrorOptions) =>
+  TagNameMismatch: ({element}: SaxErrorOptions) =>
     `End tag '${element}' does not match start tag`,
 
-  UNEXPECTED_EOF: () => "Unexpected end of file",
+  UnexpectedEof: () => "Unexpected end of file",
 
   // Namespaces
-  INVALID_QNAME: () => "QName is not well-formed",
-  INVALID_NCNAME: () => "NCName contains colon ':'",
-  UNDECLARED_PREFIX: () => "Namespace prefix is not declared",
-  PREFIX_UNDECLARING: () => "Namespace URI is empty",
-  RESERVED_PREFIX: () => "Namespace prefix starting with 'XML' is reserved",
-  RESERVED_NAMESPACE: () => "Namespace URI is reserved",
+  InvalidQName: () => "QName is not well-formed",
+  InvalidNCName: () => "NCName contains colon ':'",
+  UndeclaredPrefix: () => "Namespace prefix is not declared",
+  PrefixUndeclaring: () => "Namespace URI is empty",
+  ReservedPrefix: () => "Namespace prefix starting with 'XML' is reserved",
+  ReservedNamespace: () => "Namespace URI is reserved",
 } as const;
 
 /**
@@ -63,36 +64,39 @@ const ERRORS = {
  *
  * A comprehensive list of error codes and their meaning:
  *
- * - `LIMIT_EXCEEDED` A limit, imposed by default or `SaxOptions`, was exceeded
- * - `ENCODING_NOT_SUPPORTED` Encoding not supported
- * - `ENCODING_INVALID_DATA` Encoded data is invalid
- * - `INVALID_XML_DECL` XML declaration is not well-formed
- * - `INVALID_DOCTYPE_DECL` DOCTYPE declaration is not well-formed
- * - `INVALID_INTERNAL_SUBSET` Internal subset is not well-formed
- * - `INVALID_COMMENT` Comment contains '--'
- * - `INVALID_PI` Processing instruction is not well-formed
- * - `RESERVED_PI` Processing instruction target 'XML' is reserved
- * - `INVALID_ENTITY_REF` Entity reference is not well-formed
- * - `RECURSIVE_ENTITY` Entity directly or indirectly references itself
- * - `UNDECLARED_ENTITY` Entity is not declared
- * - `UNPARSED_ENTITY` Entity reference to unparsed entity
- * - `EXTERNAL_ENTITY` Attribute references an external entity
- * - `INVALID_CHAR_REF` Character reference to invalid character
- * - `INVALID_CHAR` Content contains an invalid character
- * - `INVALID_CDEND` Content contains ']]>' sequence
- * - `INVALID_CDATA` Content appears outside root element
- * - `INVALID_START_TAG` Start tag is not well-formed
- * - `INVALID_END_TAG` End tag is not well-formed
- * - `LT_IN_ATTRIBUTE` Attribute value contains a literal '<'
- * - `ATTRIBUTE_REDEFINED` Attribute appears multiple times
- * - `TAG_NAME_MISMATCH` End tag does not match start tag
- * - `UNEXPECTED_EOF` Unexpected end of file
+ * - `LimitExceeded` A limit, imposed by default or `SaxOptions`, was exceeded
+ * - `EncodingNotSupported` Encoding not supported
+ * - `EncodingInvalidData` Encoded data is invalid
+ * - `InvalidXMLDecl` XML declaration is not well-formed
+ * - `InvalidDoctypeDecl` DOCTYPE declaration is not well-formed
+ * - `InvalidInternalSubset` Internal subset is not well-formed
+ * - `InvalidComment` Comment contains '--'
+ * - `InvalidPI` Processing instruction is not well-formed
+ * - `ReservedPI` Processing instruction target 'XML' is reserved
+ * - `InvalidEntityRef` Entity reference is not well-formed
+ * - `RecursiveEntity` Entity directly or indirectly references itself
+ * - `UndeclaredEntity` Entity is not declared
+ * - `UnparsedEntity` Entity reference to unparsed entity
+ * - `ExternalEntity` Attribute references an external entity
+ * - `InvalidCharRef` Character reference to invalid character
+ * - `InvalidChar` Content contains an invalid character
+ * - `InvalidCDEnd` Content contains ']]>' sequence
+ * - `InvalidCData` Content appears outside root element
+ * - `InvalidStartTag` Start tag is not well-formed
+ * - `InvalidEndTag` End tag is not well-formed
+ * - `InvalidAttributeValue` Attribute value contains a literal '<'
+ * - `AttributeRedefined` Attribute appears multiple times
+ * - `TagNameMismatch` End tag does not match start tag
+ * - `UnexpectedEof` Unexpected end of file
+ * - `InvalidQName` QName is not well-formed
+ * - `InvalidNCName` NCName contains colon ':'
+ * - `UndeclaredPrefix` Namespace prefix is not declared
+ * - `PrefixUndeclaring` Namespace URI is empty
+ * - `ReservedPrefix` Namespace prefix starting with 'XML' is reserved
+ * - `ReservedNamespace` Namespace URI is reserved
  */
-export type SaxErrorCode = keyof typeof ERRORS;
+export type SaxErrorName = keyof typeof ERRORS;
 
-/**
- *
- */
 export interface SaxErrorOptions extends ErrorOptions {
   /** @internal */
   offset?: number | undefined;
@@ -103,12 +107,14 @@ export interface SaxErrorOptions extends ErrorOptions {
 }
 
 export class SaxError extends Error {
-  override name = "SaxError" as const;
   /**
    * A string indicating the specific violation or error.
-   * @see {@link SaxErrorCode}
+   * @see {@link SaxErrorName}
    */
-  code: SaxErrorCode;
+  // Standard errors use the name property to convey any specific error subtype.
+  // name is also one of the only properties that is preserved if the error is
+  // serialized or cloned.
+  override name: SaxErrorName;
   /**
    * Offset in the document, in UTF-16 code units, at which the error occurred.
    * Only set for parsing errors.
@@ -119,25 +125,25 @@ export class SaxError extends Error {
   encoding?: string | undefined;
   /**
    * Name of the element that caused the error. Only set for
-   * `TAG_NAME_MISMATCH`.
+   * `TagNameMismatch`.
    */
   element?: string | undefined;
   /**
    * Name of the attribute that caused the error. Only set for
-   * `ATTRIBUTE_REDEFINED`.
+   * `AttributeRedefined`.
    */
   attribute?: string | undefined;
   /** Name of the entity that caused the error, if any. */
   entity?: string | undefined;
-  constructor(code: SaxErrorCode, options: SaxErrorOptions = {}) {
+  constructor(name: SaxErrorName, options: SaxErrorOptions = {}) {
     super(
-      ERRORS.hasOwnProperty(code) ? ERRORS[code](options) : undefined,
+      ERRORS.hasOwnProperty(name) ? ERRORS[name](options) : undefined,
       // Only pass cause through, if any option names happen to overlap with
       // any future ErrorOptions it might accidentally change behavior.
       // Use in here because `cause` is allowed to be null or undefined.
       "cause" in options ? {cause: options.cause} : undefined,
     );
-    this.code = code;
+    this.name = name;
     this.offset = options.offset;
     this.encoding = options.encoding;
     this.element = options.element;

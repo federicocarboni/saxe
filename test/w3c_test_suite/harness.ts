@@ -5,7 +5,7 @@ import * as streams from "stream/promises";
 import * as tar from "tar";
 
 import {expect} from "chai";
-import {SaxParser, SaxReader} from "../../src/index.ts";
+import {SaxError, SaxParser, SaxReader} from "../../src/index.ts";
 import {CanonicalXmlWriter} from "../canonical_xml.ts";
 
 // Download and extract the test suite
@@ -166,7 +166,7 @@ export function runTest(testCase: TestCase) {
       expect(toCanonical()).equals(output);
     } else if (testCase.type === "not-wf") {
       expect(toCanonical)
-        .to.throw().and.have.property("name", "SaxError");
+        .throws().and.is.instanceOf(SaxError);
     }
   };
 }
