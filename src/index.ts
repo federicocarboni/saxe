@@ -11,7 +11,6 @@ import {
 import {SaxError, SaxErrorCode, SaxErrorOptions} from "./error.ts";
 import {parseXmlDecl} from "./xml_decl.ts";
 
-export {SaxDecoder} from "./encoding.ts";
 export {SaxError, type SaxErrorCode} from "./error.ts";
 
 /**
