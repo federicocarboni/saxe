@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {SaxParser, SaxReader} from "../src/index.ts";
+import {Attributes, SaxParser, SaxReader} from "../src/index.ts";
 import {CanonicalXmlWriter} from "./canonical_xml.ts";
 
 class CanonicalEntityReader implements SaxReader {
@@ -16,10 +16,10 @@ class CanonicalEntityReader implements SaxReader {
   entityRef(entity: string): void {
     this.entity = entity;
   }
-  start(name: string, attributes: ReadonlyMap<string, string>): void {
+  start(name: string, attributes: Attributes): void {
     this.canonical.start(name, attributes);
   }
-  empty(name: string, attributes: ReadonlyMap<string, string>): void {
+  empty(name: string, attributes: Attributes): void {
     this.canonical.empty(name, attributes);
   }
   end(name: string): void {

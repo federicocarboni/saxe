@@ -4,7 +4,7 @@
 // a good SaxReader example and may be used as a practical reference on how to
 // use SaxParser.
 
-import {SaxReader} from "../src/index.ts";
+import {Attributes, SaxReader} from "../src/index.ts";
 
 function escapeDataChars(value: string) {
   return value.replace(/[&<>"\t\n\r]/g, (val) => {
@@ -42,7 +42,7 @@ export class CanonicalXmlWriter implements SaxReader {
   // There are no comments in Canonical XML
   comment(): void {
   }
-  start(name: string, attributes: ReadonlyMap<string, string>): void {
+  start(name: string, attributes: Attributes): void {
     this.output += `<${name}`;
     // As per canonical XML rule lexicographically sort attributes
     const attribs = [...attributes].sort(([a], [b]) => a < b ? -1 : 1);
@@ -51,7 +51,7 @@ export class CanonicalXmlWriter implements SaxReader {
     }
     this.output += ">";
   }
-  empty(name: string, attributes: ReadonlyMap<string, string>): void {
+  empty(name: string, attributes: Attributes): void {
     this.start(name, attributes);
     this.end(name);
   }

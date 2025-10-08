@@ -5,7 +5,7 @@ import * as streams from "stream/promises";
 import * as tar from "tar";
 
 import {expect} from "chai";
-import {SaxError, SaxParser, SaxReader} from "../../src/index.ts";
+import {Attributes, SaxError, SaxParser, SaxReader} from "../../src/index.ts";
 import {CanonicalXmlWriter} from "../canonical_xml.ts";
 
 // Download and extract the test suite
@@ -58,7 +58,7 @@ class TestCaseReader implements SaxReader {
   entityRef(entity: string): void {
     void entity;
   }
-  start(name: string, attributes: ReadonlyMap<string, string>): void {
+  start(name: string, attributes: Attributes): void {
     if (name === "TEST" && attributes.get("ENTITIES") === "none") {
       this.currentType = attributes.get("TYPE");
       this.currentUri = path.join(this.baseUri, attributes.get("URI")!);
@@ -68,7 +68,7 @@ class TestCaseReader implements SaxReader {
       this.currentId = attributes.get("ID");
     }
   }
-  empty(name: string, attributes: ReadonlyMap<string, string>): void {
+  empty(name: string, attributes: Attributes): void {
     void name;
     void attributes;
   }
