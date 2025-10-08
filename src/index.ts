@@ -12,6 +12,7 @@ import {SaxError, SaxErrorCode, SaxErrorOptions} from "./error.ts";
 import {parseXmlDecl} from "./xml_decl.ts";
 
 export {SaxError, type SaxErrorCode} from "./error.ts";
+export {type AttributesNs, SaxParserNs, type SaxReaderNs} from "./namespace.ts";
 
 /**
  * XML Declaration (XMLDecl).
@@ -106,14 +107,43 @@ export interface Doctype {
    */
   systemId?: string | undefined;
 }
-
+/**
+ * An immutable view of the attributes of an XML tag.
+ *
+ * Attributes are iterable.
+ */
+export interface Attributes {
+  /** The number of attributes. */
+  readonly size: number;
+  /**
+   * @param name - Name of the attribute.
+   * @returns - Returns the value of the attribute with the specified name.
+   * If there is no attribute with the specified name `undefined` is returned.
+   */
+  get(name: string): string | undefined;
+  /**
+   * @param name - Name of the attribute.
+   * @returns - Returns a boolean value indicating whether an attribute with the
+   * specified name is present.
+   */
+  has(name: string): boolean;
+  /** @returns - Returns an iterator over the names of the attributes. */
+  keys(): IterableIterator<string>;
+  /** @returns - Returns an iterator over the values of the attributes. */
+  values(): IterableIterator<string>;
+  /**
+   * @returns - Returns an iterator over the names and values of the attributes.
+   */
+  entries(): IterableIterator<[string, string]>;
+  [Symbol.iterator](): IterableIterator<[string, string]>;
+}
 /**
  * https://www.w3.org/TR/REC-xml/
  * @since 1.0.0
  */
 export interface SaxReader {
   /**
-   * XML Declaration of the document.
+   * XML declaration of the document.
    * @param declaration -
    */
   xml?(declaration: XmlDeclaration): void;
@@ -179,27 +209,31 @@ export interface SaxReader {
    * ```xml
    * <element attr="value">
    * ```
-   * @param name -
-   * @param attributes -
+   * @param name - Name of the element.
+   * @param attributes - Attributes of the tag. Only valid for the
+   * duration of this call, implementors should make a copy to persist
+   * attributes.
    */
-  start(name: string, attributes: ReadonlyMap<string, string>): void;
+  start(name: string, attributes: Attributes): void;
   /**
    * An empty tag.
    *
    * ```xml
    * <element attr="value" />
    * ```
-   * @param name -
-   * @param attributes -
+   * @param name - Name of the element.
+   * @param attributes - Attributes of the tag. Only valid for the
+   * duration of this call, implementors should make a copy to persist
+   * attributes.
    */
-  empty(name: string, attributes: ReadonlyMap<string, string>): void;
+  empty(name: string, attributes: Attributes): void;
   /**
    * An end tag.
    *
    * ```xml
    * </element>
    * ```
-   * @param name -
+   * @param name - Name of the element.
    */
   end(name: string): void;
   /**
@@ -216,8 +250,9 @@ export interface SaxReader {
    * `text` events for the same text node enable `incompleteTextNodes`.
    *
    * Entity references which are not predefined (i.e. not `amp`, `lt`, `gt`,
-   * `apos` or `quot`) are handled by `entityRef`.
-   * @param text -
+   * `apos` or `quot`) and not defined in the internal subset are handled by
+   * `entityRef`.
+   * @param text - Character data.
    */
   text(text: string): void;
 }
@@ -1127,11 +1162,13 @@ export class SaxParser {
 
   // @internal
   private parseInternalSubsetPeRef_() {
-    // PE references are not expanded but the name is still capped.
-    this.textLength_ += this.readNameCharacters_(this.textLength_).length;
+    // PE references are not expanded but the name is still collected.
+    this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ >= this.chunk_.length) {
       return;
     }
+    this.checkNCName_(this.element_);
+    this.element_ = "";
     if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
       throw this.error_("INVALID_INTERNAL_SUBSET");
     }
@@ -1169,13 +1206,17 @@ export class SaxParser {
   }
 
   // @internal
-  private readName_() {
+  protected readName_() {
     if (!isNameStartChar(this.chunk_.codePointAt(this.index_)!)) {
       throw this.error_("INVALID_INTERNAL_SUBSET");
     }
     return this.readNameCharacters_(0);
   }
-
+  // Allow namespace parser to override this
+  // @internal
+  protected checkNCName_(name: string) {
+    void name;
+  }
   // @internal
   private readExternalId_(isNotation: boolean) {
     this.otherState_ = State.INTERNAL_SUBSET;
@@ -1243,7 +1284,7 @@ export class SaxParser {
           } else {
             ++this.index_;
             // Entities must not be expanded but must parse correctly.
-            this.readName_();
+            this.checkNCName_(this.readName_());
             if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
               throw this.error_("INVALID_INTERNAL_SUBSET");
             }
@@ -1272,6 +1313,7 @@ export class SaxParser {
       this.skipWhiteSpace_();
     }
     const entityName = this.readName_();
+    this.checkNCName_(entityName);
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
       throw this.error_("INVALID_INTERNAL_SUBSET");
     }
@@ -1300,7 +1342,7 @@ export class SaxParser {
         ) {
           this.index_ += 6;
           this.skipWhiteSpace_();
-          this.readName_();
+          this.checkNCName_(this.readName_());
           decl = EntityDecl.UNPARSED;
         }
       }
@@ -1459,7 +1501,7 @@ export class SaxParser {
   private readNotationDecl_() {
     this.index_ += 9;
     this.skipWhiteSpace_();
-    this.readName_();
+    this.checkNCName_(this.readName_());
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
       throw this.error_("INVALID_INTERNAL_SUBSET");
     }
@@ -1683,6 +1725,7 @@ export class SaxParser {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       // Name read to completion
+      this.checkNCName_(this.element_);
       if (this.element_.length === 3 && this.element_.toLowerCase() === "xml") {
         throw this.error_("RESERVED_PI");
       }
@@ -2195,13 +2238,13 @@ export class SaxParser {
       throw this.error_("INVALID_ENTITY_REF");
     }
   }
-
   // @internal
   private parseEntityRef_() {
     this.entity_ += this.readNameCharacters_(this.entity_.length);
     if (this.index_ >= this.chunk_.length) {
       return;
     }
+    this.checkNCName_(this.entity_);
     if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
       throw this.error_("INVALID_ENTITY_REF");
     }
