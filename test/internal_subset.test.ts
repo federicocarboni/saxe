@@ -1,6 +1,19 @@
 import {expect} from "chai";
 import {toCanonical} from "./template.ts";
 
+describe("Doctype Internal Subset", function() {
+  it("not-wf: stray text in internal subset", function() {
+    expect(() => toCanonical("<!DOCTYPE doc [ text ]><doc></doc>")).throws().and
+      .has.property("name", "InvalidDoctypeDecl");
+  });
+  it("not-wf: stray text in doctype", function() {
+    expect(() =>
+      toCanonical('<!DOCTYPE doc SYSTEM "XYZ" ', "text ]><doc></doc>")
+    ).throws().and
+      .has.property("name", "InvalidDoctypeDecl");
+  });
+});
+
 describe("Attribute-list Declaration", function() {
   it("wf: ATTLIST is ignored after a parameter entity", function() {
     expect(
@@ -53,6 +66,32 @@ describe("Attribute-list Declaration", function() {
       ),
     ).equals('<doc foo="baz"></doc>');
   });
+  it("not-wf: invalid ATTLIST", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE example [<!ATTLIST root&foo NOTATION bar #IMPLIED>]><root foo="  \r\n bar \t\n baz    \n\r "/>',
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE example [<!ATTLIST root foo NOTATION (bar) #xyz>]><root foo="  \r\n bar \t\n baz    \n\r "/>',
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+  });
+  it("not-wf: ATTLIST notation type no parens", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE example [<!ATTLIST root foo NOTATION bar #IMPLIED>]><root foo="  \r\n bar \t\n baz    \n\r "/>',
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+  });
+  it("not-wf: ATTLIST enumerated type empty nmtoken", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE example [<!ATTLIST root foo (  ) #IMPLIED>]><root foo="  \r\n bar \t\n baz    \n\r "/>',
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+  });
 });
 
 describe("Entity Declaration", function() {
@@ -64,7 +103,7 @@ describe("Entity Declaration", function() {
           '<!ENTITY foo "&amp;">' +
           "]><doc>&foo;</doc>",
       )
-    ).to.throw().and.have.property("name", "UndeclaredEntity");
+    ).throws().and.has.property("name", "UndeclaredEntity");
   });
   it("wf: entity declaration is recognized after parameter entity reference when standalone='yes'", function() {
     expect(
@@ -73,30 +112,86 @@ describe("Entity Declaration", function() {
       ),
     ).equals("<doc>&amp;</doc>");
   });
+  it("wf: entity value with TAB", function() {
+    expect(
+      toCanonical(
+        '<?xml version="1.0" standalone="yes" ?><!DOCTYPE doc [ <!ENTITY foo "bar\t">]><doc>&foo;</doc>',
+      ),
+    ).equals("<doc>bar&#9;</doc>");
+  });
   it("not-wf: external entity reference in attribute", function() {
     expect(() =>
       toCanonical(
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent">]><doc attribute="&foo;"></doc>',
       )
-    ).to.throw().and.have.property("name", "ExternalEntity");
+    ).throws().and.has.property("name", "ExternalEntity");
   });
   it("not-wf: unparsed entity reference in attribute", function() {
     expect(() =>
       toCanonical(
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc attribute="&foo;"></doc>',
       )
-    ).to.throw().and.have.property("name", "UnparsedEntity");
+    ).throws().and.has.property("name", "UnparsedEntity");
   });
   it("not-wf: unparsed entity reference in content", function() {
     expect(() =>
       toCanonical(
         '<!DOCTYPE doc [ <!ENTITY foo SYSTEM "./foo.ent" NDATA foo>]><doc>&foo;</doc>',
       )
-    ).to.throw().and.have.property("name", "UnparsedEntity");
+    ).throws().and.has.property("name", "UnparsedEntity");
+  });
+  it("not-wf: entity value contains invalid entity reference", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE doc [ <!ENTITY foo "&amp">]><doc>&foo;</doc>',
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+  });
+  it("not-wf: entity value is incomplete", function() {
+    expect(() =>
+      toCanonical(
+        "<!DOCTYPE doc [ <!ENTITY foo >]><doc>&foo;</doc>",
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
   });
 });
 
-describe("ElementDecl", function() {
+describe("Notation declaration", function() {
+  it("not-wf: stray text in notation declaration", function() {
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE doc [ <!NOTATION foo PUBLIC "xyz"&>]><doc>&foo;</doc>',
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+  });
+  it("not-wf: non-space after notation name", function() {
+    // TODO: this throws as InvalidDoctypeDecl should be InvalidInternalSubset
+    expect(() =>
+      toCanonical(
+        '<!DOCTYPE doc [ <!NOTATION foo&PUBLIC "xyz"&>]><doc>&foo;</doc>',
+      )
+    ).throws();
+  });
+});
+
+describe("Parameter Entity Reference", function() {
+  it("not-wf: PERef invalid start", function() {
+    expect(() =>
+      toCanonical(
+        "<!DOCTYPE doc [ % param ]><doc></doc>",
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+  });
+  it("not-wf: PERef incomplete", function() {
+    expect(() =>
+      toCanonical(
+        "<!DOCTYPE doc [ %param ]><doc></doc>",
+      )
+    ).throws().and.has.property("name", "InvalidInternalSubset");
+  });
+});
+
+describe("Element Declaration", function() {
   it("wf: ELEMENT seq", function() {
     expect(toCanonical(
       `<!DOCTYPE doc [
