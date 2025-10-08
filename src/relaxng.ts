@@ -1,4 +1,5 @@
-import {SaxParser, SaxReader} from "./index.ts";
+import {SaxReader} from "./index.ts";
+import {SaxParser} from "./parser.ts";
 
 // @internal
 const enum PatternType {
@@ -58,6 +59,7 @@ class SchemaReader implements SaxReader {
 }
 
 export class RelaxngSchema {
+  private constructor() {}
   static parse(input: string): RelaxngSchema {
     const reader = new SchemaReader();
     const parser = new SaxParser(reader);

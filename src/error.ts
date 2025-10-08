@@ -46,6 +46,11 @@ const ERRORS = {
     `End tag '${element}' does not match start tag`,
 
   UNEXPECTED_EOF: () => "Unexpected end of file",
+
+  // Namespaces
+  INVALID_QNAME: () => "QName is not well-formed",
+  INVALID_NCNAME: () => "NCName contains colon ':'",
+  UNDECLARED_PREFIX: () => "Namespace prefix is not declared",
 } as const;
 
 /**
