@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {toCanonical} from "./template.ts";
+import {toCanonical, toCanonicalOpt} from "./template.ts";
 
 describe("Doctype Internal Subset", function() {
   it("not-wf: stray text in internal subset", function() {
@@ -42,6 +42,20 @@ describe("Attribute-list Declaration", function() {
     expect(
       toCanonical(
         '<!DOCTYPE example [<!ATTLIST root attribute CDATA "defaultValue">]><root/>',
+      ),
+    ).equals('<root attribute="defaultValue"></root>');
+  });
+  it("wf: ATTLIST sets default values in single quotes for attributes", function() {
+    expect(
+      toCanonical(
+        "<!DOCTYPE example [<!ATTLIST root attribute CDATA 'defaultValue'>]><root/>",
+      ),
+    ).equals('<root attribute="defaultValue"></root>');
+  });
+  it("wf: ATTLIST sets default values for #FIXED attributes", function() {
+    expect(
+      toCanonical(
+        "<!DOCTYPE example [<!ATTLIST root attribute CDATA #FIXED 'defaultValue'>]><root/>",
       ),
     ).equals('<root attribute="defaultValue"></root>');
   });
@@ -157,6 +171,27 @@ describe("Entity Declaration", function() {
 });
 
 describe("Notation declaration", function() {
+  it("wf: Public ExternalID", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE doc [ <!NOTATION foo PUBLIC "-//%public;" "~system~"> ]><doc></doc>',
+      ),
+    ).equals("<doc></doc>");
+  });
+  it("wf: System ExternalID", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE doc [ <!NOTATION foo SYSTEM "~system~"> ]><doc></doc>',
+      ),
+    ).equals("<doc></doc>");
+  });
+  it("wf: PublicID", function() {
+    expect(
+      toCanonical(
+        '<!DOCTYPE doc [ <!NOTATION foo PUBLIC "-//%public;"> ]><doc></doc>',
+      ),
+    ).equals("<doc></doc>");
+  });
   it("not-wf: stray text in notation declaration", function() {
     expect(() =>
       toCanonical(
@@ -204,5 +239,40 @@ describe("Element Declaration", function() {
 
         <!ELEMENT doc (hello?, world*, opt+)>]><doc></doc>`,
     ));
+  });
+});
+
+describe('Internal Subset {dtd: "ignore"}', function() {
+  it("not-wf: does not use entity declarations", function() {
+    expect(() =>
+      toCanonicalOpt(
+        ['<!DOCTYPE doc [ <!ENTITY foo "&amp;"> ]><doc>&foo;</doc>'],
+        {dtd: "ignore"},
+      )
+    ).throws().and.includes({name: "UndeclaredEntity", entity: "foo"});
+  });
+  it("wf: does not use attribute declarations for normalization", function() {
+    expect(
+      toCanonicalOpt(
+        ['<!DOCTYPE doc [ <!ATTLIST doc foo ID #REQUIRED> ]><doc foo="  bar  "></doc>'],
+        {dtd: "ignore"},
+      ),
+    ).equals('<doc foo="  bar  "></doc>');
+  });
+  it("wf: does not use default attributes", function() {
+    expect(
+      toCanonicalOpt(
+        ['<!DOCTYPE doc [ <!ATTLIST doc foo CDATA "bar"> ]><doc></doc>'],
+        {dtd: "ignore"},
+      ),
+    ).equals("<doc></doc>");
+  });
+  it("not-wf: internal subset is still checked for well-formed-ness", function() {
+    expect(() =>
+      toCanonicalOpt(
+        ['<!DOCTYPE doc [ <!> ]><doc></doc>'],
+        {dtd: "ignore"},
+      ),
+    ).throws().and.has.property("name", "InvalidInternalSubset");
   });
 });
