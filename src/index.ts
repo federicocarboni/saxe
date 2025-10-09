@@ -476,6 +476,8 @@ const ATT_TYPES = [
   "NMTOKENS",
 ];
 
+const ATT_DEFAULT_DECLS = ["#REQUIRED", "#IMPLIED", "#FIXED"];
+
 const enum EntityDecl {
   EXTERNAL = 1,
   UNPARSED,
@@ -556,6 +558,9 @@ export function parse(
   parser.write(input);
   parser.end();
 }
+
+const EXTERNAL_OR_PUBLIC_ID_RE =
+  /^(?:SYSTEM|PUBLIC[ \t\n\r]+("|')([ \n\ra-zA-Z0-9-'()+,./:=?;!*#@$_%]*?)\1)(?:[ \t\n\r]+("|')([\t\n\r -\uFFFD]*?)\3)?/;
 
 /**
  * Streaming non-validating XML Parser, it makes no attempt to recover
@@ -1222,37 +1227,13 @@ export class SaxParser {
   }
   // @internal
   private readExternalId_(isNotation: boolean) {
-    this.otherState_ = State.INTERNAL_SUBSET;
-    this.parseDoctypeExternalId_();
-    this.parseStep_(); // start
-    this.parseStep_(); // quoted
-    let hasSystemId = false;
-    if (this.state_ === State.EXTERNAL_ID_SYSTEM_SPACE) {
-      if (isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
-        this.skipWhiteSpace_();
-        const codeUnit = this.chunk_.charCodeAt(this.index_);
-        if (codeUnit === Chars.APOSTROPHE || codeUnit === Chars.QUOTE) {
-          this.state_ = State.EXTERNAL_ID_QUOTED_START;
-          hasSystemId = true;
-        }
-      }
-      this.attribute_ = this.content_;
-      if (hasSystemId) {
-        this.state_ = State.EXTERNAL_ID_QUOTED_START;
-        this.otherState_ = State.INTERNAL_SUBSET;
-        this.parseStep_(); // start
-        this.parseStep_(); // quoted
-      } else {
-        this.flags_ &= ~Flags.EXTERNAL_ID_SYSTEM;
-        if (!isNotation) {
-          throw new SaxError("InvalidInternalSubset");
-        }
-      }
-    }
-    this.state_ = State.INTERNAL_SUBSET;
-    if (this.getNameAndExternalId_() === undefined) {
+    const matches = this.chunk_.slice(this.index_).match(
+      EXTERNAL_OR_PUBLIC_ID_RE,
+    );
+    if (matches == null || !isNotation && matches[4] === undefined) {
       throw new SaxError("InvalidInternalSubset");
     }
+    this.index_ += matches[0].length;
   }
 
   // @internal
@@ -1450,7 +1431,7 @@ export class SaxParser {
           ++this.index_;
         }
         const defaultDecl = this.chunk_.slice(start, this.index_);
-        if (["#REQUIRED", "#IMPLIED", "#FIXED"].indexOf(defaultDecl) === -1) {
+        if (ATT_DEFAULT_DECLS.indexOf(defaultDecl) === -1) {
           throw new SaxError("InvalidInternalSubset");
         }
         if (defaultDecl !== "#FIXED") {
