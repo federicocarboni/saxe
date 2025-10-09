@@ -2710,6 +2710,16 @@ interface AttributeNs extends QName {
 }
 
 // @internal
+function getQName(attribute: AttributeNs): QName {
+  return {
+    name: attribute.name,
+    localName: attribute.localName,
+    prefix: attribute.prefix,
+    uri: attribute.uri,
+  };
+}
+
+// @internal
 class AttributesNs_ implements AttributesNs {
   // @internal
   private map_ = new Map<string, AttributeNs>();
@@ -2745,11 +2755,13 @@ class AttributesNs_ implements AttributesNs {
     thisArg: unknown = undefined,
   ) {
     for (const attribute of this.iter_()) {
-      callbackfn.call(thisArg, attribute.value, attribute, this);
+      callbackfn.call(thisArg, attribute.value, getQName(attribute), this);
     }
   }
-  keys(): IterableIterator<QName> {
-    return this.iter_();
+  *keys(): IterableIterator<QName> {
+    for (const attribute of this.iter_()) {
+      yield getQName(attribute);
+    }
   }
   *values(): Generator<string> {
     for (const attribute of this.iter_()) {
@@ -2758,13 +2770,16 @@ class AttributesNs_ implements AttributesNs {
   }
   *entries(): Generator<[QName, string]> {
     for (const attribute of this.iter_()) {
-      yield [attribute, attribute.value];
+      yield [getQName(attribute), attribute.value];
     }
   }
   [Symbol.iterator]() {
     return this.entries();
   }
 }
+
+// @internal
+export type {AttributesNs_};
 
 function checkQName(name: string) {
   const colon = name.indexOf(":");
