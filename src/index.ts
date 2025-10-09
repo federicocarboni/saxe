@@ -722,7 +722,6 @@ export class SaxParser {
    * @since 1.0.0
    */
   write(input: string) {
-    // console.log(JSON.stringify(input));
     this.chunk_ += input;
     // Ensure CRLF is handled correctly across chunk boundary
     const cr = this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CR;
