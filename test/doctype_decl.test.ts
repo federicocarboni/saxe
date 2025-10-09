@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {Doctype, SaxParser, SaxReader} from "../src/index.ts";
+import {Doctype, SaxOptions, SaxParser, SaxReader} from "../src/index.ts";
 
 class DoctypeDeclReader implements SaxReader {
   public doctypeDecl: Doctype | undefined;
@@ -13,19 +13,22 @@ class DoctypeDeclReader implements SaxReader {
   text() {}
 }
 
-function getDoctypeDecl(...chunks: string[]) {
+function getDoctypeDeclOpt(chunks: string[], options?: SaxOptions) {
   const docReader = new DoctypeDeclReader();
-  const parser = new SaxParser(docReader);
+  const parser = new SaxParser(docReader, options);
   for (const chunk of chunks) {
     parser.write(chunk);
   }
   return docReader.doctypeDecl;
 }
+function getDoctypeDecl(...chunks: string[]) {
+  return getDoctypeDeclOpt(chunks);
+}
 
-describe("doctypedecl", function() {
+describe("Document type declaration", function() {
   it("wf: doctypedecl without ExternalID or intSubset", function() {
     expect(getDoctypeDecl("<!DOCTYPE doctypeName >"))
-      .to.have.property("name", "doctypeName");
+      .to.has.property("name", "doctypeName");
   });
   it("wf: doctypedecl with ExternalID and no intSubset", function() {
     expect(
@@ -40,7 +43,7 @@ describe("doctypedecl", function() {
     expect(getDoctypeDecl(
       "<!DOCTYPE doctypeName [  <!ENTITY name 'value'> ] >",
     ))
-      .to.have.property("name", "doctypeName");
+      .to.has.property("name", "doctypeName");
   });
   it("wf: doctypedecl with intSubset and ExternalID", function() {
     expect(
@@ -66,7 +69,7 @@ describe("doctypedecl", function() {
   });
   it("wf: doctypedecl with an astral character name", function() {
     expect(getDoctypeDecl("<!DOCTYPE \u{1F000}\u{1F001}\u{1F002}>"))
-      .to.have.property("name", "\u{1F000}\u{1F001}\u{1F002}");
+      .to.has.property("name", "\u{1F000}\u{1F001}\u{1F002}");
   });
   it("wf: doctypedecl with values split across chunks", function() {
     expect(
@@ -88,31 +91,31 @@ describe("doctypedecl", function() {
   });
   it("not-wf: doctypedecl with no name", function() {
     expect(() => getDoctypeDecl("<!DOCTYPE  >"))
-      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with invalid start", function() {
     expect(() => getDoctypeDecl("<!DOCTYP doctypName >"))
-      .to.throw().and.have.property("name", "InvalidCData");
+      .throws().and.has.property("name", "InvalidCData");
   });
   it("not-wf: more than one doctypedecl", function() {
     expect(() =>
       getDoctypeDecl("<!DOCTYPE doctypeName ><!DOCTYPE doctypeName >")
     )
-      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl after root element", function() {
     expect(() => getDoctypeDecl("<root/><!DOCTYPE doctypeName >"))
-      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with unquoted ExternalID", function() {
     expect(() => getDoctypeDecl("<!DOCTYPE doctypeName PUBLIC pubid><root/>"))
-      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with no space after Pubid", function() {
     expect(() =>
       getDoctypeDecl('<!DOCTYPE doctypeName PUBLIC "pubid""system"><root/>')
     )
-      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with invalid PubidChar", function() {
     expect(() =>
@@ -120,12 +123,18 @@ describe("doctypedecl", function() {
         '<!DOCTYPE doctypeName PUBLIC "{{pubid}}" "system"><root/>',
       )
     )
-      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
   });
   it("not-wf: doctypedecl with malformed ExternalID", function() {
     expect(() =>
       getDoctypeDecl('<!DOCTYPE doctypeName PUBLIK "pubid" "system"><root/>')
     )
-      .to.throw().and.have.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
+  });
+  it('dtd: "prohibit": doctypedecl is rejected', function() {
+    expect(() =>
+      getDoctypeDeclOpt(["<!DOCTYPE doctypeName><root/>"], {dtd: "prohibit"})
+    )
+      .throws().and.has.property("name", "InvalidDoctypeDecl");
   });
 });
