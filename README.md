@@ -4,14 +4,17 @@ Light-weight and efficient SAX-style XML parser for JavaScript.
 
 ## Goals
 
-- Complete XML standard conformance
+- Full XML 1.0 standard conformance
 - Simple and terse API
 - Reduced code footprint
-- Set a base for other standards built on XML, e.g. XHTML
+- Set a base for other standards built on XML (e.g. XHTML)
 
 ### Non-Goals
 
-- XML validation of DTDs
+- XML DTD validation
+- Full DOM implementation
+- Syntax error tolerance
+- Source code analysis or LSP features
 
 ## Example
 
@@ -20,13 +23,13 @@ import {SaxParser} from "saxe";
 
 let textContent = "";
 const parser = new SaxParser({
-  start(name, attributes) {
+  startTag(name, attributes) {
     // element start tag
   },
-  empty(name, attributes) {
-    // empty element
+  emptyTag(name, attributes) {
+    // element empty tag
   },
-  end(name, attributes) {
+  endTag(name) {
     // element end tag
   },
   text(text) {
@@ -44,19 +47,18 @@ parser.end();
 - Basic XML parsing: any ES2017 runtime. For older runtimes transpiling and
   polyfilling should be enough.
 
-- Encoding support: requires [`TextDecoder`]; most runtimes support it natively,
-  but it may be polyfilled if not available.
-
 ## Document Type Declaration
 
-Many[^1] JavaScript XML parsers ignore the internal DTD subset.
+Many[^1] JavaScript XML parsers simplify handling of the internal DTD subset,
+either not checking for well-formedness or ignoring its declarations.
 
 Internal DTD subset parsing is required even for non-validating[^2] processors,
 this parser implements the entire specification:
 
-- Internal DTD subset is parsed and checked for well-formedness.
-- `ATTLIST` and `ENTITY` declarations are recognized to normalize attributes and
-  expand entities.
+- The internal DTD subset is parsed and checked for well-formedness.
+- `ATTLIST` declarations are recognized to apply normalization and default
+  values to attributes.
+- `ENTITY` declarations are recognized to expand entity references.
 
 This process has [security implications](#security); so if the default behavior
 is undesirable it may be configured.
@@ -77,27 +79,6 @@ non-validating[^2] processors and are explicitly not supported.
 [NaturalIntelligence/fast-xml-parser]: https://github.com/NaturalIntelligence/fast-xml-parser
 [xml proc types]: https://www.w3.org/TR/REC-xml/#proc-types
 
-## Encoding Support
-
-XML documents can specify their encoding through the XML or Text Declarations:
-
-```xml
-<?xml version="1.0" encoding="UTF-8" ?>
-```
-
-The `SaxDecoder` class supports parsing XML from `Uint8Array` chunks. Do not use
-`SaxDecoder` when the encoding is specified externally (e.g. via `Content-Type`
-or higher priority protocols).
-
-### Supported Encodings
-
-`SaxDecoder` uses [`TextDecoder`], supporting all encodings defined in the
-[Encoding Standard]. If a polyfill is used, ensure at least `UTF-8` and `UTF-16`
-decoders are supported.
-
-[`TextDecoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder
-[Encoding Standard]: https://encoding.spec.whatwg.org/
-
 ## Security
 
 XML Parsers may be subject to a number of possible vulnerabilities, most common
@@ -111,45 +92,27 @@ Document Type Declaration processing may (at user option) be disabled altogether
 to prevent any attack based on them.
 
 ```js
-// Doctype declarations will be rejected
-// Alternatively, set to "ignore" to allow them but prevent
-// them from affecting further parsing
-new SaxParser(reader, {dtd: "prohibit"})
+new SaxParser(reader, {
+  // Reject any DOCTYPE declaration
+  dtd: "prohibit",
+
+  // Alternatively, allow it but ignore any declarations
+  // dtd: "ignore",
+
+  // Enforce stricter limits over strings and values
+  // collected during parsing.
+  maxNameLength: 500,
+  maxAttributes: 500,
+  maxTextLength: 10000,
+  maxEntityLength: 1000,
+  maxEntityDepth: 5,
+})
 ```
 
 [Known XML Bombs](/test/data/) are tested for as part of regular integration
 tests and the parser is [fuzz tested](/fuzz/) regularly. Despite this being the
 case, for very sensible or security oriented apps you may want to conduct your
 own security audit.
-
-### Security Comparison Table
-
-The following table provides an overview of the most common XML vulnerabilities
-and whether comparable libraries are vulnerable to them.
-
-This table is provided in the hope it be useful, it does not guarantee to be
-exhaustive or to be kept up-to-date for any of the mentioned libraries.
-
-| XML Parser                            | DTD retrieval | XXE[^3] | Billion laughs[^4] | Quadratic Blowup[^4] |
-|---------------------------------------|---------------|---------|--------------------|----------------------|
-| saxe                                  | Safe          | Safe    | Mitigated[^5]      | Mitigated[^5]        |
-| saxe (dtd ignore)                     | Safe          | Safe    | Safe (entity)[^7]  | Safe (entity)[^7]    |
-| [isaacs/sax-js]                       | Safe          | Safe    | Not applicable[^6] | Safe (entity)[^7]    |
-| [lddubeau/saxes]                      | Safe          | Safe    | Not applicable[^6] | Safe (entity)[^7]    |
-| [NaturalIntelligence/fast-xml-parser] | Safe          | Safe    | Not applicable[^6] | Throws RangeError    |
-
-[^3]: [XML External Entity (XXE) Processing OWASP | Foundation][xxe owasp]
-[^4]: [XML Denial of Service Attacks and Defenses | Microsoft Learn][msdn xml dos]
-[^5]: Attack is mitigated against, crashes should be prevented, but depending on
-  the attack it still may require more processing time than expected.
-[^6]: Attack is prevented because entity expansion is not implemented or is not
-  compliant.
-[^7]: Safe assuming the user of the library does not define entities from
-  untrusted values.
-
-<!-- https://web.archive.org/web/20240515024616/https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing -->
-[xxe owasp]: https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
-[msdn xml dos]: https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
 
 ## License
 
