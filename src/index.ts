@@ -627,7 +627,7 @@ export class SaxParser {
   private textLength_ = 0;
 
   // @internal
-  protected elements_: string[] = [];
+  private elements_: string[] = [];
 
   // Stack of entities currently expanded, required for the WFC No Recursion and
   // to limit the depth of entity expansion allowed.
