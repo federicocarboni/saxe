@@ -100,8 +100,11 @@ class TestCaseReader implements SaxReader {
       this.description = "";
     }
   }
-  text(text: string): void {
-    this.description += text;
+  cdataSection(content: string): void {
+    this.text(content);
+  }
+  text(content: string): void {
+    this.description += content;
   }
 }
 

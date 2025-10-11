@@ -237,31 +237,41 @@ export interface SaxReader extends BaseReader {
    *
    * ```xml
    * <root>
-   * &entity;
+   *   &entity;
    * </root>
    * ```
    * @param name - Name of the entity.
    */
   entityRef?(name: string): boolean;
   /**
-   * Text and character data of the document.
+   * A CDATA section.
    *
    * ```xml
-   * <element>text &amp; content</element>
+   * <element>
+   *   <![CDATA[ content ]]>
+   * </element>
+   * ```
+   * @param content - CDATA content.
+   */
+  cdataSection(content: string): void;
+  /**
+   * Text content.
+   *
+   * ```xml
+   * <element>
+   *   content
+   * </element>
    * ```
    *
-   * The above example produces a `text` event with `text & content`.
+   * By default, the parser collects text content as if it were forming a DOM
+   * Text Node. {@linkcode SaxOptions.incompleteTextNodes} may be used to emit
+   * text events as soon as more data is available.
    *
-   * By default text is collected as if to form a DOM Text Node (CDATA sections
-   * are treated as part of text nodes), to reduce memory usage but produce more
-   * `text` events for the same text node enable `incompleteTextNodes`.
-   *
-   * Entity references which are not predefined (i.e. not `amp`, `lt`, `gt`,
-   * `apos` or `quot`) and not defined in the internal subset are handled by
-   * `entityRef`.
-   * @param text - Character data.
+   * Entity references not recognized by the parser are handled in
+   * {@linkcode entityRef}.
+   * @param content - Text content.
    */
-  text(text: string): void;
+  text(content: string): void;
 }
 
 export interface EntityProvider {
@@ -359,36 +369,14 @@ export interface SaxOptions {
    */
   entityProvider?: EntityProvider | undefined;
   /**
-   * Enable passing incomplete text nodes to the `text` handler. By default the
-   * parser collects text segments as if it were to form a DOM Text Node even if
-   * they are split in multiple chunks. This means the parser's output is always
-   * predictable even when chunks are unevenly sized. This option makes it so
-   * the parser emits `text` every time a chunk is received, reducing memory
-   * usage for large text nodes but making the parser's `text` calls potentially
-   * erratic.
+   * Emit {@linkcode SaxReader.text} as soon as data is available.
    *
-   * E.g. if the parser receives the following chunks:
+   * By default, the parser collects text content as it were forming a DOM Text
+   * Node, even when text spans multiple chunks. This makes the parser more
+   * predictable but delays output until the ending chunk is reached.
    *
-   * ```xml
-   * <element>some content
-   * ```
-   *
-   * ```xml
-   * some other content</element>
-   * ```
-   *
-   * For `incompleteTextNodes: false`, the parser will call `text` once with
-   * `some content some other content`.
-   *
-   * For `incompleteTextNodes: true`, the parser will instead call `text` twice,
-   * once with `some content` and the next with `some other content`.
-   *
-   * The same concept is also applied to CDATA sections because they are
-   * considered just part of document text.
-   *
-   * **Note**: while this can speed up documents with large chunks of text that
-   * will be ignored it can have a negative impact on documents with many short
-   * text nodes.
+   * Enabling this option prevents any buffering and causes the parser to emit
+   * {@linkcode SaxReader.text} as soon as data is available.
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
@@ -461,7 +449,7 @@ const enum Flags {
   CAPTURE_PI = 1 << 0,
   // Capture Comments or ignore them.
   CAPTURE_COMMENT = 1 << 1,
-  _RESERVED = 1 << 2,
+  EMIT_CDATA_SECTION = 1 << 2,
   // These are boolean properties in SaxOptions
   OPT_INCOMPLETE_TEXT_NODES = 1 << 3,
   // OPT_TEXT_ONLY_ENTITIES = 1 << 4,
@@ -648,7 +636,7 @@ export class SaxParser {
   private otherState_ = 0;
   // Stores flags and boolean options.
   // @internal
-  private flags_ = Flags.INIT;
+  protected flags_ = Flags.INIT;
   // @internal
   private charRef_ = 0;
   // @internal
@@ -2512,8 +2500,11 @@ export class SaxParser {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit === Chars.GT) {
       ++this.index_;
+      this.reader_.cdataSection(this.content_);
       this.state_ = State.TEXT_CONTENT;
       this.otherState_ = 0;
+      this.content_ = "";
+      this.textLength_ = 0;
     } else if (codeUnit === Chars.CLOSE_BRACKET) {
       ++this.index_;
       this.textLength_ += 1;
@@ -2801,7 +2792,8 @@ export interface SaxNamespaceReader extends BaseReader {
    */
   endTag(name: QName, resolver: NamespaceResolver): void;
   entityRef?(entityName: string, resolver: NamespaceResolver): boolean;
-  text(text: string, resolver: NamespaceResolver): void;
+  cdataSection(content: string, resolver: NamespaceResolver): void;
+  text(content: string, resolver: NamespaceResolver): void;
 }
 
 // @internal
@@ -2925,17 +2917,8 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   private elementPrefixes_: string[] = [];
   // @internal
   private reader_: SaxNamespaceReader;
-  processingInstruction?(target: string, content: string): void;
-  comment?(text: string): void;
   constructor(reader: SaxNamespaceReader) {
     this.reader_ = reader;
-    // Defining or not defining these functions influences parsing behavior.
-    if (this.reader_.processingInstruction != null) {
-      this.processingInstruction = this.processingInstruction_;
-    }
-    if (this.reader_.comment != null) {
-      this.comment = this.comment_;
-    }
   }
   lookupNamespace(prefix?: string | undefined): string | undefined {
     if (prefix === "") {
@@ -3007,11 +2990,11 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     return this.reader_.doctype?.(doctype);
   }
   // @internal
-  processingInstruction_(target: string, content: string) {
+  processingInstruction?(target: string, content: string) {
     return this.reader_.processingInstruction!(target, content);
   }
   // @internal
-  comment_(text: string) {
+  comment?(text: string) {
     return this.reader_.comment!(text);
   }
   // @internal
@@ -3129,8 +3112,11 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     this.reader_.endTag(this.parseQName_(name, false), this);
     this.popPrefixes_();
   }
-  text(text: string) {
-    return this.reader_.text(text, this);
+  cdataSection(content: string): void {
+    return this.reader_.cdataSection(content, this);
+  }
+  text(content: string) {
+    return this.reader_.text(content, this);
   }
 }
 
@@ -3143,6 +3129,12 @@ export class SaxNamespaceParser extends SaxParser {
     options: SaxNamespaceOptions | undefined = undefined,
   ) {
     super(new NamespaceResolver_(reader), options);
+    if (reader.processingInstruction == null) {
+      this.flags_ &= ~Flags.CAPTURE_PI;
+    }
+    if (reader.comment == null) {
+      this.flags_ &= ~Flags.CAPTURE_COMMENT;
+    }
   }
   // @internal
   protected override readName_(): string {
