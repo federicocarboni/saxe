@@ -303,40 +303,6 @@ export interface EntityProvider {
  */
 export interface SaxOptions {
   /**
-   * Enable passing incomplete text nodes to the `text` handler. By default the
-   * parser collects text segments as if it were to form a DOM Text Node even if
-   * they are split in multiple chunks. This means the parser's output is always
-   * predictable even when chunks are unevenly sized. This option makes it so
-   * the parser emits `text` every time a chunk is received, reducing memory
-   * usage for large text nodes but making the parser's `text` calls potentially
-   * erratic.
-   *
-   * E.g. if the parser receives the following chunks:
-   *
-   * ```xml
-   * <element>some content
-   * ```
-   *
-   * ```xml
-   * some other content</element>
-   * ```
-   *
-   * For `incompleteTextNodes: false`, the parser will call `text` once with
-   * `some content some other content`.
-   *
-   * For `incompleteTextNodes: true`, the parser will instead call `text` twice,
-   * once with `some content` and the next with `some other content`.
-   *
-   * The same concept is also applied to CDATA sections because they are
-   * considered just part of document text.
-   *
-   * **Note**: while this can speed up documents with large chunks of text that
-   * will be ignored it can have a negative impact on documents with many short
-   * text nodes.
-   * @default false
-   */
-  incompleteTextNodes?: boolean | undefined;
-  /**
    * Customize behavior for Document Type Declarations. Users may want to
    * disable doctypes because certain protocols prohibit them or for safer
    * processing.
@@ -388,7 +354,44 @@ export interface SaxOptions {
    * @default 10
    */
   maxEntityDepth?: number | undefined;
+  /**
+   * An entity provider to use when the parser has no declaration for an entity.
+   */
   entityProvider?: EntityProvider | undefined;
+  /**
+   * Enable passing incomplete text nodes to the `text` handler. By default the
+   * parser collects text segments as if it were to form a DOM Text Node even if
+   * they are split in multiple chunks. This means the parser's output is always
+   * predictable even when chunks are unevenly sized. This option makes it so
+   * the parser emits `text` every time a chunk is received, reducing memory
+   * usage for large text nodes but making the parser's `text` calls potentially
+   * erratic.
+   *
+   * E.g. if the parser receives the following chunks:
+   *
+   * ```xml
+   * <element>some content
+   * ```
+   *
+   * ```xml
+   * some other content</element>
+   * ```
+   *
+   * For `incompleteTextNodes: false`, the parser will call `text` once with
+   * `some content some other content`.
+   *
+   * For `incompleteTextNodes: true`, the parser will instead call `text` twice,
+   * once with `some content` and the next with `some other content`.
+   *
+   * The same concept is also applied to CDATA sections because they are
+   * considered just part of document text.
+   *
+   * **Note**: while this can speed up documents with large chunks of text that
+   * will be ignored it can have a negative impact on documents with many short
+   * text nodes.
+   * @default false
+   */
+  incompleteTextNodes?: boolean | undefined;
 }
 
 const enum State {

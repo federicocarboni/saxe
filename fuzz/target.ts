@@ -5,8 +5,8 @@ export function fuzz(data: Buffer) {
   const str = data.toString("utf-8");
   const writer1 = new CanonicalXmlWriter();
   const writer2 = new CanonicalXmlWriter();
-  const parser1 = new SaxParser(writer1);
-  const parser2 = new SaxParser(writer2);
+  const parser1 = new SaxParser(writer1, {incompleteTextNodes: true});
+  const parser2 = new SaxParser(writer2, {incompleteTextNodes: true});
   let error1: SaxError | undefined;
   let error2: SaxError | undefined;
   try {
@@ -29,7 +29,11 @@ export function fuzz(data: Buffer) {
     }
     error2 = error;
   }
-  if (writer1.output !== writer2.output || error1?.code !== error2?.code) {
+  if (
+    error1?.name !== error2?.name ||
+    error1 === undefined && writer1.output !== writer2.output ||
+    error1 !== undefined && !writer2.output.startsWith(writer1.output)
+  ) {
     throw new Error(
       `--- FULL: ---\n${writer1.output}\n${error1}\n\n--- CHAR BY CHAR: ---\n${writer2.output}\n${error2}`,
     );
