@@ -13,9 +13,9 @@ class XmlDeclReader implements SaxReader {
     return undefined;
   }
   entityRef?(): void {}
-  start(): void {}
-  empty(): void {}
-  end(): void {}
+  startTag(): void {}
+  emptyTag(): void {}
+  endTag(): void {}
   text(): void {}
 }
 

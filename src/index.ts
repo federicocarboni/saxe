@@ -104,7 +104,7 @@ export interface Doctype {
 }
 
 /**
- * An immutable view of the attributes of an XML tag.
+ * An immutable collection of the attributes of an XML tag.
  *
  * Attributes are iterable and ordered as specified in the XML tag. Default
  * attributes from internal declarations are positioned after explicitly
@@ -145,11 +145,14 @@ export interface Attributes {
   [Symbol.iterator](): IterableIterator<[string, string]>;
 }
 
-/**
- * https://www.w3.org/TR/REC-xml/
- * @since 1.0.0
- */
-export interface SaxReader {
+interface BaseReader {
+  /**
+   * Return the replacement text of an external entity or an entity declared in
+   * external markup declarations. For unparsed entities, or entities for which
+   * the application has no declarations `undefined` should be returned.
+   * @param entityName -
+   */
+  getGeneralEntity?(entityName: string): string | undefined;
   /**
    * XML declaration of the document.
    * @param declaration -
@@ -191,26 +194,13 @@ export interface SaxReader {
    * @param text - Comment text, leading or trailing spaces are not removed.
    */
   comment?(text: string): void;
-  /**
-   * Return the replacement text of an external entity or an entity declared in
-   * external markup declarations. For unparsed entities, or entities for which
-   * the application has no declarations `undefined` should be returned.
-   * @param entityName -
-   */
-  getGeneralEntity?(entityName: string): string | undefined;
-  /**
-   * A general entity reference. Only called for external or externally declared
-   * entities in XML content, undeclared entities appearing in attribute values
-   * is an error.
-   *
-   * ```xml
-   * <root>
-   * &entity;
-   * </root>
-   * ```
-   * @param entityName -
-   */
-  entityRef?(entityName: string): void;
+}
+
+/**
+ * https://www.w3.org/TR/REC-xml/
+ * @since 1.0.0
+ */
+export interface SaxReader extends BaseReader {
   /**
    * Start tag.
    *
@@ -222,7 +212,7 @@ export interface SaxReader {
    * duration of this call, implementors should make a copy to persist
    * attributes.
    */
-  start(name: string, attributes: Attributes): void;
+  startTag(name: string, attributes: Attributes): void;
   /**
    * An empty tag.
    *
@@ -234,7 +224,7 @@ export interface SaxReader {
    * duration of this call, implementors should make a copy to persist
    * attributes.
    */
-  empty(name: string, attributes: Attributes): void;
+  emptyTag(name: string, attributes: Attributes): void;
   /**
    * An end tag.
    *
@@ -243,7 +233,22 @@ export interface SaxReader {
    * ```
    * @param name - Name of the element.
    */
-  end(name: string): void;
+  endTag(name: string): void;
+  /**
+   * A general entity reference for which the parser has no declarations. Only
+   * called for entity references in document content, undeclared entities in
+   * attribute values are an error instead.
+   *
+   * If it is not implemented any undeclared entity becomes a fatal error.
+   *
+   * ```xml
+   * <root>
+   * &entity;
+   * </root>
+   * ```
+   * @param entityName -
+   */
+  entityRef?(entityName: string): void;
   /**
    * Text and character data of the document.
    *
@@ -622,7 +627,7 @@ export class SaxParser {
   private textLength_ = 0;
 
   // @internal
-  private elements_: string[] = [];
+  protected elements_: string[] = [];
 
   // Stack of entities currently expanded, required for the WFC No Recursion and
   // to limit the depth of entity expansion allowed.
@@ -1934,7 +1939,7 @@ export class SaxParser {
     this.setDefaultAttributes_();
     this.state_ = State.TEXT_CONTENT;
     this.otherState_ = 0;
-    this.reader_.start(this.element_, this.attributes_);
+    this.reader_.startTag(this.element_, this.attributes_);
     this.elements_.push(this.element_);
     this.element_ = "";
     this.attributes_.clear();
@@ -2117,7 +2122,7 @@ export class SaxParser {
           ? State.MISC
           : State.TEXT_CONTENT;
       this.otherState_ = 0;
-      this.reader_.empty(this.element_, this.attributes_);
+      this.reader_.emptyTag(this.element_, this.attributes_);
       this.element_ = "";
       this.attributes_.clear();
     } else {
@@ -2531,7 +2536,7 @@ export class SaxParser {
       ? State.MISC
       : State.TEXT_CONTENT;
     this.otherState_ = 0;
-    this.reader_.end(this.element_);
+    this.reader_.endTag(this.element_);
     this.element_ = "";
   }
 
@@ -2604,6 +2609,7 @@ export class SaxParser {
     return this.index_ !== this.chunk_.length;
   }
 }
+
 /** A qualified XML name for elements or attributes. */
 export interface QName {
   /** Qualified name of the element or attribute. */
@@ -2613,39 +2619,55 @@ export interface QName {
   /** Prefix part of the name, if any. */
   prefix?: string | undefined;
   /** Namespace URI, if any. */
-  uri?: string | undefined;
+  namespace?: string | undefined;
 }
+
 /**
- * A namespace-aware, immutable view of the attributes of an XML tag.
+ * An immutable namespace-aware collection of the attributes of an XML tag.
  *
  * @see {@linkcode Attributes}
  */
-export interface AttributesNs {
+export interface NamespaceAttributes {
   /** The number of attributes. */
   readonly size: number;
   /**
+   * Returns the value of the attribute from its local name and namespace.
+   *
+   * ```js
+   * // ✘ Qualified name is not supported
+   * attributes.get("xml:lang")
+   * // ✔ Namespaced attribute
+   * attributes.get("lang", XML_NAMESPACE)
+   * // ✔ No namespace
+   * attributes.get("href")
+   * ```
    * @param name - Local name of the attribute. Qualified names are not
    * supported.
-   * @param uri - Namespace URI for attributes with a namespace.
+   * @param namespace - Namespace URI for attributes with a namespace.
    * @returns - Returns the value of the attribute with the specified name and
    * namespace. If there is no attribute with the specified name and namespace
    * `undefined` is returned.
    */
-  get(name: string, uri?: string | undefined): string | undefined;
+  get(name: string, namespace?: string | undefined): string | undefined;
   /**
+   * Returns `true` if the specified attribute is present, `false` otherwise.
    * @param name - Local name of the attribute.
-   * @param uri - Namespace URI for attributes with a namespace.
+   * @param namespace - Namespace URI for attributes with a namespace.
    * @returns - Returns a boolean value indicating whether an attribute with the
    * specified name and namespace is present.
    */
-  has(name: string, uri?: string | undefined): boolean;
+  has(name: string, namespace?: string | undefined): boolean;
   /**
    * Executes `callbackfn` for each attribute.
    * @param callbackfn -
    * @param thisArg -
    */
   forEach(
-    callbackfn: (value: string, name: QName, attributes: AttributesNs) => void,
+    callbackfn: (
+      value: string,
+      name: QName,
+      attributes: NamespaceAttributes,
+    ) => void,
     thisArg?: unknown,
   ): void;
   /** @returns - Returns an iterator over the names of the attributes. */
@@ -2659,9 +2681,45 @@ export interface AttributesNs {
   [Symbol.iterator](): IterableIterator<[QName, string]>;
 }
 
-export interface SaxReaderNs
-  extends Omit<SaxReader, "start" | "empty" | "end">
-{
+/**
+ * Resolves namespace URIs and prefixes from the current element of an XML
+ * document, acting as if it were a DOM Node.
+ */
+export interface NamespaceResolver {
+  /**
+   * Returns the namespace URI associated with the specified prefix.
+   *
+   * - If `prefix` is `"xml"` the return value is always the XML namespace.
+   * - If `prefix` is `"xmlns"` the return value is always the XMLNS namespace.
+   * - If `prefix` is `undefined` the return value is the default namespace URI.
+   * @param prefix - Prefix to look for. Can be set to `undefined` to lookup the
+   * default namespace.
+   * @returns - Returns the namespace URI associated with the specified prefix.
+   * Returns `undefined` if the prefix is not found.
+   */
+  lookupNamespace(prefix?: string | undefined): string | undefined;
+  /**
+   * Returns the prefix for the given namespace URI. When multiple prefixes are
+   * possible, this function searches the current element, then its attributes,
+   * and proceeds recursively on its ancestors; the first match is returned. If
+   * no match is found it returns `undefined`.
+   *
+   * Note that the return value is the most recent prefix bound to the specified
+   * namespace, but if the prefix is shadowed by a later declaration it may not
+   * be currently associated to the specified namespace.
+   *
+   * - If `namespace` is the XML namespace the return value is always `"xml"`.
+   * - If `namespace` is the XMLNS namespace the return value is always
+   *   `"xmlns"`.
+   * - If `namespace` is empty the return value is always `undefined`.
+   * @param namespace - Namespace URI to look for.
+   * @returns - Returns the prefix for the given namespace URI, if present, or
+   * returns `undefined` if it is not.
+   */
+  lookupPrefix(namespace: string): string | undefined;
+}
+
+export interface SaxNamespaceReader extends BaseReader {
   /**
    * @param prefix - Prefix to look for. Can be set to `undefined` to lookup the
    * default namespace.
@@ -2680,7 +2738,11 @@ export interface SaxReaderNs
    * duration of this call, implementors should make a copy to persist
    * attributes.
    */
-  start(name: QName, attributes: AttributesNs): void;
+  startTag(
+    name: QName,
+    attributes: NamespaceAttributes,
+    resolver: NamespaceResolver,
+  ): void;
   /**
    * An empty tag.
    *
@@ -2692,7 +2754,11 @@ export interface SaxReaderNs
    * duration of this call, implementors should make a copy to persist
    * attributes.
    */
-  empty(name: QName, attributes: AttributesNs): void;
+  emptyTag(
+    name: QName,
+    attributes: NamespaceAttributes,
+    resolver: NamespaceResolver,
+  ): void;
   /**
    * An end tag.
    *
@@ -2701,7 +2767,9 @@ export interface SaxReaderNs
    * ```
    * @param name - Name of the element.
    */
-  end(name: QName): void;
+  endTag(name: QName, resolver: NamespaceResolver): void;
+  entityRef?(entityName: string, resolver: NamespaceResolver): void;
+  text(text: string, resolver: NamespaceResolver): void;
 }
 
 // @internal
@@ -2715,25 +2783,29 @@ function getQName(attribute: AttributeNs): QName {
     name: attribute.name,
     localName: attribute.localName,
     prefix: attribute.prefix,
-    uri: attribute.uri,
+    namespace: attribute.namespace,
   };
 }
 
 // @internal
-class AttributesNs_ implements AttributesNs {
+class NamespaceAttributes_ implements NamespaceAttributes {
   // @internal
   private map_ = new Map<string, AttributeNs>();
   // @internal
   clear_() {
     this.map_.clear();
   }
+  // Making a publicly mutable version is not feasible in a SAX-style parser.
+  // Manipulating attributes requires access to the internals of the namespace
+  // reader.
   // @internal
   add_(attribute: AttributeNs) {
-    const key = attribute.uri !== undefined
-      ? `${attribute.uri}:${attribute.localName}`
+    const key = attribute.namespace !== undefined
+      ? `${attribute.namespace}:${attribute.localName}`
       : attribute.localName;
     this.map_.set(key, attribute);
   }
+  // @internal
   iter_() {
     return this.map_.values();
   }
@@ -2751,7 +2823,11 @@ class AttributesNs_ implements AttributesNs {
     return this.get(name, uri) !== undefined;
   }
   forEach(
-    callbackfn: (value: string, name: QName, attributes: AttributesNs) => void,
+    callbackfn: (
+      value: string,
+      name: QName,
+      attributes: NamespaceAttributes,
+    ) => void,
     thisArg: unknown = undefined,
   ) {
     for (const attribute of this.iter_()) {
@@ -2763,12 +2839,12 @@ class AttributesNs_ implements AttributesNs {
       yield getQName(attribute);
     }
   }
-  *values(): Generator<string> {
+  *values(): IterableIterator<string> {
     for (const attribute of this.iter_()) {
       yield attribute.value;
     }
   }
-  *entries(): Generator<[QName, string]> {
+  *entries(): IterableIterator<[QName, string]> {
     for (const attribute of this.iter_()) {
       yield [getQName(attribute), attribute.value];
     }
@@ -2779,7 +2855,7 @@ class AttributesNs_ implements AttributesNs {
 }
 
 // @internal
-export type {AttributesNs_};
+export type {NamespaceAttributes_};
 
 function checkQName(name: string) {
   const colon = name.indexOf(":");
@@ -2793,28 +2869,30 @@ function checkQName(name: string) {
   }
 }
 
-const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
-const XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
+export const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
+export const XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
 
 // @internal
-class NamespaceReader implements SaxReader {
-  // prefix name -> URI (the last is the most recent)
+class NamespaceResolver_ implements SaxReader, NamespaceResolver {
+  // prefix -> namespace URI
   // @internal
-  private namespaces_ = new Map<string, string[]>([
-    ["xml", [XML_NAMESPACE]],
-    ["xmlns", [XMLNS_NAMESPACE]],
+  private namespaces_ = new Map<string, string>([
+    ["xml", XML_NAMESPACE],
+    ["xmlns", XMLNS_NAMESPACE],
   ]);
-  // Depth number -> prefix names
+  // Depth number -> [prefix, shadowed ns or empty string, ...]
+  // The root element is depth 1
   // @internal
-  private nsPrefixes_ = new Map<number, string[]>();
-  // @internal
-  private depth_ = 0;
+  private prefixBindings_ = new Map<number, string[]>();
   // Reused across calls
   // @internal
-  private attributes_ = new AttributesNs_();
+  private attributes_ = new NamespaceAttributes_();
+  // Required for faithful lookupPrefix
   // @internal
-  private reader_: SaxReaderNs;
-  constructor(reader: SaxReaderNs) {
+  private elementPrefixes_: string[] = [];
+  // @internal
+  private reader_: SaxNamespaceReader;
+  constructor(reader: SaxNamespaceReader) {
     this.reader_ = reader;
     // @ts-expect-error -- exactOptionalPropertyTypes does not allow setting optional methods to undefined
     this.processingInstruction = this.reader_.processingInstruction != null
@@ -2826,6 +2904,66 @@ class NamespaceReader implements SaxReader {
     this.entityRef = this.reader_.entityRef != null
       ? this.entityRef
       : undefined;
+  }
+  lookupNamespace(prefix?: string | undefined): string | undefined {
+    if (prefix === "") {
+      return undefined;
+    }
+    const namespace = this.namespaces_.get(prefix ?? "");
+    return namespace !== undefined
+      ? namespace
+      : this.reader_.lookupNamespace?.(prefix ?? undefined) ?? undefined;
+  }
+  lookupPrefix(namespace: string): string | undefined {
+    if (namespace === "") {
+      return undefined;
+    }
+    // These must be special cased because they may or must not be declared in
+    // XML documents so there may not be a prefix explicitly associated to them.
+    if (namespace === XML_NAMESPACE) {
+      return "xml";
+    }
+    if (namespace === XMLNS_NAMESPACE) {
+      return "xmlns";
+    }
+    // This function tries to be as faithful as possible to the DOM lookupPrefix
+    // method, which uses the following procedure:
+    // To locate a namespace prefix for an element using namespace, run these
+    // steps:
+    //   1. If element’s namespace is namespace and its namespace prefix is
+    //   non-null, then return its namespace prefix.
+    //   2. If element has an attribute whose namespace prefix is "xmlns" and
+    //   value is namespace, then return element’s first such attribute’s local
+    //   name.
+    //   3. If element’s parent element is not null, then return the result of
+    //   running locate a namespace prefix on that element using namespace.
+    //   4. Return null.
+
+    // To look at prefixes we have to backtrack in the namespaces table, so a
+    // copy is necessary here, lookupPrefix is not expected to be called often
+    // anyway and namespace declarations are usually very few.
+    const namespaces = new Map(this.namespaces_);
+    for (let depth = this.elementPrefixes_.length - 1; depth >= 0; depth--) {
+      const prefix = this.elementPrefixes_[depth]!;
+      const elementNamespace = namespaces.get(prefix);
+      if (prefix !== "" && namespace === elementNamespace) {
+        return prefix;
+      }
+      const bindings = this.prefixBindings_.get(depth);
+      if (bindings !== undefined) {
+        for (let i = 0; i < bindings.length; i += 2) {
+          const prefix = bindings[i]!;
+          const shadowed = bindings[i + 1]!;
+          const boundNamespace = namespaces.get(prefix);
+          if (prefix !== "" && namespace === boundNamespace) {
+            return prefix;
+          }
+          // Update the namespace map as we progress back up the parent elements
+          namespaces.set(prefix, shadowed);
+        }
+      }
+    }
+    return undefined;
   }
   xml?(declaration: XmlDeclaration) {
     return this.reader_.xml?.(declaration);
@@ -2846,7 +2984,7 @@ class NamespaceReader implements SaxReader {
     return this.reader_.getGeneralEntity?.(entityName);
   }
   entityRef?(entityName: string) {
-    return this.reader_.entityRef!(entityName);
+    return this.reader_.entityRef!(entityName, this);
   }
   // @internal
   private parseQName_(name: string, isAttribute: boolean): QName {
@@ -2866,25 +3004,22 @@ class NamespaceReader implements SaxReader {
       throw new SaxError("ReservedPrefix", {element: name});
     }
     const localName = name.slice(colon + 1);
-    const uris = prefix === undefined && isAttribute
-      ? undefined
-      : this.namespaces_.get(prefix ?? "");
-    let uri = uris?.[uris.length - 1];
-    if (uri === undefined && (prefix !== undefined || !isAttribute)) {
-      uri = this.reader_.lookupNamespace?.(prefix);
-    }
-    if (prefix !== undefined && uri == null) {
+    const namespace = prefix === undefined && isAttribute
+      // Attribute xmlns despite not having a prefix has the XMLNS namespace
+      ? (name === "xmlns" ? XMLNS_NAMESPACE : undefined)
+      : this.lookupNamespace(prefix);
+    if (prefix !== undefined && namespace === undefined) {
       throw new SaxError("UndeclaredPrefix", {
         attribute: isAttribute ? name : undefined,
         element: isAttribute ? undefined : name,
       });
     }
-    return {name, localName, prefix, uri};
+    return {name, localName, prefix, namespace};
   }
   // @internal
-  private handleAttributes_(attributes: Attributes): AttributesNs {
+  private handleAttributes_(attributes: Attributes): NamespaceAttributes {
     this.attributes_.clear_();
-    const prefixes = [];
+    const bindings = [];
     // Collect namespaces first.
     for (const [name, value] of attributes) {
       if (
@@ -2914,16 +3049,12 @@ class NamespaceReader implements SaxReader {
       if (value === "") {
         throw new SaxError("PrefixUndeclaring", {attribute: name});
       }
-      let ns = this.namespaces_.get(prefix);
-      if (ns === undefined) {
-        ns = [];
-        this.namespaces_.set(prefix, ns);
-      }
-      ns.push(value);
-      prefixes.push(prefix);
+      const shadowed = this.namespaces_.get(prefix) ?? "";
+      this.namespaces_.set(prefix, value);
+      bindings.push(prefix, shadowed);
     }
-    if (prefixes.length !== 0) {
-      this.nsPrefixes_.set(this.depth_, prefixes);
+    if (bindings.length !== 0) {
+      this.prefixBindings_.set(this.elementPrefixes_.length, bindings);
     }
     for (const [name, value] of attributes) {
       const attribute = Object.assign({value}, this.parseQName_(name, true));
@@ -2933,47 +3064,53 @@ class NamespaceReader implements SaxReader {
   }
   // @internal
   private popPrefixes_() {
-    const prefixes = this.nsPrefixes_.get(this.depth_);
-    this.nsPrefixes_.delete(this.depth_);
-    this.depth_--;
-    if (prefixes !== undefined) {
-      for (const prefix of prefixes) {
-        const uris = this.namespaces_.get(prefix)!;
-        uris.pop();
-        if (uris.length === 0) {
+    this.elementPrefixes_.pop();
+    const depth = this.elementPrefixes_.length;
+    const bindings = this.prefixBindings_.get(depth);
+    this.prefixBindings_.delete(depth);
+    if (bindings !== undefined) {
+      for (let i = 0; i < bindings.length; i += 2) {
+        const prefix = bindings[i]!;
+        const shadowed = bindings[i + 1]!;
+        if (shadowed === "") {
           this.namespaces_.delete(prefix);
+        } else {
+          this.namespaces_.set(prefix, shadowed);
         }
       }
     }
   }
-  start(name: string, attributes: Attributes) {
-    this.depth_ += 1;
+  startTag(name: string, attributes: Attributes) {
     const attributesNs = this.handleAttributes_(attributes);
     const qName = this.parseQName_(name, false);
-    this.reader_.start(qName, attributesNs);
+    this.elementPrefixes_.push(qName.prefix ?? "");
+    this.reader_.startTag(qName, attributesNs, this);
   }
-  empty(name: string, attributes: Attributes) {
-    this.depth_ += 1;
+  emptyTag(name: string, attributes: Attributes) {
     const attributesNs = this.handleAttributes_(attributes);
     const qName = this.parseQName_(name, false);
-    this.reader_.empty(qName, attributesNs);
+    this.elementPrefixes_.push(qName.prefix ?? "");
+    this.reader_.emptyTag(qName, attributesNs, this);
     this.popPrefixes_();
   }
-  end(name: string) {
-    this.reader_.end(this.parseQName_(name, false));
+  endTag(name: string) {
+    this.reader_.endTag(this.parseQName_(name, false), this);
     this.popPrefixes_();
   }
   text(text: string) {
-    return this.reader_.text(text);
+    return this.reader_.text(text, this);
   }
 }
 
-export class SaxParserNs extends SaxParser {
+export interface SaxNamespaceOptions extends SaxOptions {
+}
+
+export class SaxNamespaceParser extends SaxParser {
   constructor(
-    reader: SaxReaderNs,
-    options: SaxOptions | undefined = undefined,
+    reader: SaxNamespaceReader,
+    options: SaxNamespaceOptions | undefined = undefined,
   ) {
-    super(new NamespaceReader(reader), options);
+    super(new NamespaceResolver_(reader), options);
   }
   // @internal
   protected override readName_(): string {

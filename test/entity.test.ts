@@ -16,14 +16,14 @@ class CanonicalEntityReader implements SaxReader {
   entityRef(entity: string): void {
     this.entity = entity;
   }
-  start(name: string, attributes: Attributes): void {
-    this.canonical.start(name, attributes);
+  startTag(name: string, attributes: Attributes): void {
+    this.canonical.startTag(name, attributes);
   }
-  empty(name: string, attributes: Attributes): void {
-    this.canonical.empty(name, attributes);
+  emptyTag(name: string, attributes: Attributes): void {
+    this.canonical.emptyTag(name, attributes);
   }
-  end(name: string): void {
-    this.canonical.end(name);
+  endTag(name: string): void {
+    this.canonical.endTag(name);
   }
   text(text: string): void {
     this.canonical.text(text);

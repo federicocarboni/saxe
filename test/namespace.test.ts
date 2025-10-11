@@ -1,5 +1,13 @@
 import {expect} from "chai";
-import {AttributesNs, QName, SaxParserNs, SaxReaderNs} from "../src/index.ts";
+import {
+  NamespaceAttributes,
+  Doctype,
+  NamespaceResolver,
+  QName,
+  SaxNamespaceParser,
+  SaxNamespaceReader,
+  XmlDeclaration,
+} from "../src/index.ts";
 
 interface Node {
   name: QName;
@@ -16,20 +24,20 @@ function copyQName(name: QName): QName {
   if (name.prefix != null) {
     nameCopy.prefix = name.prefix;
   }
-  if (name.uri != null) {
-    nameCopy.uri = name.uri;
+  if (name.namespace != null) {
+    nameCopy.namespace = name.namespace;
   }
   return nameCopy;
 }
 
 // Builds a very basic DOM from an XML document
-class TreeBuilder implements SaxReaderNs {
+class TreeBuilder implements SaxNamespaceReader {
   // lookupNamespace?(prefix: string | undefined): string | undefined {
   //   throw new Error("Method not implemented.");
   // }
   root: Node | undefined = undefined;
   private nodeStack_: Node[] = [];
-  private pushNode_(name: QName, attributes: AttributesNs, empty: boolean) {
+  private pushNode_(name: QName, attributes: NamespaceAttributes, empty: boolean) {
     const node: Node = {
       name: copyQName(name),
       attributes: Array.from(
@@ -46,13 +54,13 @@ class TreeBuilder implements SaxReaderNs {
     }
     this.nodeStack_.push(node);
   }
-  start(name: QName, attributes: AttributesNs): void {
+  startTag(name: QName, attributes: NamespaceAttributes): void {
     this.pushNode_(name, attributes, false);
   }
-  empty(name: QName, attributes: AttributesNs): void {
+  emptyTag(name: QName, attributes: NamespaceAttributes): void {
     this.pushNode_(name, attributes, true);
   }
-  end(name: QName): void {
+  endTag(name: QName): void {
     void name;
     this.nodeStack_.pop();
   }
@@ -65,7 +73,7 @@ class TreeBuilder implements SaxReaderNs {
 
 function getTree(input: string): Node | undefined {
   const treeBuilder = new TreeBuilder();
-  const parser = new SaxParserNs(treeBuilder);
+  const parser = new SaxNamespaceParser(treeBuilder);
   parser.write(input);
   parser.end();
   return treeBuilder.root;
@@ -93,19 +101,27 @@ describe("namespace", function() {
           attributes: [[{name: "attr", localName: "attr"}, "value"]],
           empty: true,
           children: [{
-            name: {name: "ns", localName: "ns", uri: "urn:default"},
-            attributes: [[{name: "xmlns", localName: "xmlns"}, "urn:default"], [
+            name: {name: "ns", localName: "ns", namespace: "urn:default"},
+            attributes: [[{
+              name: "xmlns",
+              localName: "xmlns",
+              namespace: "http://www.w3.org/2000/xmlns/",
+            }, "urn:default"], [
               {
                 name: "xmlns:a",
                 localName: "a",
                 prefix: "xmlns",
-                uri: "http://www.w3.org/2000/xmlns/",
+                namespace: "http://www.w3.org/2000/xmlns/",
               },
               "urn:a",
             ]],
             empty: false,
             children: [{
-              name: {name: "empty", localName: "empty", uri: "urn:default"},
+              name: {
+                name: "empty",
+                localName: "empty",
+                namespace: "urn:default",
+              },
               attributes: [[{name: "attr", localName: "attr"}, "value"]],
               empty: true,
               children: [{
@@ -113,25 +129,33 @@ describe("namespace", function() {
                   name: "a:empty",
                   localName: "empty",
                   prefix: "a",
-                  uri: "urn:a",
+                  namespace: "urn:a",
                 },
                 attributes: [[{
                   name: "a:attr",
                   localName: "attr",
                   prefix: "a",
-                  uri: "urn:a",
+                  namespace: "urn:a",
                 }, "value"]],
                 empty: true,
                 children: [{
-                  name: {name: "ns", localName: "ns", uri: "urn:default-other"},
+                  name: {
+                    name: "ns",
+                    localName: "ns",
+                    namespace: "urn:default-other",
+                  },
                   attributes: [[
-                    {name: "xmlns", localName: "xmlns"},
+                    {
+                      name: "xmlns",
+                      localName: "xmlns",
+                      namespace: "http://www.w3.org/2000/xmlns/",
+                    },
                     "urn:default-other",
                   ], [{
                     name: "xmlns:a",
                     localName: "a",
                     prefix: "xmlns",
-                    uri: "http://www.w3.org/2000/xmlns/",
+                    namespace: "http://www.w3.org/2000/xmlns/",
                   }, "urn:a-other"]],
                   empty: false,
                   children: [{
@@ -139,13 +163,13 @@ describe("namespace", function() {
                       name: "a:empty",
                       localName: "empty",
                       prefix: "a",
-                      uri: "urn:a-other",
+                      namespace: "urn:a-other",
                     },
                     attributes: [[{
                       name: "a:attr",
                       localName: "attr",
                       prefix: "a",
-                      uri: "urn:a-other",
+                      namespace: "urn:a-other",
                     }, "value"]],
                     empty: true,
                     children: [],
@@ -154,13 +178,13 @@ describe("namespace", function() {
                       name: "a:empty",
                       localName: "empty",
                       prefix: "a",
-                      uri: "urn:a",
+                      namespace: "urn:a",
                     },
                     attributes: [[{
                       name: "a:attr",
                       localName: "attr",
                       prefix: "a",
-                      uri: "urn:a",
+                      namespace: "urn:a",
                     }, "value"]],
                     empty: true,
                     children: [],
@@ -176,35 +200,35 @@ describe("namespace", function() {
   it("not-wf: namespace not declared", function() {
     expect(() => getTree('<root xmlns="urn:default"><a:empty /></root>'))
       .throws().and.includes({
-        code: "UNDECLARED_PREFIX",
+        name: "UndeclaredPrefix",
         element: "a:empty",
       });
   });
   it("not-wf: invalid prefix", function() {
     expect(() => getTree('<root xmlns:a:="urn:default"><a:empty /></root>'))
       .throws().and.includes({
-        code: "INVALID_QNAME",
+        name: "InvalidQName",
         attribute: "xmlns:a:",
       });
   });
-  it("not-wf: empty namespace URI", function() {
+  it("not-wf: empty namespace namespace", function() {
     expect(() => getTree('<root xmlns:a=""><a:empty /></root>'))
       .throws().and.includes({
-        code: "PREFIX_UNDECLARING",
+        name: "PrefixUndeclaring",
         attribute: "xmlns:a",
       });
   });
   it("not-wf: xmlns reserved prefix", function() {
     expect(() => getTree('<root xmlns:xmlns=""><a:empty /></root>'))
       .throws().and.includes({
-        code: "RESERVED_PREFIX",
+        name: "ReservedPrefix",
         attribute: "xmlns:xmlns",
       });
   });
   it("not-wf: xml reserved prefix", function() {
     expect(() => getTree('<root xmlns:xml="urn:default"><a:empty /></root>'))
       .throws().and.includes({
-        code: "RESERVED_PREFIX",
+        name: "ReservedPrefix",
         attribute: "xmlns:xml",
       });
   });
@@ -220,7 +244,7 @@ describe("namespace", function() {
           localName: "xml",
           name: "xmlns:xml",
           prefix: "xmlns",
-          uri: "http://www.w3.org/2000/xmlns/",
+          namespace: "http://www.w3.org/2000/xmlns/",
         }, "http://www.w3.org/XML/1998/namespace"]],
         children: [],
         empty: false,
@@ -235,8 +259,71 @@ describe("namespace", function() {
     )
       .throws()
       .and.includes({
-        code: "RESERVED_PREFIX",
+        name: "ReservedPrefix",
         element: "xmlns:empty",
       });
   });
 });
+
+// class Reader implements SaxNamespaceReader {
+//   private depth_ = 0;
+//   constructor(
+//     private callback_: (
+//       depth: number,
+//       resolver: NamespaceResolver,
+//       name: QName,
+//     ) => void,
+//   ) {
+//   }
+//   startTag(
+//     name: QName,
+//     attributes: NamespaceAttributes,
+//     resolver: NamespaceResolver,
+//   ): void {
+//     console.log(attributes, resolver);
+
+//     this.callback_(this.depth_, resolver, name);
+//     void attributes;
+//     this.depth_ += 1;
+//   }
+//   emptyTag(
+//     name: QName,
+//     attributes: NamespaceAttributes,
+//     resolver: NamespaceResolver,
+//   ): void {
+//     this.startTag(name, attributes, resolver);
+//     this.endTag(name, resolver);
+//   }
+//   endTag(name: QName, resolver: NamespaceResolver): void {
+//     // this.callback_(this.depth_, resolver, name);
+//     void name;
+//     void resolver;
+//   }
+//   text(text: string): void {
+//     void text;
+//   }
+// }
+
+// describe("NamespaceResolver", function() {
+//   it("works", function() {
+//     const reader = new Reader((depth, resolver) => {
+//       if (depth === 1) {
+//         expect(resolver.lookupPrefix("urn:a")).equals("foo");
+//         console.log(resolver.lookupNamespace("foo"));
+//         console.log(resolver.lookupNamespace("xml"));
+//         console.log(resolver.lookupNamespace("xmlns"));
+//         console.log(resolver.lookupPrefix("urn:a"));
+//         console.log(resolver.lookupPrefix("urn:b"));
+//       } else {
+//         console.log(resolver.lookupNamespace("foo"));
+//         console.log(resolver.lookupNamespace("xml"));
+//         console.log(resolver.lookupNamespace("xmlns"));
+//         console.log(resolver.lookupPrefix("urn:a"));
+//         console.log(resolver.lookupPrefix("urn:b"));
+//       }
+//     });
+//     const parser = new SaxNamespaceParser(reader);
+//     parser.write(`<doc xmlns:foo="urn:a"><foo:empty xmlns:bar="urn:a" /></doc>`);
+//     parser.end();
+//   });
+// });

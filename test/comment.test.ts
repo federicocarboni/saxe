@@ -8,9 +8,9 @@ function getComment(...chunks: string[]) {
       comment = text;
     },
     entityRef() {},
-    start() {},
-    empty() {},
-    end() {},
+    startTag() {},
+    emptyTag() {},
+    endTag() {},
     text() {},
   });
   for (const chunk of chunks) {

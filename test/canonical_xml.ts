@@ -42,7 +42,7 @@ export class CanonicalXmlWriter implements SaxReader {
   // There are no comments in Canonical XML
   comment(): void {
   }
-  start(name: string, attributes: Attributes): void {
+  startTag(name: string, attributes: Attributes): void {
     this.output += `<${name}`;
     // As per canonical XML rule lexicographically sort attributes
     const attribs = [...attributes].sort(([a], [b]) => a < b ? -1 : 1);
@@ -51,11 +51,11 @@ export class CanonicalXmlWriter implements SaxReader {
     }
     this.output += ">";
   }
-  empty(name: string, attributes: Attributes): void {
-    this.start(name, attributes);
-    this.end(name);
+  emptyTag(name: string, attributes: Attributes): void {
+    this.startTag(name, attributes);
+    this.endTag(name);
   }
-  end(name: string): void {
+  endTag(name: string): void {
     this.output += `</${name}>`;
   }
   text(text: string): void {

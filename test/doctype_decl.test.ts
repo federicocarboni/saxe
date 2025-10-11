@@ -7,9 +7,9 @@ class DoctypeDeclReader implements SaxReader {
     this.doctypeDecl = doctype;
   }
   entityRef() {}
-  start() {}
-  empty() {}
-  end() {}
+  startTag() {}
+  emptyTag() {}
+  endTag() {}
   text() {}
 }
 

@@ -11,9 +11,9 @@ function getPi(...chunks: string[]) {
       pi = {target, content};
     },
     entityRef() {},
-    start() {},
-    empty() {},
-    end() {},
+    startTag() {},
+    emptyTag() {},
+    endTag() {},
     text() {},
   });
   for (const chunk of chunks) {

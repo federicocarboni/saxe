@@ -58,7 +58,7 @@ class TestCaseReader implements SaxReader {
   entityRef(entity: string): void {
     void entity;
   }
-  start(name: string, attributes: Attributes): void {
+  startTag(name: string, attributes: Attributes): void {
     if (name === "TEST" && attributes.get("ENTITIES") === "none") {
       this.currentType = attributes.get("TYPE");
       this.currentUri = path.join(this.baseUri, attributes.get("URI")!);
@@ -68,11 +68,11 @@ class TestCaseReader implements SaxReader {
       this.currentId = attributes.get("ID");
     }
   }
-  empty(name: string, attributes: Attributes): void {
+  emptyTag(name: string, attributes: Attributes): void {
     void name;
     void attributes;
   }
-  end(name: string): void {
+  endTag(name: string): void {
     if (
       name === "TEST" &&
       this.currentType !== undefined && this.currentUri !== undefined &&
