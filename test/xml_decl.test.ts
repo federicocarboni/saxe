@@ -9,10 +9,9 @@ class XmlDeclReader implements SaxReader {
   doctype?(): void {}
   processingInstruction?(): void {}
   comment?(): void {}
-  getGeneralEntity?(): string | undefined {
-    return undefined;
+  entityRef?(): boolean {
+    return true;
   }
-  entityRef?(): void {}
   startTag(): void {}
   emptyTag(): void {}
   endTag(): void {}

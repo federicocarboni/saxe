@@ -5,16 +5,12 @@ import {CanonicalXmlWriter} from "./canonical_xml.ts";
 class CanonicalEntityReader implements SaxReader {
   public entity: string | undefined;
   public canonical: CanonicalXmlWriter;
-  constructor(private entities: Record<string, string>) {
+  constructor() {
     this.canonical = new CanonicalXmlWriter();
   }
-  getGeneralEntity(entity: string): string | undefined {
-    return this.entities.hasOwnProperty(entity)
-      ? this.entities[entity]
-      : undefined;
-  }
-  entityRef(entity: string): void {
+  entityRef(entity: string): boolean {
     this.entity = entity;
+    return true;
   }
   startTag(name: string, attributes: Attributes): void {
     this.canonical.startTag(name, attributes);
@@ -31,8 +27,16 @@ class CanonicalEntityReader implements SaxReader {
 }
 
 function getEntity(entities: Record<string, string>, ...chunks: string[]) {
-  const reader = new CanonicalEntityReader(entities);
-  const parser = new SaxParser(reader);
+  const reader = new CanonicalEntityReader();
+  const parser = new SaxParser(reader, {
+    entityProvider: {
+      getEntity(entity: string): string | undefined {
+        return entities.hasOwnProperty(entity)
+          ? entities[entity]
+          : undefined;
+      },
+    },
+  });
   for (const chunk of chunks) {
     parser.write(chunk);
   }

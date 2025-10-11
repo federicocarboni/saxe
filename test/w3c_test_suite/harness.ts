@@ -55,8 +55,9 @@ class TestCaseReader implements SaxReader {
     public baseUri: string,
     public testCases = new Map<string, TestCase[]>(),
   ) {}
-  entityRef(entity: string): void {
+  entityRef(entity: string): boolean {
     void entity;
+    return true;
   }
   startTag(name: string, attributes: Attributes): void {
     if (name === "TEST" && attributes.get("ENTITIES") === "none") {

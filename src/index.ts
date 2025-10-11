@@ -147,13 +147,6 @@ export interface Attributes {
 
 interface BaseReader {
   /**
-   * Return the replacement text of an external entity or an entity declared in
-   * external markup declarations. For unparsed entities, or entities for which
-   * the application has no declarations `undefined` should be returned.
-   * @param entityName -
-   */
-  getGeneralEntity?(entityName: string): string | undefined;
-  /**
    * XML declaration of the document.
    * @param declaration -
    */
@@ -235,20 +228,21 @@ export interface SaxReader extends BaseReader {
    */
   endTag(name: string): void;
   /**
-   * A general entity reference for which the parser has no declarations. Only
-   * called for entity references in document content, undeclared entities in
-   * attribute values are an error instead.
+   * A general entity reference in document content, for which the parser has no
+   * declarations. Undeclared entities in attribute values are always an error.
    *
-   * If it is not implemented any undeclared entity becomes a fatal error.
+   * This function should return `true` if `name` was recognized. If this
+   * function is not defined or returns `false` the parser throws an
+   * `UndeclaredEntity` error.
    *
    * ```xml
    * <root>
    * &entity;
    * </root>
    * ```
-   * @param entityName -
+   * @param name - Name of the entity.
    */
-  entityRef?(entityName: string): void;
+  entityRef?(name: string): boolean;
   /**
    * Text and character data of the document.
    *
@@ -268,6 +262,40 @@ export interface SaxReader extends BaseReader {
    * @param text - Character data.
    */
   text(text: string): void;
+}
+
+export interface EntityProvider {
+  /**
+   * Returns the replacement text of an external entity or an entity declared in
+   * external markup declarations. Returns `undefined` for entity names with no
+   * declaration.
+   *
+   * Note that replacement text is not treated as literal *plain* text, it is
+   * parsed as *markup*, so it may contain elements, character references, or
+   * even other entity references.
+   *
+   * If the entity value should be treated as literal plain text it should be
+   * escaped with {@linkcode escape} before returning it.
+   *
+   * ## Example
+   *
+   * ```js
+   * getEntity(name) {
+   *   if (name === "foo") {
+   *     // Parsed as start tag 'bar', entity ref 'baz', end tag 'bar'
+   *     return "<bar>&baz;</bar>";
+   *   }
+   *   if (name === "boo") {
+   *     // Parsed as the literal text '<bar>&baz;</bar>'
+   *     return escape("<bar>&baz;</bar>");
+   *   }
+   *   return undefined;
+   * }
+   * ```
+   * @param name - Name of the entity.
+   * @returns - Returns the replacement text of the specified entity.
+   */
+  getEntity(name: string): string | undefined;
 }
 
 /**
@@ -360,6 +388,7 @@ export interface SaxOptions {
    * @default 10
    */
   maxEntityDepth?: number | undefined;
+  entityProvider?: EntityProvider | undefined;
 }
 
 const enum State {
@@ -588,6 +617,8 @@ export class SaxParser {
 
   // @internal
   private reader_: SaxReader;
+  // @internal
+  private entityProvider_: EntityProvider | undefined;
 
   // Options
   // @internal
@@ -711,6 +742,7 @@ export class SaxParser {
     this.maxTextLength_ = options?.maxTextLength ?? 10_000_000;
     this.maxEntityLength_ = options?.maxEntityLength ?? 1_000_000;
     this.maxEntityDepth_ = options?.maxEntityDepth ?? 10;
+    this.entityProvider_ = options?.entityProvider ?? undefined;
   }
 
   /**
@@ -2267,7 +2299,7 @@ export class SaxParser {
       // Allow the application to set a default value for an entity not
       // declared in internal markup declarations.
       if (entityValue === EntityDecl.EXTERNAL || entityValue === undefined) {
-        entityValue = this.reader_.getGeneralEntity?.(this.entity_);
+        entityValue = this.entityProvider_?.getEntity(this.entity_);
       }
       if (entityValue == null) {
         if (
@@ -2282,16 +2314,13 @@ export class SaxParser {
           // complicated and not generally useful (an application can still
           // just return any value from getGeneralEntity to suppress the error)
           this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED ||
-          // If the application does not handle undeclared entities throw an
-          // error
-          this.reader_.entityRef == null
+          // Allow the application to handle undeclared entities in content.
+          !this.reader_.entityRef?.(this.entity_)
         ) {
           throw new SaxError("UndeclaredEntity", {
             entity: this.entity_,
           });
         }
-        // Allow the application to handle undeclared entities in content.
-        this.reader_.entityRef(this.entity_);
       } else {
         this.entityLength_ += entityValue.length;
         if (
@@ -2768,7 +2797,7 @@ export interface SaxNamespaceReader extends BaseReader {
    * @param name - Name of the element.
    */
   endTag(name: QName, resolver: NamespaceResolver): void;
-  entityRef?(entityName: string, resolver: NamespaceResolver): void;
+  entityRef?(entityName: string, resolver: NamespaceResolver): boolean;
   text(text: string, resolver: NamespaceResolver): void;
 }
 
@@ -2895,7 +2924,6 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   private reader_: SaxNamespaceReader;
   processingInstruction?(target: string, content: string): void;
   comment?(text: string): void;
-  entityRef?(entityName: string): void;
   constructor(reader: SaxNamespaceReader) {
     this.reader_ = reader;
     // Defining or not defining these functions influences parsing behavior.
@@ -2904,10 +2932,6 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
     if (this.reader_.comment != null) {
       this.comment = this.comment_;
-    }
-    // If entityRef is not defined the parser errors on undeclared entities.
-    if (this.reader_.entityRef != null) {
-      this.entityRef = this.entityRef_;
     }
   }
   lookupNamespace(prefix?: string | undefined): string | undefined {
@@ -2970,9 +2994,6 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
     return undefined;
   }
-  getGeneralEntity?(entityName: string) {
-    return this.reader_.getGeneralEntity?.(entityName);
-  }
   xml?(declaration: XmlDeclaration) {
     return this.reader_.xml?.(declaration);
   }
@@ -2991,8 +3012,8 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     return this.reader_.comment!(text);
   }
   // @internal
-  entityRef_(entityName: string) {
-    return this.reader_.entityRef!(entityName, this);
+  entityRef?(entityName: string) {
+    return !!this.reader_.entityRef?.(entityName, this);
   }
   // @internal
   private parseQName_(name: string, isAttribute: boolean): QName {
