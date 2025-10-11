@@ -2893,18 +2893,22 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   private elementPrefixes_: string[] = [];
   // @internal
   private reader_: SaxNamespaceReader;
+  processingInstruction?(target: string, content: string): void;
+  comment?(text: string): void;
+  entityRef?(entityName: string): void;
   constructor(reader: SaxNamespaceReader) {
     this.reader_ = reader;
-    // @ts-expect-error -- exactOptionalPropertyTypes does not allow setting optional methods to undefined
-    this.processingInstruction = this.reader_.processingInstruction != null
-      ? this.processingInstruction
-      : undefined;
-    // @ts-expect-error -- exactOptionalPropertyTypes does not allow setting optional methods to undefined
-    this.comment = this.reader_.comment != null ? this.comment : undefined;
-    // @ts-expect-error -- exactOptionalPropertyTypes does not allow setting optional methods to undefined
-    this.entityRef = this.reader_.entityRef != null
-      ? this.entityRef
-      : undefined;
+    // Defining or not defining these functions influences parsing behavior.
+    if (this.reader_.processingInstruction != null) {
+      this.processingInstruction = this.processingInstruction_;
+    }
+    if (this.reader_.comment != null) {
+      this.comment = this.comment_;
+    }
+    // If entityRef is not defined the parser errors on undeclared entities.
+    if (this.reader_.entityRef != null) {
+      this.entityRef = this.entityRef_;
+    }
   }
   lookupNamespace(prefix?: string | undefined): string | undefined {
     if (prefix === "") {
@@ -2966,6 +2970,9 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
     return undefined;
   }
+  getGeneralEntity?(entityName: string) {
+    return this.reader_.getGeneralEntity?.(entityName);
+  }
   xml?(declaration: XmlDeclaration) {
     return this.reader_.xml?.(declaration);
   }
@@ -2975,16 +2982,16 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     checkQName(doctype.name);
     return this.reader_.doctype?.(doctype);
   }
-  processingInstruction?(target: string, content: string) {
+  // @internal
+  processingInstruction_(target: string, content: string) {
     return this.reader_.processingInstruction!(target, content);
   }
-  comment?(text: string) {
+  // @internal
+  comment_(text: string) {
     return this.reader_.comment!(text);
   }
-  getGeneralEntity?(entityName: string) {
-    return this.reader_.getGeneralEntity?.(entityName);
-  }
-  entityRef?(entityName: string) {
+  // @internal
+  entityRef_(entityName: string) {
     return this.reader_.entityRef!(entityName, this);
   }
   // @internal
