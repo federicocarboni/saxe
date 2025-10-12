@@ -2838,15 +2838,17 @@ class NamespaceAttributes_ implements NamespaceAttributes {
   get size() {
     return this.map_.size;
   }
-  get(name: string, uri?: string | undefined): string | undefined {
+  get(name: string, namespace?: string | undefined): string | undefined {
     // Name must be an NCName
     if (name.indexOf(":") !== -1) {
       return undefined;
     }
-    return this.map_.get(uri != null ? `${uri}:${name}` : name)?.value;
+    const key = namespace != null ? `${namespace}:${name}` : name;
+    const attribute = this.map_.get(key);
+    return attribute !== undefined ? attribute.value : undefined;
   }
-  has(name: string, uri?: string | undefined): boolean {
-    return this.get(name, uri) !== undefined;
+  has(name: string, namespace?: string | undefined): boolean {
+    return this.get(name, namespace) !== undefined;
   }
   forEach(
     callbackfn: (
