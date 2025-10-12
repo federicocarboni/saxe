@@ -4,10 +4,9 @@ import {SaxParser} from "../src/index.ts";
 function getComment(...chunks: string[]) {
   let comment: string | undefined;
   const parser = new SaxParser({
-    comment(text) {
-      comment = text;
+    comment(content) {
+      comment = content;
     },
-    entityRef() {},
     startTag() {},
     emptyTag() {},
     endTag() {},
