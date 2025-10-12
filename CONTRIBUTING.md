@@ -76,8 +76,6 @@ https://google.github.io/styleguide/jsguide.html
 - `UPPER_SNAKE_CASE` for enum variants and values intended to be constant
 - Acronyms only have their first letter capitalized, e.g. `XMLParser` should
   instead be `XmlParser`
-- Avoid getters and setters. Use a getter or setter method instead.
-- No inheritance, not even for `Error`
 - No enums on the public API, enums are specific to TypeScript and are generally
   not a good fit for JavaScript APIs
 - Only use `undefined` instead of `null` internally but assume they are
