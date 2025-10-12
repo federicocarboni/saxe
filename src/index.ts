@@ -23,7 +23,6 @@ export {SaxError, type SaxErrorName} from "./error.ts";
 export interface XmlDeclaration {
   /**
    * Version declared in the XML Declaration. Generally `1.0` or `1.1`.
-   * @since 1.0.0
    */
   version: string;
   /**
@@ -145,7 +144,7 @@ export interface Attributes {
   [Symbol.iterator](): IterableIterator<[string, string]>;
 }
 
-interface BaseReader {
+interface PrologReader {
   /**
    * XML declaration of the document.
    * @param declaration -
@@ -154,8 +153,11 @@ interface BaseReader {
   /**
    * Document type declaration.
    *
-   * If the internal DTD subset is present, this handler is called before
-   * parsing it.
+   * ```xml
+   * <!DOCTYPE example PUBLIC "-//Example//example doc" "http://example.org/example.dtd">
+   * ```
+   *
+   * This handler is called before parsing any markup declarations.
    * @param doctype -
    */
   doctype?(doctype: Doctype): void;
@@ -166,34 +168,27 @@ interface BaseReader {
    * <?target content?>
    * ```
    *
-   * Unless processing instructions are required, avoid defining this handler as
-   * that will prevent the parser from buffering their content.
-   * Processing instructions are always checked for well-formedness regardless
-   * of the configuration.
-   * @param target -
-   * @param content -
+   * @param target - PI target, used to identify the application to which the
+   * instruction is directed.
+   * @param content - PI content, whitespace is not trimmed or normalized.
    */
   processingInstruction?(target: string, content: string): void;
   /**
    * A comment.
    *
    * ```xml
-   * <!-- text -->
+   * <!-- content -->
    * ```
    *
-   * Unless processing comments is required, avoid defining this handler as that
-   * will prevent the parser from buffering the comment contents. Comments are
-   * always checked for well-formedness regardless of the configuration.
-   * @param text - Comment text, leading or trailing spaces are not removed.
+   * @param content - Comment content, whitespace is not trimmed or normalized.
    */
-  comment?(text: string): void;
+  comment?(content: string): void;
 }
 
 /**
  * https://www.w3.org/TR/REC-xml/
- * @since 1.0.0
  */
-export interface SaxReader extends BaseReader {
+export interface SaxReader extends PrologReader {
   /**
    * Start tag.
    *
@@ -301,7 +296,6 @@ export interface EntityProvider {
 }
 
 /**
- * @since 1.0.0
  */
 export interface SaxOptions {
   /**
@@ -585,7 +579,6 @@ const EXTERNAL_OR_PUBLIC_ID_RE =
  * well-formedness errors.
  *
  * To optimize for efficiency the parser does not store line information.
- * @since 1.0.0
  */
 export class SaxParser {
   // Private properties and methods of this class are mangled at build time to
@@ -740,7 +733,6 @@ export class SaxParser {
    *
    * @param input
    * @throws {@link SaxError}
-   * @since 1.0.0
    */
   write(input: string) {
     this.chunk_ += input;
@@ -760,7 +752,6 @@ export class SaxParser {
   /**
    * Signal to the parser that the source has ended.
    * @throws {@link SaxError}
-   * @since 1.0.0
    */
   end() {
     if (this.state_ === State.INIT) {
@@ -2752,7 +2743,7 @@ export interface NamespaceResolver {
   lookupPrefix(namespace: string): string | undefined;
 }
 
-export interface SaxNamespaceReader extends BaseReader {
+export interface SaxNamespaceReader extends PrologReader {
   /**
    * Start tag.
    *
@@ -2761,6 +2752,8 @@ export interface SaxNamespaceReader extends BaseReader {
    * ```
    * @param name - Name of the element.
    * @param attributes - Attributes of the tag.
+   * @param resolver - Namespace resolver relative to the current element,
+   * should only be used after the handler returns.
    */
   startTag(
     name: QName,
@@ -2775,6 +2768,8 @@ export interface SaxNamespaceReader extends BaseReader {
    * ```
    * @param name - Name of the element.
    * @param attributes - Attributes of the tag.
+   * @param resolver - Namespace resolver relative to the current element,
+   * should only be used after the handler returns.
    */
   emptyTag(
     name: QName,
@@ -2788,9 +2783,45 @@ export interface SaxNamespaceReader extends BaseReader {
    * </element>
    * ```
    * @param name - Name of the element.
+   * @param resolver - Namespace resolver relative to the current element,
+   * should only be used after the handler returns.
    */
   endTag(name: QName, resolver: NamespaceResolver): void;
+  /**
+   * A general entity reference.
+   *
+   * ```xml
+   * <root>
+   *   &entity;
+   * </root>
+   * ```
+   *
+   * This handler is equivalent to {@linkcode SaxReader.entityRef} except it
+   * has access to the namespace resolver of the current element.
+   * @param name - Name of the entity.
+   * @returns - Returns `true` if entity `name` was recognized. If the function
+   * is not defined or returns `false` the parser throws an `UndeclaredEntity`
+   * error.
+   */
   entityRef?(entityName: string, resolver: NamespaceResolver): boolean;
+  /**
+   * Text content.
+   *
+   * ```xml
+   * <element>
+   *   content
+   * </element>
+   * ```
+   *
+   * This handler is equivalent to {@linkcode SaxReader.text} except it has
+   * access to the namespace resolver of the current element.
+   * {@linkcode entityRef}.
+   * @param content - Text content.
+   * @param isCdataSection - Boolean value `true` if content originated from a
+   * CDATA section or `false` if it is regular character data.
+   * @param resolver - Namespace resolver relative to the current element,
+   * should only be used after the handler returns.
+   */
   text(
     content: string,
     isCdataSection: boolean,
