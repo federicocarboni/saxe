@@ -3010,7 +3010,8 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     const colon = name.indexOf(":");
     if (
       colon === 0 || colon === name.length - 1 ||
-      name.indexOf(":", colon + 1) !== -1
+      name.indexOf(":", colon + 1) !== -1 ||
+      !isNameStartChar(name.charCodeAt(colon + 1))
     ) {
       throw new SaxError("InvalidQName", {
         attribute: isAttribute ? name : undefined,
