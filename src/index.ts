@@ -2705,7 +2705,7 @@ export interface NamespaceAttributes {
 
 /**
  * Resolves namespace URIs and prefixes from the current element of an XML
- * document, acting as if it were a DOM Node.
+ * document.
  */
 export interface NamespaceResolver {
   /**
@@ -2714,6 +2714,14 @@ export interface NamespaceResolver {
    * - If `prefix` is `"xml"` the return value is always the XML namespace.
    * - If `prefix` is `"xmlns"` the return value is always the XMLNS namespace.
    * - If `prefix` is `undefined` the return value is the default namespace URI.
+   * - If `prefix` is not found, the return value is {@linkcode SaxNamespaceReader.lookupNamespace}
+   *
+   * This function acts as if [DOM Node `lookupNamespaceURI`] were called on the
+   * current element being parsed, usually the element of the last call to
+   * {@linkcode SaxNamespaceReader.startTag}.
+   *
+   * [DOM Node `lookupNamespaceURI`]:
+   * https://dom.spec.whatwg.org/#dom-node-lookupnamespaceuri
    * @param prefix - Prefix to look for. Can be set to `undefined` to lookup the
    * default namespace.
    * @returns - Returns the namespace URI associated with the specified prefix.
@@ -2728,12 +2736,19 @@ export interface NamespaceResolver {
    *
    * Note that the return value is the most recent prefix bound to the specified
    * namespace, but if the prefix is shadowed by a later declaration it may not
-   * be currently associated to the specified namespace.
+   * be *currently* associated to the specified namespace.
    *
    * - If `namespace` is the XML namespace the return value is always `"xml"`.
    * - If `namespace` is the XMLNS namespace the return value is always
    *   `"xmlns"`.
    * - If `namespace` is empty the return value is always `undefined`.
+   *
+   * This function acts as if [DOM Node `lookupPrefix`] were called on the
+   * current element being parsed, usually the element of the last call to
+   * {@linkcode SaxNamespaceReader.startTag}.
+   *
+   * [DOM Node `lookupPrefix`]:
+   * https://dom.spec.whatwg.org/#dom-node-lookupprefix
    * @param namespace - Namespace URI to look for.
    * @returns - Returns the prefix for the given namespace URI, if present, or
    * returns `undefined` if it is not.
@@ -2742,13 +2757,6 @@ export interface NamespaceResolver {
 }
 
 export interface SaxNamespaceReader extends BaseReader {
-  /**
-   * @param prefix - Prefix to look for. Can be set to `undefined` to lookup the
-   * default namespace.
-   * @returns - Returns the namespace URI associated with the specified prefix.
-   * Returns `undefined` if the prefix is not found.
-   */
-  lookupNamespace?(prefix: string | undefined): string | undefined;
   /**
    * Start tag.
    *
@@ -2928,10 +2936,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     if (prefix === "") {
       return undefined;
     }
-    const namespace = this.namespaces_.get(prefix ?? "");
-    return namespace !== undefined
-      ? namespace
-      : this.reader_.lookupNamespace?.(prefix ?? undefined) ?? undefined;
+    return this.namespaces_.get(prefix ?? "");
   }
   lookupPrefix(namespace: string): string | undefined {
     if (namespace === "") {
