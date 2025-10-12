@@ -201,9 +201,7 @@ export interface SaxReader extends BaseReader {
    * <element attr="value">
    * ```
    * @param name - Name of the element.
-   * @param attributes - Attributes of the tag. Only valid for the
-   * duration of this call, implementors should make a copy to persist
-   * attributes.
+   * @param attributes - Attributes of the tag.
    */
   startTag(name: string, attributes: Attributes): void;
   /**
@@ -213,9 +211,7 @@ export interface SaxReader extends BaseReader {
    * <element attr="value" />
    * ```
    * @param name - Name of the element.
-   * @param attributes - Attributes of the tag. Only valid for the
-   * duration of this call, implementors should make a copy to persist
-   * attributes.
+   * @param attributes - Attributes of the tag.
    */
   emptyTag(name: string, attributes: Attributes): void;
   /**
@@ -1962,7 +1958,7 @@ export class SaxParser {
     this.reader_.startTag(this.element_, this.attributes_);
     this.elements_.push(this.element_);
     this.element_ = "";
-    this.attributes_.clear();
+    this.attributes_ = new Map();
   }
 
   // @internal
@@ -2144,7 +2140,7 @@ export class SaxParser {
       this.otherState_ = 0;
       this.reader_.emptyTag(this.element_, this.attributes_);
       this.element_ = "";
-      this.attributes_.clear();
+      this.attributes_ = new Map();
     } else {
       throw new SaxError("InvalidStartTag");
     }
@@ -2764,9 +2760,7 @@ export interface SaxNamespaceReader extends BaseReader {
    * <element attr="value">
    * ```
    * @param name - Name of the element.
-   * @param attributes - Attributes of the tag. Only valid for the
-   * duration of this call, implementors should make a copy to persist
-   * attributes.
+   * @param attributes - Attributes of the tag.
    */
   startTag(
     name: QName,
@@ -2780,9 +2774,7 @@ export interface SaxNamespaceReader extends BaseReader {
    * <element attr="value" />
    * ```
    * @param name - Name of the element.
-   * @param attributes - Attributes of the tag. Only valid for the
-   * duration of this call, implementors should make a copy to persist
-   * attributes.
+   * @param attributes - Attributes of the tag.
    */
   emptyTag(
     name: QName,
@@ -2825,10 +2817,6 @@ function getQName(attribute: AttributeNs): QName {
 class NamespaceAttributes_ implements NamespaceAttributes {
   // @internal
   private map_ = new Map<string, AttributeNs>();
-  // @internal
-  clear_() {
-    this.map_.clear();
-  }
   // @internal
   add_(attribute: AttributeNs) {
     const key = attribute.namespace !== undefined
@@ -2918,9 +2906,6 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   // The root element is depth 1
   // @internal
   private prefixBindings_ = new Map<number, string[]>();
-  // Reused across calls
-  // @internal
-  private attributes_ = new NamespaceAttributes_();
   // Required for faithful lookupPrefix
   // @internal
   private elementPrefixes_: string[] = [];
@@ -3040,7 +3025,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   }
   // @internal
   private handleAttributes_(attributes: Attributes): NamespaceAttributes {
-    this.attributes_.clear_();
+    const nsAttributes = new NamespaceAttributes_();
     const bindings = [];
     // Collect namespaces first.
     for (const [name, value] of attributes) {
@@ -3080,9 +3065,9 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
     for (const [name, value] of attributes) {
       const attribute = Object.assign(this.parseQName_(name, true), {value});
-      this.attributes_.add_(attribute);
+      nsAttributes.add_(attribute);
     }
-    return this.attributes_;
+    return nsAttributes;
   }
   // @internal
   private popPrefixes_() {
@@ -3103,16 +3088,16 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
   }
   startTag(name: string, attributes: Attributes) {
-    const attributesNs = this.handleAttributes_(attributes);
+    const nsAttributes = this.handleAttributes_(attributes);
     const qName = this.parseQName_(name, false);
     this.elementPrefixes_.push(qName.prefix ?? "");
-    this.reader_.startTag(qName, attributesNs, this);
+    this.reader_.startTag(qName, nsAttributes, this);
   }
   emptyTag(name: string, attributes: Attributes) {
-    const attributesNs = this.handleAttributes_(attributes);
+    const nsAttributes = this.handleAttributes_(attributes);
     const qName = this.parseQName_(name, false);
     this.elementPrefixes_.push(qName.prefix ?? "");
-    this.reader_.emptyTag(qName, attributesNs, this);
+    this.reader_.emptyTag(qName, nsAttributes, this);
     this.popPrefixes_();
   }
   endTag(name: string) {
