@@ -21,8 +21,8 @@ class CanonicalEntityReader implements SaxReader {
   endTag(name: string): void {
     this.canonical.endTag(name);
   }
-  text(text: string): void {
-    this.canonical.text(text);
+  text(content: string): void {
+    this.canonical.text(content);
   }
 }
 

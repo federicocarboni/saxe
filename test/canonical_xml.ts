@@ -58,7 +58,7 @@ export class CanonicalXmlWriter implements SaxReader {
   endTag(name: string): void {
     this.output += `</${name}>`;
   }
-  text(text: string): void {
-    this.output += escapeDataChars(text);
+  text(content: string): void {
+    this.output += escapeDataChars(content);
   }
 }
