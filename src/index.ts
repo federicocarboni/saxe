@@ -228,32 +228,26 @@ export interface SaxReader extends BaseReader {
    */
   endTag(name: string): void;
   /**
-   * A general entity reference in document content, for which the parser has no
+   * A general entity reference in document content for which the parser has no
    * declarations. Undeclared entities in attribute values are always an error.
-   *
-   * This function should return `true` if `name` was recognized. If this
-   * function is not defined or returns `false` the parser throws an
-   * `UndeclaredEntity` error.
    *
    * ```xml
    * <root>
    *   &entity;
    * </root>
    * ```
+   *
+   * This function is intended to be called only for references to undeclared
+   * entities. If the replacement text of entities can be provided, consider
+   * using {@linkcode SaxOptions.entityProvider} instead so that entities are
+   * expanded automatically.
+   *
    * @param name - Name of the entity.
+   * @returns - Returns `true` if entity `name` was recognized. If the function
+   * is not defined or returns `false` the parser throws an `UndeclaredEntity`
+   * error.
    */
   entityRef?(name: string): boolean;
-  /**
-   * A CDATA section.
-   *
-   * ```xml
-   * <element>
-   *   <![CDATA[ content ]]>
-   * </element>
-   * ```
-   * @param content - CDATA content.
-   */
-  cdataSection(content: string): void;
   /**
    * Text content.
    *
@@ -270,8 +264,10 @@ export interface SaxReader extends BaseReader {
    * Entity references not recognized by the parser are handled in
    * {@linkcode entityRef}.
    * @param content - Text content.
+   * @param isCdataSection - Boolean value `true` if content originated from a
+   * CDATA section or `false` if it is regular character data.
    */
-  text(content: string): void;
+  text(content: string, isCdataSection: boolean): void;
 }
 
 export interface EntityProvider {
@@ -369,14 +365,15 @@ export interface SaxOptions {
    */
   entityProvider?: EntityProvider | undefined;
   /**
-   * Emit {@linkcode SaxReader.text} as soon as data is available.
+   * Emit {@linkcode SaxReader.text} as soon as data becomes available.
    *
    * By default, the parser collects text content as it were forming a DOM Text
-   * Node, even when text spans multiple chunks. This makes the parser more
-   * predictable but delays output until the ending chunk is reached.
+   * Node (or CDATA Section Node), even when text spans multiple chunks. This
+   * makes the parser more predictable but delays output until the ending chunk
+   * is reached.
    *
    * Enabling this option prevents any buffering and causes the parser to emit
-   * {@linkcode SaxReader.text} as soon as data is available.
+   * {@linkcode SaxReader.text} as soon as data becomes available.
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
@@ -2231,7 +2228,7 @@ export class SaxParser {
       this.state_ !== State.TEXT_CONTENT ||
       this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES
     ) {
-      this.reader_.text(this.content_);
+      this.reader_.text(this.content_, false);
       this.content_ = "";
     }
     ++this.index_;
@@ -2460,11 +2457,9 @@ export class SaxParser {
     }
     this.content_ += chunk;
     if (index === -1) {
-      // Chunk is read to completion even on an ending hyphen, it will be
-      // removed after the fact if the comment is ending.
+      // Chunk is read to completion even on an ending close bracket, it just
+      // removed from content and state is set appropriately.
       this.index_ = this.chunk_.length;
-      // This chunk doesn't contain the end of this comment but it may contain
-      // a trailing hyphen that has to be handled on the next chunk.
       if (
         this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CLOSE_BRACKET
       ) {
@@ -2477,6 +2472,10 @@ export class SaxParser {
           this.state_ = State.CDATA_SECTION_END0;
           this.content_ = this.content_.slice(0, -1);
         }
+      }
+      if (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES) {
+        this.reader_.text(this.content_, true);
+        this.content_ = "";
       }
     } else {
       this.index_ = index + 2;
@@ -2500,7 +2499,7 @@ export class SaxParser {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit === Chars.GT) {
       ++this.index_;
-      this.reader_.cdataSection(this.content_);
+      this.reader_.text(this.content_, true);
       this.state_ = State.TEXT_CONTENT;
       this.otherState_ = 0;
       this.content_ = "";
@@ -2792,8 +2791,11 @@ export interface SaxNamespaceReader extends BaseReader {
    */
   endTag(name: QName, resolver: NamespaceResolver): void;
   entityRef?(entityName: string, resolver: NamespaceResolver): boolean;
-  cdataSection(content: string, resolver: NamespaceResolver): void;
-  text(content: string, resolver: NamespaceResolver): void;
+  text(
+    content: string,
+    isCdataSection: boolean,
+    resolver: NamespaceResolver,
+  ): void;
 }
 
 // @internal
@@ -3112,11 +3114,8 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     this.reader_.endTag(this.parseQName_(name, false), this);
     this.popPrefixes_();
   }
-  cdataSection(content: string): void {
-    return this.reader_.cdataSection(content, this);
-  }
-  text(content: string) {
-    return this.reader_.text(content, this);
+  text(content: string, isCdataSection: boolean) {
+    return this.reader_.text(content, isCdataSection, this);
   }
 }
 
