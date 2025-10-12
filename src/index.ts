@@ -2829,9 +2829,6 @@ class NamespaceAttributes_ implements NamespaceAttributes {
   clear_() {
     this.map_.clear();
   }
-  // Making a publicly mutable version is not feasible in a SAX-style parser.
-  // Manipulating attributes requires access to the internals of the namespace
-  // reader.
   // @internal
   add_(attribute: AttributeNs) {
     const key = attribute.namespace !== undefined
@@ -3074,15 +3071,15 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
       if (value === "") {
         throw new SaxError("PrefixUndeclaring", {attribute: name});
       }
-      const shadowed = this.namespaces_.get(prefix) ?? "";
+      const shadowed = this.namespaces_.get(prefix);
       this.namespaces_.set(prefix, value);
-      bindings.push(prefix, shadowed);
+      bindings.push(prefix, shadowed !== undefined ? shadowed : "");
     }
-    if (bindings.length !== 0) {
+    if (bindings.length > 0) {
       this.prefixBindings_.set(this.elementPrefixes_.length, bindings);
     }
     for (const [name, value] of attributes) {
-      const attribute = Object.assign({value}, this.parseQName_(name, true));
+      const attribute = Object.assign(this.parseQName_(name, true), {value});
       this.attributes_.add_(attribute);
     }
     return this.attributes_;
