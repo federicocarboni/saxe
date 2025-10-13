@@ -439,7 +439,7 @@ function normalizeLineEndings(s: string) {
   return s.replace(/\r\n?/g, "\n");
 }
 
-// @internal
+/** @internal */
 interface AttDef {
   // Default value for the attribute
   default_: string | undefined;
@@ -567,82 +567,82 @@ export class SaxParser {
   // standards) but `codePointAt` is avoided where possible as it is much
   // slower than `charCodeAt`.
 
-  // @internal
+  /** @internal */
   private reader_: SaxReader;
-  // @internal
+  /** @internal */
   private entityProvider_: EntityProvider | undefined;
 
   // Options
-  // @internal
+  /** @internal */
   private maxNameLength_: number;
-  // @internal
+  /** @internal */
   private maxAttributes_: number;
-  // @internal
+  /** @internal */
   private maxTextLength_: number;
-  // @internal
+  /** @internal */
   private maxEntityLength_: number;
-  // @internal
+  /** @internal */
   private maxEntityDepth_: number;
 
-  // @internal
+  /** @internal */
   private offset_ = 0;
   // State
-  // @internal
+  /** @internal */
   private chunk_ = "";
-  // @internal
+  /** @internal */
   private index_ = 0;
-  // @internal
+  /** @internal */
   private state_ = State.INIT;
-  // @internal
+  /** @internal */
   private otherState_ = 0;
   // Stores flags and boolean options.
-  // @internal
+  /** @internal */
   protected flags_ = Flags.INIT;
-  // @internal
+  /** @internal */
   private charRef_ = 0;
-  // @internal
+  /** @internal */
   private quote_ = -1;
-  // @internal
+  /** @internal */
   private entityLength_ = 0;
   // Current text node length in code units. Required for when
   // incompleteTextNodes is enabled.
-  // @internal
+  /** @internal */
   private textLength_ = 0;
 
-  // @internal
+  /** @internal */
   private elements_: string[] = [];
 
   // Stack of entities currently expanded, required for the WFC No Recursion and
   // to limit the depth of entity expansion allowed.
-  // @internal
+  /** @internal */
   private entityStack_: string[] = [];
 
   // Accumulators
 
   // Generic accumulator
   // Current element name
-  // @internal
+  /** @internal */
   private element_ = "";
   // Current text content, contains decoded and normalized content
   // or current attribute value (or XML Decl attribute value)
-  // @internal
+  /** @internal */
   private content_ = "";
   // Current attribute name (or XML Decl attribute value)
-  // @internal
+  /** @internal */
   private attribute_ = "";
-  // @internal
+  /** @internal */
   private entity_ = "";
   // Current attributes, this parser enforces well-formedness so an attribute
   // list cannot be avoided. To improve lookup times it uses a Map instead of a
   // plain object.
-  // @internal
+  /** @internal */
   private attributes_ = new Map<string, string>();
 
   // Internal entities declared in the internal subset.
-  // @internal
+  /** @internal */
   private entities_ = new Map<string, string | EntityDecl>();
   // Attlists declared in the internal subset.
-  // @internal
+  /** @internal */
   private attlists_ = new Map<string, Map<string, AttDef>>();
 
   // TODO: Namespace support?
@@ -659,11 +659,11 @@ export class SaxParser {
 
   // XML Declaration attributes are held onto because they may be useful
   // (e.g. XML 1.1) in the future?
-  // // @internal
+  // /** @internal */
   // private version_: string | undefined = undefined;
-  // // @internal
+  // /** @internal */
   // private encoding_: string | undefined = undefined;
-  // @internal
+  /** @internal */
   private standalone_: boolean | undefined = undefined;
 
   /**
@@ -748,7 +748,7 @@ export class SaxParser {
 
   // Strings are assumed to be well-formed, meaning they do not contain any
   // lone surrogates code units.
-  // @internal
+  /** @internal */
   private parseStep_() {
     switch (this.state_) {
       case State.INIT:
@@ -874,7 +874,7 @@ export class SaxParser {
   // XMLDecl and doctypedecl are optimized for size and not for speed since they
   // are only read once. DTD is only skimmed through as fast as possible for now
 
-  // @internal
+  /** @internal */
   private parseInit_() {
     const newChunk = this.chunk_.slice(0, 6 - this.element_.length);
     this.element_ += newChunk;
@@ -895,7 +895,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseXmlDecl_() {
     if (this.element_.charCodeAt(this.element_.length - 1) === Chars.QUESTION) {
       // Edge case, last chunk ended in ? so this chunk must start with >
@@ -927,7 +927,7 @@ export class SaxParser {
     this.element_ = "";
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeDeclStart_() {
     // No need to backtrack here, we know it's either DOCTYPE or fatal error
     const start = this.index_;
@@ -949,7 +949,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeDecl_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -962,7 +962,7 @@ export class SaxParser {
     this.state_ = State.DOCTYPE_NAME;
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeName_() {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
@@ -971,7 +971,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private getNameAndExternalId_() {
     const systemId = this.flags_ & Flags.EXTERNAL_ID_SYSTEM
       ? normalizeLineEndings(this.content_)
@@ -1003,7 +1003,7 @@ export class SaxParser {
     return {name: this.element_, publicId, systemId};
   }
 
-  // @internal
+  /** @internal */
   private doctypeEnd_() {
     ++this.index_;
     const doctype = this.getNameAndExternalId_();
@@ -1015,7 +1015,7 @@ export class SaxParser {
     this.state_ = State.MISC;
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeNameEnd_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -1033,7 +1033,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeExternalId_() {
     const newChunk = this.chunk_.slice(
       this.index_,
@@ -1059,7 +1059,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeSystemSpace_() {
     this.attribute_ = this.content_;
     this.content_ = "";
@@ -1071,7 +1071,7 @@ export class SaxParser {
     this.state_ = State.EXTERNAL_ID_QUOTED_START;
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeExternalIdQuotedStart_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -1085,7 +1085,7 @@ export class SaxParser {
     this.quote_ = codeUnit;
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeExternalIdQuoted_() {
     const index = this.chunk_.indexOf(
       this.quote_ === Chars.APOSTROPHE ? "'" : '"',
@@ -1108,7 +1108,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeMaybeInternalSubset_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -1124,7 +1124,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseInternalSubset_() {
     loop: while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
@@ -1147,7 +1147,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseInternalSubsetPeRefStart_() {
     const codePoint = this.nextCodePoint_();
     if (!isNameStartChar(codePoint)) {
@@ -1157,7 +1157,7 @@ export class SaxParser {
     this.state_ = State.INTERNAL_SUBSET_PE_REF;
   }
 
-  // @internal
+  /** @internal */
   private parseInternalSubsetPeRef_() {
     // PE references are not expanded but the name is still collected.
     this.element_ += this.readNameCharacters_(this.element_.length);
@@ -1176,7 +1176,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseInternalSubsetOpenAngle_() {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     ++this.index_;
@@ -1190,7 +1190,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseInternalSubsetOpenAngleBang_() {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit === Chars.HYPHEN) {
@@ -1202,7 +1202,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   protected readName_() {
     if (!isNameStartChar(this.chunk_.codePointAt(this.index_)!)) {
       throw new SaxError("InvalidInternalSubset");
@@ -1210,11 +1210,11 @@ export class SaxParser {
     return this.readNameCharacters_(0);
   }
   // Allow namespace parser to override this
-  // @internal
+  /** @internal */
   protected checkNcName_(name: string) {
     void name;
   }
-  // @internal
+  /** @internal */
   private readExternalId_(isNotation: boolean) {
     const matches = this.chunk_.slice(this.index_).match(
       EXTERNAL_OR_PUBLIC_ID_RE,
@@ -1225,7 +1225,7 @@ export class SaxParser {
     this.index_ += matches[0].length;
   }
 
-  // @internal
+  /** @internal */
   private readEntityValue_() {
     let start = this.index_;
     while (this.index_ < this.chunk_.length) {
@@ -1276,7 +1276,7 @@ export class SaxParser {
     // this.appendContent_(start, this.maxEntityLength_);
   }
 
-  // @internal
+  /** @internal */
   private readEntityDecl_() {
     this.index_ += 7;
     this.skipWhiteSpace_();
@@ -1335,7 +1335,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private readNotationOrEnumeration_(isNotation: boolean) {
     this.skipWhiteSpace_();
     if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
@@ -1360,7 +1360,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private readAttlistDecl_() {
     this.index_ += 8;
     this.skipWhiteSpace_();
@@ -1469,7 +1469,7 @@ export class SaxParser {
     this.skipWhiteSpace_();
   }
 
-  // @internal
+  /** @internal */
   private readNotationDecl_() {
     this.index_ += 9;
     this.skipWhiteSpace_();
@@ -1486,7 +1486,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private readChoiceOrSeq_() {
     this.skipWhiteSpace_();
     this.readCp_(false);
@@ -1510,7 +1510,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private readCp_(isChildren: boolean) {
     if (
       isChildren ||
@@ -1534,7 +1534,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private readElementDecl_() {
     this.index_ += 8;
     this.skipWhiteSpace_();
@@ -1581,7 +1581,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private readInternalSubsetDecl_() {
     const index = this.index_;
     const chunk = this.chunk_;
@@ -1615,7 +1615,7 @@ export class SaxParser {
     this.chunk_ = chunk;
   }
 
-  // @internal
+  /** @internal */
   private parseInternalSubsetDecl_() {
     const start = this.index_;
     loop: while (this.index_ < this.chunk_.length) {
@@ -1638,7 +1638,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseInternalSubsetDeclQuoted_() {
     const index = this.chunk_.indexOf(
       this.quote_ === Chars.APOSTROPHE ? "'" : '"',
@@ -1655,7 +1655,7 @@ export class SaxParser {
     this.appendContent_(start, this.maxTextLength_);
   }
 
-  // @internal
+  /** @internal */
   private parseDoctypeEnd_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -1667,7 +1667,7 @@ export class SaxParser {
     this.state_ = State.MISC;
   }
 
-  // @internal
+  /** @internal */
   private parseMisc_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -1681,7 +1681,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parsePiTargetStart_() {
     // codePointAt is fine here since we are not in a loop
     const codePoint = this.nextCodePoint_();
@@ -1693,7 +1693,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parsePiTarget_() {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
@@ -1714,14 +1714,14 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parsePiContentStart_() {
     if (this.skipWhiteSpace_()) {
       this.state_ = State.PI_CONTENT;
     }
   }
 
-  // @internal
+  /** @internal */
   private piEnd_() {
     if (this.flags_ & Flags.CAPTURE_PI) {
       this.reader_.processingInstruction?.(this.element_, this.content_);
@@ -1732,7 +1732,7 @@ export class SaxParser {
     this.otherState_ = 0;
   }
 
-  // @internal
+  /** @internal */
   private parsePiContent_() {
     // All the searching is done with indexOf, basically a native strstr routine
     // which is much faster than anything that can be written manually in JS.
@@ -1762,7 +1762,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parsePiContentEnd_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       this.content_ = this.content_.slice(0, -1);
@@ -1774,7 +1774,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parsePiEnd_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       ++this.index_;
@@ -1784,7 +1784,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCommentStart_() {
     if (this.chunk_.charCodeAt(this.index_) !== Chars.HYPHEN) {
       throw new SaxError("InvalidContent");
@@ -1793,7 +1793,7 @@ export class SaxParser {
     this.state_ = State.COMMENT;
   }
 
-  // @internal
+  /** @internal */
   private parseComment_() {
     // Same rationale behind parsePi_
     const index = this.chunk_.indexOf("--", this.index_);
@@ -1826,7 +1826,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCommentHyphen_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.HYPHEN) {
       // Content still contains the hyphen from the previous chunk.
@@ -1841,7 +1841,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCommentEnd_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       ++this.index_;
@@ -1856,7 +1856,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseOpenAngleBracket_() {
     const codePoint = this.nextCodePoint_();
     if (isNameStartChar(codePoint)) {
@@ -1882,7 +1882,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseOpenAngleBracketBang_() {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     ++this.index_;
@@ -1903,7 +1903,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private setDefaultAttributes_() {
     const attlist = this.attlists_.get(this.element_);
     if (attlist === undefined) {
@@ -1919,7 +1919,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private startTagEnd_() {
     this.setDefaultAttributes_();
     this.state_ = State.TEXT_CONTENT;
@@ -1930,7 +1930,7 @@ export class SaxParser {
     this.attributes_ = new Map();
   }
 
-  // @internal
+  /** @internal */
   private parseStartTagName_() {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
@@ -1948,7 +1948,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseStartTag_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -1966,7 +1966,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseStartTagSpace_() {
     const codeUnit = this.chunk_.charCodeAt(this.index_)!;
     ++this.index_;
@@ -1982,7 +1982,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseStartTagAttr_() {
     this.attribute_ += this.readNameCharacters_(this.attribute_.length);
     if (this.index_ < this.chunk_.length) {
@@ -1999,7 +1999,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseStartTagAttrEq_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -2012,7 +2012,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseStartTagAttrValue_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -2030,7 +2030,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseStartTagAttrValueQuoted_() {
     const quote = this.quote_;
     let start = this.index_;
@@ -2096,7 +2096,7 @@ export class SaxParser {
     ++this.index_;
   }
 
-  // @internal
+  /** @internal */
   private parseEmptyTag_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       ++this.index_;
@@ -2115,7 +2115,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private appendTextContent_(start: number) {
     const chunk = this.chunk_.slice(start, this.index_);
     this.textLength_ += chunk.length;
@@ -2128,7 +2128,7 @@ export class SaxParser {
   // This should ideally be somewhere else so that it can be applied to entities
   // This is the hottest part of the parser as most of an XML Document is text
   // content.
-  // @internal
+  /** @internal */
   private parseTextContent_() {
     let start = this.index_;
     // Due to having multiple exit points and error conditions, text content
@@ -2199,7 +2199,7 @@ export class SaxParser {
     ++this.index_;
   }
 
-  // @internal
+  /** @internal */
   private parseReference_() {
     const codePoint = this.nextCodePoint_();
     if (isNameStartChar(codePoint)) {
@@ -2211,7 +2211,7 @@ export class SaxParser {
       throw new SaxError("InvalidEntityRef");
     }
   }
-  // @internal
+  /** @internal */
   private parseEntityRef_() {
     this.entity_ += this.readNameCharacters_(this.entity_.length);
     if (this.index_ >= this.chunk_.length) {
@@ -2329,7 +2329,7 @@ export class SaxParser {
     this.entity_ = "";
   }
 
-  // @internal
+  /** @internal */
   private parseCharRef_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.LOWER_X) {
       ++this.index_;
@@ -2339,7 +2339,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private handleCharRef_() {
     // Skip semicolon ;
     ++this.index_;
@@ -2354,7 +2354,7 @@ export class SaxParser {
     this.otherState_ = 0;
   }
 
-  // @internal
+  /** @internal */
   private parseCharRefDec_() {
     while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
@@ -2371,7 +2371,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCharRefHex_() {
     while (this.index_ < this.chunk_.length) {
       const codeUnit = this.chunk_.charCodeAt(this.index_);
@@ -2391,7 +2391,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCDataSectionStart_() {
     const start = this.index_;
     this.index_ += 6 - this.element_.length;
@@ -2404,7 +2404,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCDataSection_() {
     // Same rationale behind parsePi_
     const index = this.chunk_.indexOf("]]>", this.index_);
@@ -2448,7 +2448,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCDataSectionEnd0_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.CLOSE_BRACKET) {
       ++this.index_;
@@ -2459,7 +2459,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseCDataSectionEnd_() {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit === Chars.GT) {
@@ -2483,7 +2483,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseEndTagStart_() {
     const codePoint = this.nextCodePoint_();
     if (isNameStartChar(codePoint)) {
@@ -2495,7 +2495,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseEndTag_() {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
@@ -2504,7 +2504,7 @@ export class SaxParser {
     }
   }
 
-  // @internal
+  /** @internal */
   private parseEndTagEnd_() {
     if (!this.skipWhiteSpace_()) {
       return;
@@ -2529,7 +2529,7 @@ export class SaxParser {
 
   // Internal functions
 
-  // @internal
+  /** @internal */
   private appendContent_(start: number, limit: number) {
     const chunk = this.chunk_.slice(start, this.index_);
     if (this.content_.length + chunk.length > limit) {
@@ -2538,7 +2538,7 @@ export class SaxParser {
     this.content_ += chunk;
   }
 
-  // @internal
+  /** @internal */
   private nextCodePoint_() {
     let codePoint = this.chunk_.charCodeAt(this.index_);
     if (codePoint >= 0xd800 && codePoint <= 0xdbff) {
@@ -2550,7 +2550,7 @@ export class SaxParser {
     return codePoint;
   }
 
-  // @internal
+  /** @internal */
   private readNameCharacters_(length: number) {
     const start = this.index_;
     while (this.index_ < this.chunk_.length) {
@@ -2585,7 +2585,7 @@ export class SaxParser {
     return name;
   }
 
-  // @internal
+  /** @internal */
   private skipWhiteSpace_() {
     while (this.index_ < this.chunk_.length) {
       if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
@@ -2808,12 +2808,12 @@ export interface SaxNamespaceReader extends PrologReader {
   ): void;
 }
 
-// @internal
+/** @internal */
 interface AttributeNs extends QName {
   value: string;
 }
 
-// @internal
+/** @internal */
 function getQName(attribute: AttributeNs): QName {
   return {
     name: attribute.name,
@@ -2825,16 +2825,16 @@ function getQName(attribute: AttributeNs): QName {
 
 /** @internal */
 class NamespaceAttributes_ implements NamespaceAttributes {
-  // @internal
+  /** @internal */
   private map_ = new Map<string, AttributeNs>();
-  // @internal
+  /** @internal */
   add_(attribute: AttributeNs) {
     const key = attribute.namespace !== undefined
       ? `${attribute.namespace}:${attribute.localName}`
       : attribute.localName;
     this.map_.set(key, attribute);
   }
-  // @internal
+  /** @internal */
   iter_() {
     return this.map_.values();
   }
@@ -2885,7 +2885,7 @@ class NamespaceAttributes_ implements NamespaceAttributes {
   }
 }
 
-// @internal
+/** @internal */
 export type {NamespaceAttributes_};
 
 function checkQName(name: string) {
@@ -2904,22 +2904,22 @@ function checkQName(name: string) {
 export const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
 export const XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
 
-// @internal
+/** @internal */
 class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   // prefix -> namespace URI
-  // @internal
+  /** @internal */
   private namespaces_ = new Map<string, string>([
     ["xml", XML_NAMESPACE],
     ["xmlns", XMLNS_NAMESPACE],
   ]);
   // Depth number -> [prefix, shadowed ns or empty string, ...]
   // The root element is depth 1
-  // @internal
+  /** @internal */
   private prefixBindings_ = new Map<number, string[]>();
   // Required for faithful lookupPrefix
-  // @internal
+  /** @internal */
   private elementPrefixes_: string[] = [];
-  // @internal
+  /** @internal */
   private reader_: SaxNamespaceReader;
   constructor(reader: SaxNamespaceReader) {
     this.reader_ = reader;
@@ -2990,19 +2990,19 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     checkQName(doctype.name);
     return this.reader_.doctype?.(doctype);
   }
-  // @internal
+  /** @internal */
   processingInstruction?(target: string, content: string) {
     return this.reader_.processingInstruction!(target, content);
   }
-  // @internal
+  /** @internal */
   comment?(text: string) {
     return this.reader_.comment!(text);
   }
-  // @internal
+  /** @internal */
   entityRef?(entityName: string) {
     return !!this.reader_.entityRef?.(entityName, this);
   }
-  // @internal
+  /** @internal */
   private parseQName_(name: string, isAttribute: boolean): QName {
     const colon = name.indexOf(":");
     if (
@@ -3033,7 +3033,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
     return {name, localName, prefix, namespace};
   }
-  // @internal
+  /** @internal */
   private handleAttributes_(attributes: Attributes): NamespaceAttributes {
     const nsAttributes = new NamespaceAttributes_();
     const bindings = [];
@@ -3079,7 +3079,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
     return nsAttributes;
   }
-  // @internal
+  /** @internal */
   private popPrefixes_() {
     this.elementPrefixes_.pop();
     const depth = this.elementPrefixes_.length;
@@ -3135,13 +3135,13 @@ export class SaxNamespaceParser extends SaxParser {
       this.flags_ &= ~Flags.CAPTURE_COMMENT;
     }
   }
-  // @internal
+  /** @internal */
   protected override readName_(): string {
     const name = super.readName_();
     checkQName(name);
     return name;
   }
-  // @internal
+  /** @internal */
   protected override checkNcName_(name: string): void {
     if (name.indexOf(":") !== -1) {
       throw new SaxError("InvalidNcName");

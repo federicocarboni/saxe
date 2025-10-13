@@ -1,4 +1,4 @@
-// @internal
+/** @internal */
 export const enum Chars {
   TAB = 0x9,
   LF = 0xA,
@@ -34,16 +34,20 @@ export const enum Chars {
   VERTICAL_BAR = 0x7C,
 }
 
-// https://www.w3.org/TR/REC-xml/#NT-S
-// § White Space
-// @internal
+/**
+ * https://www.w3.org/TR/REC-xml/#NT-S
+ * § White Space
+ * @internal
+ */
 export function isWhiteSpace(c: number) {
   return c === Chars.SP || c === Chars.TAB || c === Chars.LF || c === Chars.CR;
 }
 
-// https://www.w3.org/TR/REC-xml/#NT-Char
-// § Character Range
-// @internal
+/**
+ * https://www.w3.org/TR/REC-xml/#NT-Char
+ * § Character Range
+ * @internal
+ */
 export function isChar(c: number) {
   return (
     c === 0x9 ||
@@ -55,8 +59,10 @@ export function isChar(c: number) {
   );
 }
 
-// https://www.w3.org/TR/REC-xml/#NT-NameStartChar
-// @internal
+/**
+ * https://www.w3.org/TR/REC-xml/#NT-NameStartChar
+ * @internal
+ */
 export function isNameStartChar(c: number) {
   return (
     0x61 /* a */ <= c && c <= 0x7A /* z */ ||
@@ -71,8 +77,10 @@ export function isNameStartChar(c: number) {
   );
 }
 
-// https://www.w3.org/TR/REC-xml/#NT-NameChar
-// @internal
+/**
+ * https://www.w3.org/TR/REC-xml/#NT-NameChar
+ * @internal
+ */
 export function isNameChar(c: number) {
   return (
     isNameStartChar(c) || c === 0x2D /* - */ || c === 0x2E /* . */ ||
@@ -81,7 +89,7 @@ export function isNameChar(c: number) {
   );
 }
 
-// @internal
+/** @internal */
 export function hasInvalidChar(s: string) {
   // Astral characters are not considered because enabling Unicode support on
   // regexes is a performance hit and we assume strings are well-formed.
