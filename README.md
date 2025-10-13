@@ -81,6 +81,10 @@ non-validating[^2] processors and are explicitly not supported.
 [NaturalIntelligence/fast-xml-parser]: https://github.com/NaturalIntelligence/fast-xml-parser
 [xml proc types]: https://www.w3.org/TR/REC-xml/#proc-types
 
+<!-- https://web.archive.org/web/20240515024616/https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing -->
+[xxe owasp]: https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
+[msdn xml dos]: https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
+
 ## Security
 
 XML Parsers may be subject to a number of possible vulnerabilities, most common
