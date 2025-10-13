@@ -19,7 +19,7 @@ const ERRORS = {
   // All well-formed-ness errors in the internal subset are grouped here
   InvalidInternalSubset: () => "Internal subset is not well-formed",
 
-  InvalidComment: () => "Comment contains '--'",
+  InvalidComment: () => "Comment contains invalid sequence '--'",
   InvalidPi: () => "Processing instruction is not well-formed",
   ReservedPi: () => "Processing instruction target 'XML' is reserved",
   // Entities
@@ -35,7 +35,7 @@ const ERRORS = {
   // Character data (text content) errors
   InvalidCharRef: () => "Character reference to invalid character",
   InvalidChar: () => "Content contains an invalid character",
-  InvalidCDataEnd: () => "Content contains ']]>' sequence",
+  InvalidCDataEnd: () => "Content contains invalid sequence ']]>'",
   InvalidContent: () => "Content appears outside root element",
   // Tag errors
   InvalidStartTag: () => "Start tag is not well-formed",
@@ -70,7 +70,7 @@ const ERRORS = {
  * - `InvalidXmlDecl` XML declaration is not well-formed
  * - `InvalidDoctypeDecl` DOCTYPE declaration is not well-formed
  * - `InvalidInternalSubset` Internal subset is not well-formed
- * - `InvalidComment` Comment contains '--'
+ * - `InvalidComment` Comment contains invalid sequence '--'
  * - `InvalidPi` Processing instruction is not well-formed
  * - `ReservedPi` Processing instruction target 'XML' is reserved
  * - `InvalidEntityRef` Entity reference is not well-formed
@@ -80,7 +80,7 @@ const ERRORS = {
  * - `ExternalEntity` Attribute references an external entity
  * - `InvalidCharRef` Character reference to invalid character
  * - `InvalidChar` Content contains an invalid character
- * - `InvalidCDataEnd` Content contains ']]>' sequence
+ * - `InvalidCDataEnd` Content contains invalid sequence ']]>'
  * - `InvalidCData` Content appears outside root element
  * - `InvalidStartTag` Start tag is not well-formed
  * - `InvalidEndTag` End tag is not well-formed
