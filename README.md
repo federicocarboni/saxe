@@ -73,6 +73,8 @@ non-validating[^2] processors and are explicitly not supported.
   Non-validating processors are not required to fetch and parse external markup
   declarations and external entities.
   [XML Standard § 5.1 Validating and Non-Validating Processors][xml proc types]
+[^3]: [XML External Entity (XXE) Processing | OWASP Foundation][xxe owasp]
+[^4]: [XML Denial of Service Attacks and Defenses | Microsoft Learn][msdn xml dos]
 
 [lddubeau/saxes]: https://github.com/lddubeau/saxes
 [isaacs/sax-js]: https://github.com/isaacs/sax-js
