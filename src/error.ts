@@ -135,7 +135,13 @@ export class SaxError extends Error {
   attribute?: string | undefined;
   /** Name of the entity that caused the error, if any. */
   entity?: string | undefined;
-  constructor(name: SaxErrorName, options: SaxErrorOptions = {}) {
+  constructor(
+    name: SaxErrorName,
+    options: SaxErrorOptions | undefined = undefined,
+  ) {
+    if (options == null) {
+      options = {};
+    }
     super(
       ERRORS.hasOwnProperty(name) ? ERRORS[name](options) : undefined,
       // Only pass cause through, if any option names happen to overlap with

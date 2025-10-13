@@ -241,7 +241,7 @@ export interface SaxReader extends PrologReader {
    * {@linkcode entityRef}.
    * @param content - Text content.
    * @param isCDataSection - Boolean value `true` if content originated from a
-   * CDATA section or `false` if it is regular character data.
+   * CDATA section or `false` if it is regular text.
    */
   text(content: string, isCDataSection: boolean): void;
 }
@@ -672,6 +672,9 @@ export class SaxParser {
    * @param options -
    */
   constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
+    if (options == null) {
+      options = {};
+    }
     this.reader_ = reader;
     // Avoid capturing information that will be ignored
     if (this.reader_.processingInstruction != null) {
@@ -680,21 +683,21 @@ export class SaxParser {
     if (this.reader_.comment != null) {
       this.flags_ |= Flags.CAPTURE_COMMENT;
     }
-    if (options?.incompleteTextNodes) {
+    if (options.incompleteTextNodes) {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
-    const dtd = options?.dtd;
+    const dtd = options.dtd;
     if (dtd === "ignore") {
       this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
     } else if (dtd === "prohibit") {
       this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
     }
-    this.maxNameLength_ = options?.maxNameLength ?? 2_000;
-    this.maxAttributes_ = options?.maxAttributes ?? 2_000;
-    this.maxTextLength_ = options?.maxTextLength ?? 10_000_000;
-    this.maxEntityLength_ = options?.maxEntityLength ?? 1_000_000;
-    this.maxEntityDepth_ = options?.maxEntityDepth ?? 10;
-    this.entityProvider_ = options?.entityProvider ?? undefined;
+    this.maxNameLength_ = options.maxNameLength ?? 2_000;
+    this.maxAttributes_ = options.maxAttributes ?? 2_000;
+    this.maxTextLength_ = options.maxTextLength ?? 10_000_000;
+    this.maxEntityLength_ = options.maxEntityLength ?? 1_000_000;
+    this.maxEntityDepth_ = options.maxEntityDepth ?? 10;
+    this.entityProvider_ = options.entityProvider ?? undefined;
   }
 
   /**
@@ -2794,7 +2797,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * {@linkcode entityRef}.
    * @param content - Text content.
    * @param isCDataSection - Boolean value `true` if content originated from a
-   * CDATA section or `false` if it is regular character data.
+   * CDATA section or `false` if it is regular text.
    * @param resolver - Namespace resolver relative to the current element,
    * should not be used outside the handler.
    */
