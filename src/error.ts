@@ -13,15 +13,15 @@ const ERRORS = {
   //   `Data is not valid for encoding '${encoding}'`,
 
   // XMLDecl
-  InvalidXMLDecl: () => "XML declaration is not well-formed",
+  InvalidXmlDecl: () => "XML declaration is not well-formed",
   // doctypedecl
   InvalidDoctypeDecl: () => "DOCTYPE declaration is not well-formed",
   // All well-formed-ness errors in the internal subset are grouped here
   InvalidInternalSubset: () => "Internal subset is not well-formed",
 
   InvalidComment: () => "Comment contains '--'",
-  InvalidPI: () => "Processing instruction is not well-formed",
-  ReservedPI: () => "Processing instruction target 'XML' is reserved",
+  InvalidPi: () => "Processing instruction is not well-formed",
+  ReservedPi: () => "Processing instruction target 'XML' is reserved",
   // Entities
   InvalidEntityRef: () => "Entity reference is not well-formed",
   RecursiveEntity: ({entity}: SaxErrorOptions) =>
@@ -32,11 +32,11 @@ const ERRORS = {
     `Entity reference to unparsed entity '${entity}'`,
   ExternalEntity: ({entity}: SaxErrorOptions) =>
     `Attribute references external entity '${entity}'`,
-  // Character data (CDATA) errors
+  // Character data (text content) errors
   InvalidCharRef: () => "Character reference to invalid character",
   InvalidChar: () => "Content contains an invalid character",
-  InvalidCDEnd: () => "Content contains ']]>' sequence",
-  InvalidCData: () => "Content appears outside root element",
+  InvalidCDataEnd: () => "Content contains ']]>' sequence",
+  InvalidContent: () => "Content appears outside root element",
   // Tag errors
   InvalidStartTag: () => "Start tag is not well-formed",
   InvalidEndTag: () => "End tag is not well-formed",
@@ -50,11 +50,11 @@ const ERRORS = {
 
   // Namespaces
   InvalidQName: () => "QName is not well-formed",
-  InvalidNCName: () => "NCName contains colon ':'",
+  InvalidNcName: () => "NCName contains colon ':'",
   UndeclaredPrefix: () => "Namespace prefix is not declared",
   PrefixUndeclaring: () => "Namespace URI is empty",
   ReservedPrefix: () => "Namespace prefix starting with 'XML' is reserved",
-  ReservedNamespace: () => "Namespace URI is reserved",
+  ReservedNamespace: () => "Namespace is reserved",
 } as const;
 
 /**
@@ -67,12 +67,12 @@ const ERRORS = {
  * - `LimitExceeded` A limit, imposed by default or `SaxOptions`, was exceeded
  * - `EncodingNotSupported` Encoding not supported
  * - `EncodingInvalidData` Encoded data is invalid
- * - `InvalidXMLDecl` XML declaration is not well-formed
+ * - `InvalidXmlDecl` XML declaration is not well-formed
  * - `InvalidDoctypeDecl` DOCTYPE declaration is not well-formed
  * - `InvalidInternalSubset` Internal subset is not well-formed
  * - `InvalidComment` Comment contains '--'
- * - `InvalidPI` Processing instruction is not well-formed
- * - `ReservedPI` Processing instruction target 'XML' is reserved
+ * - `InvalidPi` Processing instruction is not well-formed
+ * - `ReservedPi` Processing instruction target 'XML' is reserved
  * - `InvalidEntityRef` Entity reference is not well-formed
  * - `RecursiveEntity` Entity directly or indirectly references itself
  * - `UndeclaredEntity` Entity is not declared
@@ -80,7 +80,7 @@ const ERRORS = {
  * - `ExternalEntity` Attribute references an external entity
  * - `InvalidCharRef` Character reference to invalid character
  * - `InvalidChar` Content contains an invalid character
- * - `InvalidCDEnd` Content contains ']]>' sequence
+ * - `InvalidCDataEnd` Content contains ']]>' sequence
  * - `InvalidCData` Content appears outside root element
  * - `InvalidStartTag` Start tag is not well-formed
  * - `InvalidEndTag` End tag is not well-formed
@@ -89,7 +89,7 @@ const ERRORS = {
  * - `TagNameMismatch` End tag does not match start tag
  * - `UnexpectedEof` Unexpected end of file
  * - `InvalidQName` QName is not well-formed
- * - `InvalidNCName` NCName contains colon ':'
+ * - `InvalidNcName` NCName contains colon ':'
  * - `UndeclaredPrefix` Namespace prefix is not declared
  * - `PrefixUndeclaring` Namespace URI is empty
  * - `ReservedPrefix` Namespace prefix starting with 'XML' is reserved

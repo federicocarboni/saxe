@@ -75,14 +75,14 @@ describe("processing instruction", function() {
   });
   it("not-wf: processing instruction with invalid character in name", function() {
     expect(() => getPi("<?target! ?><root/>"))
-      .to.throw().and.have.property("name", "InvalidPI");
+      .to.throw().and.have.property("name", "InvalidPi");
   });
   it("not-wf: processing instruction with empty content and invalid end sequence", function() {
     expect(() => getPi("<?target?<root/>"))
-      .to.throw().and.have.property("name", "InvalidPI");
+      .to.throw().and.have.property("name", "InvalidPi");
   });
   it("not-wf: processing instruction with reserved name", function() {
     expect(() => getPi("<?xML ?><root/>"))
-      .to.throw().and.have.property("name", "ReservedPI");
+      .to.throw().and.have.property("name", "ReservedPi");
   });
 });

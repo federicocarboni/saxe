@@ -1,7 +1,7 @@
 import {expect} from "chai";
 import {
-  NamespaceAttributes,
   Doctype,
+  NamespaceAttributes,
   NamespaceResolver,
   QName,
   SaxNamespaceParser,
@@ -37,7 +37,11 @@ class TreeBuilder implements SaxNamespaceReader {
   // }
   root: Node | undefined = undefined;
   private nodeStack_: Node[] = [];
-  private pushNode_(name: QName, attributes: NamespaceAttributes, empty: boolean) {
+  private pushNode_(
+    name: QName,
+    attributes: NamespaceAttributes,
+    empty: boolean,
+  ) {
     const node: Node = {
       name: copyQName(name),
       attributes: Array.from(

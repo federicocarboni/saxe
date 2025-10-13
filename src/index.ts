@@ -255,10 +255,10 @@ export interface SaxReader extends PrologReader {
    * Entity references not recognized by the parser are handled in
    * {@linkcode entityRef}.
    * @param content - Text content.
-   * @param isCdataSection - Boolean value `true` if content originated from a
+   * @param isCDataSection - Boolean value `true` if content originated from a
    * CDATA section or `false` if it is regular character data.
    */
-  text(content: string, isCdataSection: boolean): void;
+  text(content: string, isCDataSection: boolean): void;
 }
 
 export interface EntityProvider {
@@ -876,13 +876,13 @@ export class SaxParser {
       case State.CHAR_REF_HEX:
         return this.parseCharRefHex_();
       case State.CDATA_SECTION_START:
-        return this.parseCdataSectionStart_();
+        return this.parseCDataSectionStart_();
       case State.CDATA_SECTION:
-        return this.parseCdataSection_();
+        return this.parseCDataSection_();
       case State.CDATA_SECTION_END0:
-        return this.parseCdataSectionEnd0_();
+        return this.parseCDataSectionEnd0_();
       case State.CDATA_SECTION_END:
-        return this.parseCdataSectionEnd_();
+        return this.parseCDataSectionEnd_();
       case State.END_TAG_START:
         return this.parseEndTagStart_();
       case State.END_TAG:
@@ -966,7 +966,7 @@ export class SaxParser {
       this.state_ = State.DOCTYPE_DECL;
       this.element_ = "";
     } else if (this.element_.length === 7) {
-      throw new SaxError("InvalidCData");
+      throw new SaxError("InvalidContent");
     }
   }
 
@@ -1185,7 +1185,7 @@ export class SaxParser {
     if (this.index_ >= this.chunk_.length) {
       return;
     }
-    this.checkNcname_(this.element_);
+    this.checkNcName_(this.element_);
     this.element_ = "";
     if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
       throw new SaxError("InvalidInternalSubset");
@@ -1232,7 +1232,7 @@ export class SaxParser {
   }
   // Allow namespace parser to override this
   // @internal
-  protected checkNcname_(name: string) {
+  protected checkNcName_(name: string) {
     void name;
   }
   // @internal
@@ -1278,7 +1278,7 @@ export class SaxParser {
           } else {
             ++this.index_;
             // Entities must not be expanded but must parse correctly.
-            this.checkNcname_(this.readName_());
+            this.checkNcName_(this.readName_());
             if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
               throw new SaxError("InvalidInternalSubset");
             }
@@ -1307,7 +1307,7 @@ export class SaxParser {
       this.skipWhiteSpace_();
     }
     const entityName = this.readName_();
-    this.checkNcname_(entityName);
+    this.checkNcName_(entityName);
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
       throw new SaxError("InvalidInternalSubset");
     }
@@ -1338,7 +1338,7 @@ export class SaxParser {
         ) {
           this.index_ += 6;
           this.skipWhiteSpace_();
-          this.checkNcname_(this.readName_());
+          this.checkNcName_(this.readName_());
           decl = EntityDecl.UNPARSED;
         }
       }
@@ -1366,7 +1366,7 @@ export class SaxParser {
     while (true) {
       this.skipWhiteSpace_();
       if (isNotation) {
-        this.checkNcname_(this.readName_());
+        this.checkNcName_(this.readName_());
       } else if (this.readNameCharacters_(0).length === 0) {
         throw new SaxError("InvalidInternalSubset");
       }
@@ -1494,7 +1494,7 @@ export class SaxParser {
   private readNotationDecl_() {
     this.index_ += 9;
     this.skipWhiteSpace_();
-    this.checkNcname_(this.readName_());
+    this.checkNcName_(this.readName_());
     // Not necessary readExternalId_ will throw anyway
     // if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
     //   throw new SaxError("InvalidInternalSubset");
@@ -1698,7 +1698,7 @@ export class SaxParser {
       this.state_ = State.OPEN_ANGLE_BRACKET;
       this.otherState_ = State.MISC;
     } else {
-      throw new SaxError("InvalidCData");
+      throw new SaxError("InvalidContent");
     }
   }
 
@@ -1710,7 +1710,7 @@ export class SaxParser {
       this.state_ = State.PI_TARGET;
       this.element_ = String.fromCodePoint(codePoint);
     } else {
-      throw new SaxError("InvalidPI");
+      throw new SaxError("InvalidPi");
     }
   }
 
@@ -1719,9 +1719,9 @@ export class SaxParser {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       // Name read to completion
-      this.checkNcname_(this.element_);
+      this.checkNcName_(this.element_);
       if (this.element_.length === 3 && this.element_.toLowerCase() === "xml") {
-        throw new SaxError("ReservedPI");
+        throw new SaxError("ReservedPi");
       }
       const codeUnit = this.chunk_.charCodeAt(this.index_);
       ++this.index_;
@@ -1730,7 +1730,7 @@ export class SaxParser {
       } else if (codeUnit === Chars.QUESTION) {
         this.state_ = State.PI_END;
       } else {
-        throw new SaxError("InvalidPI");
+        throw new SaxError("InvalidPi");
       }
     }
   }
@@ -1801,14 +1801,14 @@ export class SaxParser {
       ++this.index_;
       this.piEnd_();
     } else {
-      throw new SaxError("InvalidPI");
+      throw new SaxError("InvalidPi");
     }
   }
 
   // @internal
   private parseCommentStart_() {
     if (this.chunk_.charCodeAt(this.index_) !== Chars.HYPHEN) {
-      throw new SaxError("InvalidCData");
+      throw new SaxError("InvalidContent");
     }
     ++this.index_;
     this.state_ = State.COMMENT;
@@ -1920,7 +1920,7 @@ export class SaxParser {
       }
       this.state_ = State.DOCTYPE_DECL_START;
     } else {
-      throw new SaxError("InvalidCData");
+      throw new SaxError("InvalidContent");
     }
   }
 
@@ -2190,7 +2190,7 @@ export class SaxParser {
           // Catch ]]>, this.otherState_ just stores the number of consecutive
           // brackets found.
           if (this.otherState_ > 1) {
-            throw new SaxError("InvalidCDEnd");
+            throw new SaxError("InvalidCDataEnd");
           }
           break;
         default:
@@ -2238,7 +2238,7 @@ export class SaxParser {
     if (this.index_ >= this.chunk_.length) {
       return;
     }
-    this.checkNcname_(this.entity_);
+    this.checkNcName_(this.entity_);
     if (this.chunk_.charCodeAt(this.index_) !== Chars.SEMICOLON) {
       throw new SaxError("InvalidEntityRef");
     }
@@ -2413,7 +2413,7 @@ export class SaxParser {
   }
 
   // @internal
-  private parseCdataSectionStart_() {
+  private parseCDataSectionStart_() {
     const start = this.index_;
     this.index_ += 6 - this.element_.length;
     this.element_ += this.chunk_.slice(start, this.index_);
@@ -2421,12 +2421,12 @@ export class SaxParser {
       this.state_ = State.CDATA_SECTION;
       this.element_ = "";
     } else if (this.element_.length === 6) {
-      throw new SaxError("InvalidCData");
+      throw new SaxError("InvalidContent");
     }
   }
 
   // @internal
-  private parseCdataSection_() {
+  private parseCDataSection_() {
     // Same rationale behind parsePi_
     const index = this.chunk_.indexOf("]]>", this.index_);
     const content = this.chunk_.slice(
@@ -2470,7 +2470,7 @@ export class SaxParser {
   }
 
   // @internal
-  private parseCdataSectionEnd0_() {
+  private parseCDataSectionEnd0_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.CLOSE_BRACKET) {
       ++this.index_;
       this.state_ = State.CDATA_SECTION_END;
@@ -2481,7 +2481,7 @@ export class SaxParser {
   }
 
   // @internal
-  private parseCdataSectionEnd_() {
+  private parseCDataSectionEnd_() {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit === Chars.GT) {
       ++this.index_;
@@ -2619,7 +2619,7 @@ export class SaxParser {
 }
 
 /** A qualified XML name for elements or attributes. */
-export interface Qname {
+export interface QName {
   /** Qualified name of the element or attribute. */
   name: string;
   /** Local part of the name. */
@@ -2673,20 +2673,20 @@ export interface NamespaceAttributes {
   forEach(
     callbackfn: (
       value: string,
-      name: Qname,
+      name: QName,
       attributes: NamespaceAttributes,
     ) => void,
     thisArg?: unknown,
   ): void;
   /** @returns - Returns an iterator over the names of the attributes. */
-  keys(): IterableIterator<Qname>;
+  keys(): IterableIterator<QName>;
   /** @returns - Returns an iterator over the values of the attributes. */
   values(): IterableIterator<string>;
   /**
    * @returns - Returns an iterator over the names and values of the attributes.
    */
-  entries(): IterableIterator<[Qname, string]>;
-  [Symbol.iterator](): IterableIterator<[Qname, string]>;
+  entries(): IterableIterator<[QName, string]>;
+  [Symbol.iterator](): IterableIterator<[QName, string]>;
 }
 
 /**
@@ -2755,7 +2755,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * should only be used after the handler returns.
    */
   startTag(
-    name: Qname,
+    name: QName,
     attributes: NamespaceAttributes,
     resolver: NamespaceResolver,
   ): void;
@@ -2771,7 +2771,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * should only be used after the handler returns.
    */
   emptyTag(
-    name: Qname,
+    name: QName,
     attributes: NamespaceAttributes,
     resolver: NamespaceResolver,
   ): void;
@@ -2785,7 +2785,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * @param resolver - Namespace resolver relative to the current element,
    * should only be used after the handler returns.
    */
-  endTag(name: Qname, resolver: NamespaceResolver): void;
+  endTag(name: QName, resolver: NamespaceResolver): void;
   /**
    * A general entity reference.
    *
@@ -2816,25 +2816,25 @@ export interface SaxNamespaceReader extends PrologReader {
    * access to the namespace resolver of the current element.
    * {@linkcode entityRef}.
    * @param content - Text content.
-   * @param isCdataSection - Boolean value `true` if content originated from a
+   * @param isCDataSection - Boolean value `true` if content originated from a
    * CDATA section or `false` if it is regular character data.
    * @param resolver - Namespace resolver relative to the current element,
    * should only be used after the handler returns.
    */
   text(
     content: string,
-    isCdataSection: boolean,
+    isCDataSection: boolean,
     resolver: NamespaceResolver,
   ): void;
 }
 
 // @internal
-interface AttributeNs extends Qname {
+interface AttributeNs extends QName {
   value: string;
 }
 
 // @internal
-function getQname(attribute: AttributeNs): Qname {
+function getQName(attribute: AttributeNs): QName {
   return {
     name: attribute.name,
     localName: attribute.localName,
@@ -2876,18 +2876,18 @@ class NamespaceAttributes_ implements NamespaceAttributes {
   forEach(
     callbackfn: (
       value: string,
-      name: Qname,
+      name: QName,
       attributes: NamespaceAttributes,
     ) => void,
     thisArg: unknown = undefined,
   ) {
     for (const attribute of this.iter_()) {
-      callbackfn.call(thisArg, attribute.value, getQname(attribute), this);
+      callbackfn.call(thisArg, attribute.value, getQName(attribute), this);
     }
   }
-  *keys(): IterableIterator<Qname> {
+  *keys(): IterableIterator<QName> {
     for (const attribute of this.iter_()) {
-      yield getQname(attribute);
+      yield getQName(attribute);
     }
   }
   *values(): IterableIterator<string> {
@@ -2895,9 +2895,9 @@ class NamespaceAttributes_ implements NamespaceAttributes {
       yield attribute.value;
     }
   }
-  *entries(): IterableIterator<[Qname, string]> {
+  *entries(): IterableIterator<[QName, string]> {
     for (const attribute of this.iter_()) {
-      yield [getQname(attribute), attribute.value];
+      yield [getQName(attribute), attribute.value];
     }
   }
   [Symbol.iterator]() {
@@ -2908,7 +2908,7 @@ class NamespaceAttributes_ implements NamespaceAttributes {
 // @internal
 export type {NamespaceAttributes_};
 
-function checkQname(name: string) {
+function checkQName(name: string) {
   const colon = name.indexOf(":");
   if (
     colon !== -1 &&
@@ -3007,7 +3007,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   doctype?(doctype: Doctype) {
     // doctype name must match QName syntactically but it is not resolved
     // because it is not an element or attribute name
-    checkQname(doctype.name);
+    checkQName(doctype.name);
     return this.reader_.doctype?.(doctype);
   }
   // @internal
@@ -3023,7 +3023,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     return !!this.reader_.entityRef?.(entityName, this);
   }
   // @internal
-  private parseQname_(name: string, isAttribute: boolean): Qname {
+  private parseQName_(name: string, isAttribute: boolean): QName {
     const colon = name.indexOf(":");
     if (
       colon === 0 || colon === name.length - 1 ||
@@ -3094,7 +3094,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
       this.prefixBindings_.set(this.elementPrefixes_.length, bindings);
     }
     for (const [name, value] of attributes) {
-      const attribute = Object.assign(this.parseQname_(name, true), {value});
+      const attribute = Object.assign(this.parseQName_(name, true), {value});
       nsAttributes.add_(attribute);
     }
     return nsAttributes;
@@ -3119,23 +3119,23 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   }
   startTag(name: string, attributes: Attributes) {
     const nsAttributes = this.handleAttributes_(attributes);
-    const qName = this.parseQname_(name, false);
+    const qName = this.parseQName_(name, false);
     this.elementPrefixes_.push(qName.prefix ?? "");
     this.reader_.startTag(qName, nsAttributes, this);
   }
   emptyTag(name: string, attributes: Attributes) {
     const nsAttributes = this.handleAttributes_(attributes);
-    const qName = this.parseQname_(name, false);
+    const qName = this.parseQName_(name, false);
     this.elementPrefixes_.push(qName.prefix ?? "");
     this.reader_.emptyTag(qName, nsAttributes, this);
     this.popPrefixes_();
   }
   endTag(name: string) {
-    this.reader_.endTag(this.parseQname_(name, false), this);
+    this.reader_.endTag(this.parseQName_(name, false), this);
     this.popPrefixes_();
   }
-  text(content: string, isCdataSection: boolean) {
-    return this.reader_.text(content, isCdataSection, this);
+  text(content: string, isCDataSection: boolean) {
+    return this.reader_.text(content, isCDataSection, this);
   }
 }
 
@@ -3158,13 +3158,13 @@ export class SaxNamespaceParser extends SaxParser {
   // @internal
   protected override readName_(): string {
     const name = super.readName_();
-    checkQname(name);
+    checkQName(name);
     return name;
   }
   // @internal
-  protected override checkNcname_(name: string): void {
+  protected override checkNcName_(name: string): void {
     if (name.indexOf(":") !== -1) {
-      throw new SaxError("InvalidNCName");
+      throw new SaxError("InvalidNcName");
     }
   }
 }

@@ -95,7 +95,7 @@ describe("Document type declaration", function() {
   });
   it("not-wf: doctypedecl with invalid start", function() {
     expect(() => getDoctypeDecl("<!DOCTYP doctypName >"))
-      .throws().and.has.property("name", "InvalidCData");
+      .throws().and.has.property("name", "InvalidContent");
   });
   it("not-wf: more than one doctypedecl", function() {
     expect(() =>

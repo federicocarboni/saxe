@@ -48,7 +48,7 @@ describe("comment", function() {
   });
   it("not-wf: comment with invalid start", function() {
     expect(() => getComment("<!-Hello--><root/>"))
-      .to.throw().and.have.property("name", "InvalidCData");
+      .to.throw().and.have.property("name", "InvalidContent");
   });
   it("not-wf: comment with invalid character", function() {
     expect(() => getComment("<!--\uFFFF--><root/>"))
