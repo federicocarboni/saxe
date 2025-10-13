@@ -11,7 +11,7 @@ import {
 import {SaxError} from "./error.ts";
 import {parseXmlDecl} from "./xml_decl.ts";
 
-export {SaxError, type SaxErrorName} from "./error.ts";
+export {SaxError, type SaxErrorName, type SaxErrorOptions} from "./error.ts";
 
 /**
  * XML declaration (XMLDecl).
@@ -43,28 +43,12 @@ export interface XmlDeclaration {
    *
    * `true` when set to `yes`, `false` when set to `no`, or `undefined` when
    * unspecified.
-   *
-   * #### [VC: Standalone Document Declaration]
-   * The standalone document declaration MUST have the value "no" if any
-   * external markup declarations contain declarations of:
-   *
-   * - attributes with default values, if elements to which these attributes
-   *   apply appear in the document without specifications of values for these
-   *   attributes, or
-   * - entities (other than `amp`, `lt`, `gt`, `apos`, `quot`), if references to
-   *   those entities appear in the document, or
-   * - attributes with tokenized types, where the attribute appears in the
-   *   document with a value such that normalization will produce a different
-   *   value from that which would be produced in the absence of the
-   *   declaration, or
-   * - element types with element content, if white space occurs directly within
-   *   any instance of those types.
    */
   standalone?: boolean | undefined;
 }
 
 /**
- * Document type declaration (doctypedecl).
+ * Document type declaration.
  *
  * ```xml
  * <!DOCTYPE example PUBLIC "-//Example//example doc" "http://example.org/example.dtd">
@@ -73,17 +57,13 @@ export interface XmlDeclaration {
 export interface Doctype {
   /**
    * Name in the document type declaration.
-   *
-   * #### [VC: Root Element Type]
-   * The Name in the document type declaration MUST match the element type of
-   * the root element.
    */
   name: string;
   /**
    * Public identifier in the document type declaration, if present.
    *
-   * All strings of white space in the public identifier are normalized to
-   * single space characters, and leading and trailing white space is removed.
+   * All whitespace in the public identifier is normalized to single space
+   * characters, and leading and trailing whitespace is removed.
    */
   publicId?: string | undefined;
   /**
@@ -147,6 +127,11 @@ export interface Attributes {
 interface PrologReader {
   /**
    * XML declaration of the document.
+   *
+   * ```xml
+   * <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+   * ```
+   *
    * @param declaration -
    */
   xml?(declaration: XmlDeclaration): void;
@@ -531,10 +516,11 @@ function escapeChar(c: string): string {
 }
 
 /**
- * Escapes XML markup characters in the given string.
+ * Escapes a string by replacing each instance of XML markup characters by their
+ * predefined entity or decimal character reference, so that they are
+ * interpreted literally in text content or attributes.
  *
- * XML markup is escaped using their predefined entity if there is one, or a
- * decimal character reference.
+ * Each of the following characters is turned in the corresponding sequences:
  *
  * - `&` -> `&amp;`
  * - `<` -> `&lt;`
@@ -545,9 +531,9 @@ function escapeChar(c: string): string {
  * - `\n` (LF) -> `&#10;`
  * - `\r` (CR) -> `&#13;`
  *
- * @param s - Input string to be escaped.
- * @returns - A new string where all XML markup characters are replaced with
- * their escape sequence.
+ * @param s - A string to be escaped as XML content.
+ * @returns - Returns a new string where each XML markup character is replaced
+ * by their escape sequence.
  *
  * @example
  * ```ts
@@ -558,16 +544,6 @@ function escapeChar(c: string): string {
  */
 export function escape(s: string) {
   return s.replace(/[&<>'"\t\n\r]/g, escapeChar);
-}
-
-export function parse(
-  input: string,
-  reader: SaxReader,
-  options: SaxOptions | undefined = undefined,
-) {
-  const parser = new SaxParser(reader, options);
-  parser.write(input);
-  parser.end();
 }
 
 const EXTERNAL_OR_PUBLIC_ID_RE =
@@ -2161,7 +2137,7 @@ export class SaxParser {
         case Chars.LF:
           // TAB and LF are valid and since they are common, it's faster to
           // handle them here than in the default case
-          // TODO: add significant white space handler?
+          // TODO: add significant whitespace handler?
           break;
         case Chars.CR:
           if (this.entityStack_.length === 0) {
@@ -2700,7 +2676,6 @@ export interface NamespaceResolver {
    * - If `prefix` is `"xml"` the return value is always the XML namespace.
    * - If `prefix` is `"xmlns"` the return value is always the XMLNS namespace.
    * - If `prefix` is `undefined` the return value is the default namespace URI.
-   * - If `prefix` is not found, the return value is {@linkcode SaxNamespaceReader.lookupNamespace}
    *
    * This function acts as if [DOM Node `lookupNamespaceURI`] were called on the
    * current element being parsed, usually the element of the last call to
@@ -2752,7 +2727,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * @param name - Name of the element.
    * @param attributes - Attributes of the tag.
    * @param resolver - Namespace resolver relative to the current element,
-   * should only be used after the handler returns.
+   * should not be used outside the handler.
    */
   startTag(
     name: QName,
@@ -2768,7 +2743,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * @param name - Name of the element.
    * @param attributes - Attributes of the tag.
    * @param resolver - Namespace resolver relative to the current element,
-   * should only be used after the handler returns.
+   * should not be used outside the handler.
    */
   emptyTag(
     name: QName,
@@ -2783,7 +2758,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * ```
    * @param name - Name of the element.
    * @param resolver - Namespace resolver relative to the current element,
-   * should only be used after the handler returns.
+   * should not be used outside the handler.
    */
   endTag(name: QName, resolver: NamespaceResolver): void;
   /**
@@ -2798,11 +2773,13 @@ export interface SaxNamespaceReader extends PrologReader {
    * This handler is equivalent to {@linkcode SaxReader.entityRef} except it
    * has access to the namespace resolver of the current element.
    * @param name - Name of the entity.
+   * @param resolver - Namespace resolver relative to the current element,
+   * should not be used outside the handler.
    * @returns - Returns `true` if entity `name` was recognized. If the function
    * is not defined or returns `false` the parser throws an `UndeclaredEntity`
    * error.
    */
-  entityRef?(entityName: string, resolver: NamespaceResolver): boolean;
+  entityRef?(name: string, resolver: NamespaceResolver): boolean;
   /**
    * Text content.
    *
@@ -2819,7 +2796,7 @@ export interface SaxNamespaceReader extends PrologReader {
    * @param isCDataSection - Boolean value `true` if content originated from a
    * CDATA section or `false` if it is regular character data.
    * @param resolver - Namespace resolver relative to the current element,
-   * should only be used after the handler returns.
+   * should not be used outside the handler.
    */
   text(
     content: string,
@@ -2843,7 +2820,7 @@ function getQName(attribute: AttributeNs): QName {
   };
 }
 
-// @internal
+/** @internal */
 class NamespaceAttributes_ implements NamespaceAttributes {
   // @internal
   private map_ = new Map<string, AttributeNs>();
