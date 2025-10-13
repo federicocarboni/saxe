@@ -1,9 +1,9 @@
 /* eslint-disable */
 
-import type { ReadStream } from "fs";
-import type { ReadTokens } from "../index.ts";
+import type {ReadStream} from "fs";
+import type {ReadTokens} from "../index.ts";
 
-import { SaxParser, SaxReader } from "saxe";
+import {SaxParser, type SaxReader} from "../../src/index.ts";
 
 class Reader implements SaxReader {
   comments = 0;
@@ -12,24 +12,26 @@ class Reader implements SaxReader {
   emptyTags = 0;
   endTags = 0;
   textNodes = 0;
-  // some test files use entities without declaring them
-  getGeneralEntity(entityName: string): string | undefined {
-    return "";
+  attributes = 0;
+
+  entityRef(_entityName: string): boolean {
+    return true;
   }
-  entityRef(entityName: string): void {}
   comment(_text: string): void {
     ++this.comments;
   }
   processingInstruction(_target: string, _content: string): void {
     ++this.processingInstructions;
   }
-  start(_name: string, _attributes: ReadonlyMap<string, string>): void {
+  startTag(_name: string, _attributes: ReadonlyMap<string, string>): void {
     ++this.startTags;
+    this.attributes += _attributes.size;
   }
-  empty(_name: string, _attributes: ReadonlyMap<string, string>): void {
+  emptyTag(_name: string, _attributes: ReadonlyMap<string, string>): void {
     ++this.emptyTags;
+    this.attributes += _attributes.size;
   }
-  end(_name: string): void {
+  endTag(_name: string): void {
     ++this.endTags;
   }
   text(_text: string): void {
@@ -40,16 +42,22 @@ class Reader implements SaxReader {
 export function saxe(
   readable: ReadStream,
   callback: (tokens: ReadTokens | undefined, error?: unknown) => void,
-  ignoreDtd?: boolean
+  ignoreDtd?: boolean,
 ) {
   const reader = new Reader();
   const parser = new SaxParser(reader, {
-    maxAttributes: 20_000_000,
-    maxNameLength: 20_000_000,
-    maxTextLength: 20_000_000,
+    // maxAttributes: 20_000_000,
+    maxNameLength: 10_000_000,
+    maxTextLength: 10_000_010,
     dtd: ignoreDtd ? "ignore" : undefined,
     // maxEntityDepth: Infinity,
     // maxEntityLength: Infinity,
+    entityProvider: {
+      // some test files use entities without declaring them
+      getEntity(_entityName: string): string | undefined {
+        return "";
+      },
+    },
   });
 
   readable.setEncoding("utf-8");

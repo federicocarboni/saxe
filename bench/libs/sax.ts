@@ -18,7 +18,7 @@ export function sax(
   let emptyTags = 0;
   let endTags = 0;
   let textNodes = 0;
-
+  let attributes = 0;
 
   // Kept on default configuration, strict mode is not compliant anyway.
   const parser = new sax1.SAXParser();
@@ -29,6 +29,10 @@ export function sax(
 
   parser.onprocessinginstruction = () => {
     ++processingInstructions;
+  };
+
+  parser.onattribute = () => {
+    ++attributes;
   };
 
   parser.onopentagstart = (tag) => {
@@ -81,6 +85,7 @@ export function sax(
       emptyTags,
       endTags,
       textNodes,
+      attributes,
     });
   });
 }

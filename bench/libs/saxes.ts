@@ -15,9 +15,12 @@ export function saxes(
   let emptyTags = 0;
   let endTags = 0;
   let textNodes = 0;
+  let attributes = 0;
 
   // Kept on default configuration, strict mode is not compliant anyway.
-  const parser = new SaxesParser();
+  const parser = new SaxesParser({
+    // xmlns: true
+  });
 
   parser.on("comment", () => {
     ++comments;
@@ -25,6 +28,10 @@ export function saxes(
 
   parser.on("processinginstruction", () => {
     ++processingInstructions;
+  });
+
+  parser.on("attribute", () => {
+    ++attributes;
   });
 
   parser.on("opentag", (tag) => {
@@ -77,6 +84,7 @@ export function saxes(
       emptyTags,
       endTags,
       textNodes,
+      attributes,
     });
   });
 }
