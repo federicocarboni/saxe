@@ -52,7 +52,7 @@ const ERRORS = {
   InvalidQName: () => "QName is not well-formed",
   InvalidNcName: () => "NCName contains colon ':'",
   UndeclaredPrefix: () => "Namespace prefix is not declared",
-  PrefixUndeclaring: () => "Namespace URI is empty",
+  PrefixUndeclaring: () => "Namespace prefix undeclaring is not supported",
   ReservedPrefix: () => "Namespace prefix starting with 'XML' is reserved",
   ReservedNamespace: () => "Namespace is reserved",
 } as const;
@@ -91,9 +91,9 @@ const ERRORS = {
  * - `InvalidQName` QName is not well-formed
  * - `InvalidNcName` NCName contains colon ':'
  * - `UndeclaredPrefix` Namespace prefix is not declared
- * - `PrefixUndeclaring` Namespace URI is empty
+ * - `PrefixUndeclaring` Namespace prefix undeclaring is not supported
  * - `ReservedPrefix` Namespace prefix starting with 'XML' is reserved
- * - `ReservedNamespace` Namespace URI is reserved
+ * - `ReservedNamespace` Namespace is reserved
  */
 export type SaxErrorName = keyof typeof ERRORS;
 
