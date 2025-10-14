@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {SaxParser, SaxReader, XmlDeclaration} from "../src/index.ts";
+import {SaxParser, type SaxReader, type XmlDeclaration} from "../src/index.ts";
 
 class XmlDeclReader implements SaxReader {
   declaration: XmlDeclaration | undefined = undefined;

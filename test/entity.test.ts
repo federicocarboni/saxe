@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {Attributes, SaxParser, SaxReader} from "../src/index.ts";
+import {type Attributes, SaxParser, type SaxReader} from "../src/index.ts";
 import {CanonicalXmlWriter} from "./canonical_xml.ts";
 
 class CanonicalEntityReader implements SaxReader {

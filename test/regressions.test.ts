@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import {SaxError, SaxErrorName, SaxParser} from "../src/index.ts";
+import {SaxError, type SaxErrorName, SaxParser} from "../src/index.ts";
 import {CanonicalXmlWriter} from "./canonical_xml.ts";
 
 // Found through fuzz testing

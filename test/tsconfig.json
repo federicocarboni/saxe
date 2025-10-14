@@ -4,7 +4,13 @@
     "target": "esnext",
     "lib": ["ESNext"],
     "rootDir": "../",
-    "types": ["mocha", "chai", "@types/chai", "@types/chai-as-promised", "@types/node"]
+    "types": [
+      "mocha",
+      "chai",
+      "@types/chai",
+      "@types/chai-as-promised",
+      "@types/node"
+    ]
   },
   "include": ["**/*"]
 }

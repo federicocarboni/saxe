@@ -1,12 +1,9 @@
 import {expect} from "chai";
 import {
-  Doctype,
-  NamespaceAttributes,
-  NamespaceResolver,
-  QName,
+  type NamespaceAttributes,
+  type QName,
   SaxNamespaceParser,
-  SaxNamespaceReader,
-  XmlDeclaration,
+  type SaxNamespaceReader,
 } from "../src/index.ts";
 
 interface Node {
@@ -54,7 +51,7 @@ class TreeBuilder implements SaxNamespaceReader {
     if (this.nodeStack_.length === 0) {
       this.root = node;
     } else {
-      this.nodeStack_[this.nodeStack_.length - 1].children.push(node);
+      this.nodeStack_[this.nodeStack_.length - 1]!.children.push(node);
     }
     this.nodeStack_.push(node);
   }
@@ -70,7 +67,7 @@ class TreeBuilder implements SaxNamespaceReader {
   }
   text(text: string): void {
     if (text.trim()) {
-      this.nodeStack_[this.nodeStack_.length - 1].children.push(text);
+      this.nodeStack_[this.nodeStack_.length - 1]!.children.push(text);
     }
   }
 }

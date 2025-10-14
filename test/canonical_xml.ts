@@ -4,7 +4,7 @@
 // a good SaxReader example and may be used as a practical reference on how to
 // use SaxParser.
 
-import {Attributes, SaxReader} from "../src/index.ts";
+import type {Attributes, SaxReader} from "../src/index.ts";
 
 function escapeDataChars(value: string) {
   return value.replace(/[&<>"\t\n\r]/g, (val) => {

@@ -5,7 +5,12 @@ import * as streams from "stream/promises";
 import * as tar from "tar";
 
 import {expect} from "chai";
-import {Attributes, SaxError, SaxParser, SaxReader} from "../../src/index.ts";
+import {
+  type Attributes,
+  SaxError,
+  SaxParser,
+  type SaxReader,
+} from "../../src/index.ts";
 import {CanonicalXmlWriter} from "../canonical_xml.ts";
 
 // Download and extract the test suite

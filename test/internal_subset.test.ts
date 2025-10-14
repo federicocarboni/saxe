@@ -270,9 +270,9 @@ describe('Internal Subset {dtd: "ignore"}', function() {
   it("not-wf: internal subset is still checked for well-formed-ness", function() {
     expect(() =>
       toCanonicalOpt(
-        ['<!DOCTYPE doc [ <!> ]><doc></doc>'],
+        ["<!DOCTYPE doc [ <!> ]><doc></doc>"],
         {dtd: "ignore"},
-      ),
+      )
     ).throws().and.has.property("name", "InvalidInternalSubset");
   });
 });
