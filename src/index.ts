@@ -1,5 +1,3 @@
-/** */
-
 import {
   Chars,
   hasInvalidChar,
