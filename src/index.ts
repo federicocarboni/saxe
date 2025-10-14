@@ -561,6 +561,9 @@ const EXTERNAL_OR_PUBLIC_ID_RE =
  * text content. Because the parser does not construct a tree representation
  * of the document it is possible to process very large inputs efficiently.
  *
+ * Malformed XML documents are not accepted, parsing errors cannot be recovered
+ * from.
+ *
  * For namespace-aware processing use {@linkcode SaxNamespaceParser} instead.
  *
  * @example

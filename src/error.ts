@@ -58,8 +58,8 @@ const ERRORS = {
 } as const;
 
 /**
- * A string that identifies a parsing or decoding error in an XML Document or
- * Entity. New error codes may be added in the future so it's not recommended
+ * A string that identifies a parsing or decoding error in an XML document or
+ * entity. New error codes may be added in the future so it's not recommended
  * to match exhaustively against all possible values.
  *
  * A comprehensive list of error codes and their meaning:
@@ -106,6 +106,11 @@ export interface SaxErrorOptions extends ErrorOptions {
   entity?: string | undefined;
 }
 
+/**
+ * A parsing error in an XML document or entity. The specific violation or error
+ * is identified by {@linkcode name}.
+ * @see {@link SaxErrorName}
+ */
 export class SaxError extends Error {
   /**
    * A string indicating the specific violation or error.
@@ -123,15 +128,9 @@ export class SaxError extends Error {
   offset?: number | undefined;
   /** Encoding of the document or entity. Only set for decoding errors. */
   encoding?: string | undefined;
-  /**
-   * Name of the element that caused the error. Only set for
-   * `TagNameMismatch`.
-   */
+  /** Name of the element that caused the error, if any. */
   element?: string | undefined;
-  /**
-   * Name of the attribute that caused the error. Only set for
-   * `AttributeRedefined`.
-   */
+  /** Name of the attribute that caused the error, if any. */
   attribute?: string | undefined;
   /** Name of the entity that caused the error, if any. */
   entity?: string | undefined;
