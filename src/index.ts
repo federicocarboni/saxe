@@ -733,6 +733,13 @@ export class SaxParser {
     this.entityProvider_ = options.entityProvider ?? undefined;
   }
 
+  /**
+   * Parses XML from `input` and notifies the reader of parsing events such as
+   * start tags, end tags and text content.
+   * @param input - A string containing the XML data to parse.
+   * @param options -
+   * @throws {@linkcode SaxError} Thrown if a parsing error occurs.
+   */
   parse(
     input: string | undefined = undefined,
     options: SaxParseOptions | undefined = undefined,
