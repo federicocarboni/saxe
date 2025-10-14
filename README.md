@@ -1,5 +1,8 @@
 # Saxe
 
+[![Docs](https://img.shields.io/badge/docs-online-brightgreen)](https://federicocarboni.github.io/saxe/)
+[![Coverage](https://img.shields.io/codecov/c/github/federicocarboni/saxe?logo=codecov)](https://app.codecov.io/gh/federicocarboni/saxe)
+
 Light-weight and efficient SAX-style XML parser for JavaScript.
 
 ## Goals
