@@ -62,9 +62,6 @@ importers:
       eslint-plugin-jsdoc:
         specifier: ^61.1.2
         version: 61.1.2(eslint@9.37.0)
-      jsfuzz@node-options:
-        specifier: link:github+https:federicocarboni/jsfuzz@node-options
-        version: link:github+https:federicocarboni/jsfuzz@node-options
       mocha:
         specifier: ^11.7.4
         version: 11.7.4
