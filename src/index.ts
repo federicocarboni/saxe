@@ -516,16 +516,16 @@ function escapeChar(c: string): string {
  * predefined entity or decimal character reference, so that they are
  * interpreted literally in text content or attributes.
  *
- * Each of the following characters is turned in the corresponding sequences:
+ * Each of the following characters is replaced by the corresponding sequence:
  *
- * - `&` -> `&amp;`
- * - `<` -> `&lt;`
- * - `>` -> `&gt;`
- * - `'` -> `&apos;`
- * - `"` -> `&quot;`
- * - `\t` (TAB) -> `&#9;`
- * - `\n` (LF) -> `&#10;`
- * - `\r` (CR) -> `&#13;`
+ * - `&` → `&amp;`
+ * - `<` → `&lt;`
+ * - `>` → `&gt;`
+ * - `'` → `&apos;`
+ * - `"` → `&quot;`
+ * - `\t` → `&#9;` (TAB)
+ * - `\n` → `&#10;` (LF)
+ * - `\r` → `&#13;` (CR)
  *
  * @param s - A string to be escaped as XML content.
  * @returns - Returns a new string where each XML markup character is replaced
@@ -563,6 +563,8 @@ const EXTERNAL_OR_PUBLIC_ID_RE =
  * text content. Because the parser does not construct a tree representation
  * of the document it is possible to process very large inputs efficiently.
  *
+ * For namespace-aware processing use {@linkcode SaxNamespaceParser} instead.
+ *
  * @example
  * ```js
  * const parser = new SaxParser({
@@ -587,6 +589,11 @@ const EXTERNAL_OR_PUBLIC_ID_RE =
  * parser.parse(`<empty-tag attr="value" />`, {stream: true});
  * parser.parse("</example>");
  * ```
+ *
+ * @see {@linkcode SaxReader}
+ * @see {@linkcode SaxOptions}
+ * @see {@linkcode SaxNamespaceReader}
+ * @see {@linkcode SaxNamespaceParser}
  */
 export class SaxParser {
   // Private properties and methods of this class are mangled at build time to
@@ -699,11 +706,6 @@ export class SaxParser {
   /** @internal */
   private standalone_: boolean | undefined = undefined;
 
-  /**
-   * Creates a new `SaxParser`.
-   * @param reader - A reader set to receive parsing events.
-   * @param options -
-   */
   constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
     if (options == null) {
       options = {};
@@ -738,7 +740,7 @@ export class SaxParser {
    * start tags, end tags and text content.
    * @param input - A string containing the XML data to parse.
    * @param options -
-   * @throws {@linkcode SaxError} Thrown if a parsing error occurs.
+   * @throws {@linkcode SaxError}
    */
   parse(
     input: string | undefined = undefined,
@@ -3154,6 +3156,23 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
 export interface SaxNamespaceOptions extends SaxOptions {
 }
 
+/**
+ * A streaming SAX-style namespace-aware XML parser.
+ *
+ * `SaxNamespaceParser` works the same way as {@linkcode SaxParser} except
+ * instead of plain strings it resolves namespace information and passes
+ * {@linkcode QName} to the reader for element and attribute names.
+ *
+ * Additionally, document content handlers are provided with a
+ * {@linkcode NamespaceResolver} to resolve namespaces and prefixes
+ * at the current element.
+ *
+ * @see {@linkcode SaxParser}
+ * @see {@linkcode SaxNamespaceOptions}
+ * @see {@linkcode SaxNamespaceReader}
+ * @see {@linkcode QName}
+ * @see {@linkcode NamespaceResolver}
+ */
 export class SaxNamespaceParser extends SaxParser {
   constructor(
     reader: SaxNamespaceReader,
