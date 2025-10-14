@@ -24,7 +24,7 @@ function testRegression(content: string, expectedError?: SaxErrorName) {
   try {
     parser1.parse(content);
   } catch (error) {
-    error1 = error;
+    error1 = error as SaxError;
   }
   try {
     for (const c of content) {
@@ -32,7 +32,7 @@ function testRegression(content: string, expectedError?: SaxErrorName) {
     }
     parser2.parse();
   } catch (error) {
-    error2 = error;
+    error2 = error as SaxError;
   }
   expect(error1?.name).equals(expectedError);
   expect(error2?.name).equals(expectedError);
