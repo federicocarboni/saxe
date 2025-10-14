@@ -21,25 +21,27 @@ Light-weight and efficient SAX-style XML parser for JavaScript.
 ```js
 import {SaxParser} from "saxe";
 
-let textContent = "";
 const parser = new SaxParser({
   startTag(name, attributes) {
-    // element start tag
+    // Start tag: example
+    console.log("Start tag:", name, ...attributes);
   },
   emptyTag(name, attributes) {
-    // element empty tag
+    // Empty tag: empty-tag value
+    console.log("Empty tag:", name, attributes.get("attr"));
   },
   endTag(name) {
-    // element end tag
+    // End tag: example
+    console.log("End tag:", name);
   },
-  text(text) {
-    textContent += text;
+  text(content) {
+    // Text: Hello, world!
+    console.log("Text:", content);
   },
 });
-for (const chunk of INPUT_STREAM) {
-  parser.write(chunk);
-}
-parser.end();
+parser.parse("<example>Hello, world!", {stream: true});
+parser.parse(`<empty-tag attr="value" />`, {stream: true});
+parser.parse("</example>");
 ```
 
 ## Runtime Support
