@@ -22,7 +22,7 @@ Light-weight and efficient SAX-style XML parser for JavaScript.
 ## Example
 
 ```js
-import {SaxParser} from "saxe";
+import {SaxParser} from "@federicocarboni/saxe";
 
 const parser = new SaxParser({
   startTag(name, attributes) {

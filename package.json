@@ -1,5 +1,5 @@
 {
-  "name": "saxe",
+  "name": "@federicocarboni/saxe",
   "version": "0.1.0",
   "description": "Light-weight and efficient SAX-style XML parser",
   "type": "module",
