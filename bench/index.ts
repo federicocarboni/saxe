@@ -46,7 +46,7 @@ async function runTestCaseSax(name: string, n: number) {
     const start = performance.now();
     try {
       await pSax(readable);
-    } catch (error) {
+    } catch {
       isError = true;
     }
     all += performance.now() - start;
@@ -63,7 +63,7 @@ async function runTestCaseSaxe(name: string, n: number) {
     const start = performance.now();
     try {
       await pSaxe(readable);
-    } catch (error) {
+    } catch {
       isError = true;
     }
     all += performance.now() - start;
@@ -80,7 +80,7 @@ async function runTestCaseSaxe2(name: string, n: number) {
     const start = performance.now();
     try {
       await pSaxe(readable, true);
-    } catch (error) {
+    } catch {
       isError = true;
     }
     all += performance.now() - start;
@@ -97,7 +97,7 @@ async function runTestCaseSaxes(name: string, n: number) {
     const start = performance.now();
     try {
       await pSaxes(readable);
-    } catch (error) {
+    } catch {
       isError = true;
     }
     all += performance.now() - start;
