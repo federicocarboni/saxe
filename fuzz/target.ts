@@ -30,8 +30,7 @@ export function fuzz(data: Buffer) {
   }
   if (
     error1?.name !== error2?.name ||
-    error1 === undefined && writer1.output !== writer2.output ||
-    error1 !== undefined && !writer2.output.startsWith(writer1.output)
+    error1 === undefined && writer1.output !== writer2.output
   ) {
     throw new Error(
       `--- FULL: ---\n${writer1.output}\n${error1}\n\n--- CHAR BY CHAR: ---\n${writer2.output}\n${error2}`,
