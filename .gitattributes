@@ -1,2 +1,2 @@
 # Exclude config files from Git stats
-*.cjs linguist-vendored
+*.config.js linguist-vendored
