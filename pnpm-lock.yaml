@@ -15,8 +15,8 @@ importers:
         specifier: ^9.37.0
         version: 9.37.0
       '@gitlab-org/jsfuzz':
-        specifier: github:federicocarboni/jsfuzz
-        version: https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/bc1fc5c33dbf86aa703305f6a726aec15845df8f
+        specifier: github:federicocarboni/jsfuzz#node-options
+        version: https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/5ae7ed7671354000e33c9178ff064ccb3bff3a8f
       '@types/chai':
         specifier: ^5.2.2
         version: 5.2.2
@@ -62,6 +62,9 @@ importers:
       eslint-plugin-jsdoc:
         specifier: ^61.1.2
         version: 61.1.2(eslint@9.37.0)
+      jsfuzz@node-options:
+        specifier: link:github+https:federicocarboni/jsfuzz@node-options
+        version: link:github+https:federicocarboni/jsfuzz@node-options
       mocha:
         specifier: ^11.7.4
         version: 11.7.4
@@ -412,8 +415,8 @@ packages:
   '@gerrit0/mini-shiki@3.13.1':
     resolution: {integrity: sha512-fDWM5QQc70jwBIt/WYMybdyXdyBmoJe7r1hpM+V/bHnyla79sygVDK2/LlVxIPc4n5FA3B5Wzt7AQH2+psNphg==}
 
-  '@gitlab-org/jsfuzz@https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/bc1fc5c33dbf86aa703305f6a726aec15845df8f':
-    resolution: {tarball: https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/bc1fc5c33dbf86aa703305f6a726aec15845df8f}
+  '@gitlab-org/jsfuzz@https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/5ae7ed7671354000e33c9178ff064ccb3bff3a8f':
+    resolution: {tarball: https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/5ae7ed7671354000e33c9178ff064ccb3bff3a8f}
     version: 1.2.4
     hasBin: true
 
@@ -2554,7 +2557,7 @@ snapshots:
       '@shikijs/types': 3.13.0
       '@shikijs/vscode-textmate': 10.0.2
 
-  '@gitlab-org/jsfuzz@https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/bc1fc5c33dbf86aa703305f6a726aec15845df8f':
+  '@gitlab-org/jsfuzz@https://codeload.github.com/federicocarboni/jsfuzz/tar.gz/5ae7ed7671354000e33c9178ff064ccb3bff3a8f':
     dependencies:
       deep-equal: 1.1.2
       istanbul-lib-hook: 3.0.0
