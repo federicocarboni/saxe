@@ -6,9 +6,6 @@ on:
 
 jobs:
   build:
-    permissions:
-      id-token: write
-      pages: write
     runs-on: ubuntu-latest
     steps:
       - name: Check out Git repository
@@ -39,6 +36,9 @@ jobs:
           path: docs/
 
   deploy:
+    permissions:
+      id-token: write
+      pages: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
