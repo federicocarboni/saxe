@@ -22,14 +22,15 @@ function testRegression(content: string, expectedError?: SaxErrorName) {
   let error1: SaxError | undefined = undefined;
   let error2: SaxError | undefined = undefined;
   try {
-    parser1.write(content);
-    parser1.end();
+    parser1.parse(content);
   } catch (error) {
     error1 = error;
   }
   try {
-    for (const c of content) { parser2.write(c); }
-    parser2.end();
+    for (const c of content) {
+      parser2.parse(c, {stream: true});
+    }
+    parser2.parse();
   } catch (error) {
     error2 = error;
   }

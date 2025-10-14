@@ -110,14 +110,14 @@ async function getTestCases(xmlconf: string) {
   const parser = new SaxParser(reader);
   test.on("data", (data) => {
     try {
-      parser.write(data as string);
+      parser.parse(data as string, {stream: true});
     } catch (error) {
       console.error(error, xmlconf);
       throw error;
     }
   });
   await streams.finished(test);
-  parser.end();
+  parser.parse();
 }
 
 const TEST_SUITE = [
@@ -153,9 +153,9 @@ export function runTest(testCase: TestCase) {
       const canonicalizer = new CanonicalXmlWriter();
       const parser = new SaxParser(canonicalizer);
       for (const c of content) {
-        parser.write(c);
+        parser.parse(c, {stream: true});
       }
-      parser.end();
+      parser.parse();
       return canonicalizer.output;
     };
 

@@ -10,8 +10,7 @@ export function fuzz(data: Buffer) {
   let error1: SaxError | undefined;
   let error2: SaxError | undefined;
   try {
-    parser1.write(str);
-    parser1.end();
+    parser1.parse(str);
   } catch (error) {
     if (!(error instanceof SaxError)) {
       throw error;
@@ -20,9 +19,9 @@ export function fuzz(data: Buffer) {
   }
   try {
     for (const c of str) {
-      parser2.write(c);
+      parser2.parse(c, {stream: true});
     }
-    parser2.end();
+    parser2.parse();
   } catch (error) {
     if (!(error instanceof SaxError)) {
       throw error;

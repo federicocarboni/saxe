@@ -124,7 +124,7 @@ export interface Attributes {
   [Symbol.iterator](): IterableIterator<[string, string]>;
 }
 
-interface PrologReader {
+interface SaxPrologReader {
   /**
    * XML declaration of the document.
    *
@@ -173,7 +173,7 @@ interface PrologReader {
 /**
  * https://www.w3.org/TR/REC-xml/
  */
-export interface SaxReader extends PrologReader {
+export interface SaxReader extends SaxPrologReader {
   /**
    * Start tag.
    *
@@ -280,25 +280,22 @@ export interface EntityProvider {
   getEntity(name: string): string | undefined;
 }
 
-/** */
 export interface SaxOptions {
   /**
-   * Customize behavior for Document Type Declarations. Users may want to
-   * disable doctypes because certain protocols prohibit them or for safer
-   * processing.
+   * Set behavior for document type declarations.
    *
-   * - `"process"` - internal DTD is processed, i.e. attribute lists are read
-   * and processed to set default attribute values and normalize attributes
-   * correctly, internal entities are read and expanded as needed.
-   * External DTD identifiers are passed to the application. External entities
-   * and external declarations are not read or processed.
-   * - `"prohibit"` - throw an error if the document has any DTD, including
-   * external DTDs, i.e. `<!DOCTYPE any>` immediately aborts parsing. Throws
-   * `InvalidDoctypeDecl`.
-   * - `"ignore"` - internal DTD is not processed but is still checked for
-   * well-formedness, i.e. internal entity references are not expanded
-   * automatically but a syntax error still throws. External DTD identifiers are
-   * still passed to the application.
+   * By default, internal document type declarations are processed, so attribute
+   * lists declarations apply normalization and default values to attributes and
+   * internal entities are recognized and expanded.
+   *
+   * Restricting document type declarations may be preferable where DoS attacks
+   * are a concern or where higher priority protocols explicitly prohibit them.
+   *
+   * - `"process"` - Default, internal declarations are processed normally.
+   * - `"prohibit"` - `DOCTYPE` declarations are prohibited by throwing
+   *   `InvalidDoctypeDecl` if the document has one.
+   * - `"ignore"` - `DOCTYPE` declarations are allowed and checked for syntax
+   *   errors but do not affect parsing of the document.
    * @default "process"
    */
   dtd?: "process" | "prohibit" | "ignore" | undefined;
@@ -319,8 +316,7 @@ export interface SaxOptions {
   /**
    * Maximum size allowed for a text node.
    *
-   * Also applies to comments and processing instruction content when they are
-   * collected.
+   * Also applies to comments and processing instructions.
    * @default 10_000_000
    */
   maxTextLength?: number | undefined;
@@ -546,14 +542,51 @@ export function escape(s: string) {
   return s.replace(/[&<>'"\t\n\r]/g, escapeChar);
 }
 
+export interface SaxParseOptions {
+  /**
+   * A boolean value indicating whether additional data follows in subsequent
+   * calls to {@linkcode SaxParser.parse}. Set to `true` to process input in
+   * chunks, and `false` for the final chunk or if the input is not chunked.
+   * @default false
+   */
+  stream?: boolean | undefined;
+}
+
 const EXTERNAL_OR_PUBLIC_ID_RE =
   /^(?:SYSTEM|PUBLIC[ \t\n\r]+("|')([ \n\ra-zA-Z0-9-'()+,./:=?;!*#@$_%]*?)\1)(?:[ \t\n\r]+("|')([\t\n\r -\uFFFD]*?)\3)?/;
 
 /**
- * Streaming non-validating XML Parser, it makes no attempt to recover
- * well-formedness errors.
+ * A streaming SAX-style XML parser.
  *
- * To optimize for efficiency the parser does not store line information.
+ * `SaxParser` processes input incrementally, notifying the provided
+ * {@linkcode SaxReader} of parsing events such as start tags, end tags and
+ * text content. Because the parser does not construct a tree representation
+ * of the document it is possible to process very large inputs efficiently.
+ *
+ * @example
+ * ```js
+ * const parser = new SaxParser({
+ *   startTag(name, attributes) {
+ *     // Start tag: example
+ *     console.log("Start tag:", name, ...attributes);
+ *   },
+ *   emptyTag(name, attributes) {
+ *     // Empty tag: empty-tag value
+ *     console.log("Empty tag:", name, attributes.get("attr"));
+ *   },
+ *   endTag(name) {
+ *     // End tag: example
+ *     console.log("End tag:", name);
+ *   },
+ *   text(content) {
+ *     // Text: Hello, world!
+ *     console.log("Text:", content);
+ *   },
+ * });
+ * parser.parse("<example>Hello, world!", {stream: true});
+ * parser.parse(`<empty-tag attr="value" />`, {stream: true});
+ * parser.parse("</example>");
+ * ```
  */
 export class SaxParser {
   // Private properties and methods of this class are mangled at build time to
@@ -667,8 +700,8 @@ export class SaxParser {
   private standalone_: boolean | undefined = undefined;
 
   /**
-   * Create a new XML parser.
-   * @param reader -
+   * Creates a new `SaxParser`.
+   * @param reader - A reader set to receive parsing events.
    * @param options -
    */
   constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
@@ -700,19 +733,31 @@ export class SaxParser {
     this.entityProvider_ = options.entityProvider ?? undefined;
   }
 
-  /**
-   * Add more data for the parser to process. May be called repeatedly to parse
-   * a streaming source.
-   *
-   * Input string must be well-formed (have no lone surrogates) as most common
-   * XML sources (`fetch`, `TextDecoder`) already verify this is the case.
-   * Note however that a string coming from other source may not be guaranteed
-   * to be well-formed. Use `isWellFormed` to check if you are unsure.
-   *
-   * @param input
-   * @throws {@link SaxError}
-   */
-  write(input: string) {
+  parse(
+    input: string | undefined = undefined,
+    options: SaxParseOptions | undefined = undefined,
+  ) {
+    if (input != null) {
+      this.feed_(input);
+    }
+    if (!options?.stream) {
+      if (this.state_ === State.INIT) {
+        // Document is less than 6 characters long.
+        this.state_ = State.MISC;
+        this.feed_(this.element_);
+      }
+      if (
+        this.elements_.length !== 0 ||
+        this.state_ !== State.MISC ||
+        !(this.flags_ & Flags.SEEN_ROOT)
+      ) {
+        throw new SaxError("UnexpectedEof");
+      }
+    }
+  }
+
+  /** @internal */
+  private feed_(input: string) {
     this.chunk_ += input;
     // Ensure CRLF is handled correctly across chunk boundary
     const cr = this.chunk_.charCodeAt(this.chunk_.length - 1) === Chars.CR;
@@ -726,26 +771,6 @@ export class SaxParser {
     this.chunk_ = cr ? "\r" : "";
     this.index_ = 0;
   }
-
-  /**
-   * Signal to the parser that the source has ended.
-   * @throws {@link SaxError}
-   */
-  end() {
-    if (this.state_ === State.INIT) {
-      // Document is less than 6 characters long.
-      this.state_ = State.MISC;
-      this.write(this.element_);
-    }
-    if (
-      this.elements_.length !== 0 ||
-      this.state_ !== State.MISC ||
-      !(this.flags_ & Flags.SEEN_ROOT)
-    ) {
-      throw new SaxError("UnexpectedEof");
-    }
-  }
-
   // Strings are assumed to be well-formed, meaning they do not contain any
   // lone surrogates code units.
   /** @internal */
@@ -2720,7 +2745,7 @@ export interface NamespaceResolver {
   lookupPrefix(namespace: string): string | undefined;
 }
 
-export interface SaxNamespaceReader extends PrologReader {
+export interface SaxNamespaceReader extends SaxPrologReader {
   /**
    * Start tag.
    *

@@ -13,9 +13,9 @@ function getComment(...chunks: string[]) {
     text() {},
   });
   for (const chunk of chunks) {
-    parser.write(chunk);
+    parser.parse(chunk, {stream: true});
   }
-  parser.end();
+  parser.parse();
   return comment;
 }
 

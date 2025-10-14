@@ -10,16 +10,15 @@ function getPi(...chunks: string[]) {
     processingInstruction(target, content) {
       pi = {target, content};
     },
-    entityRef() {},
     startTag() {},
     emptyTag() {},
     endTag() {},
     text() {},
   });
   for (const chunk of chunks) {
-    parser.write(chunk);
+    parser.parse(chunk, {stream: true});
   }
-  parser.end();
+  parser.parse();
   return pi;
 }
 

@@ -63,14 +63,14 @@ export function saxe(
   readable.setEncoding("utf-8");
   readable.on("data", (data) => {
     try {
-      parser.write(data as unknown as string);
+      parser.parse(data as string, {stream: true});
     } catch (error) {
       callback(undefined, error);
     }
   });
   readable.on("end", () => {
     try {
-      parser.end();
+      parser.parse();
     } catch (error) {
       callback(undefined, error);
       return;

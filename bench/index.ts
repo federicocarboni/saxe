@@ -108,11 +108,11 @@ async function runTestCaseSaxes(name: string, n: number) {
 const DATASET = [
   "lolz.xml",
   "quadratic_blowup.xml",
-  "aaaaaa_attr.xml",
-  "aaaaaa_cdata.xml",
-  "aaaaaa_comment.xml",
-  "aaaaaa_tag.xml",
-  "aaaaaa_text.xml",
+  // "aaaaaa_attr.xml",
+  // "aaaaaa_cdata.xml",
+  // "aaaaaa_comment.xml",
+  // "aaaaaa_tag.xml",
+  // "aaaaaa_text.xml",
 ];
 
 function out([time, isError]: readonly [number, boolean]) {
@@ -156,7 +156,7 @@ for (const data of DATASET) {
 }
 
 const DATASET2 = [
-  "dblp.xml",
+  // "dblp.xml",
   "mondial-3.0.xml",
   "uwm.xml",
   "nasa.xml",

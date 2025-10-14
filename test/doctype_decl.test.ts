@@ -6,7 +6,6 @@ class DoctypeDeclReader implements SaxReader {
   doctype(doctype: Doctype): void {
     this.doctypeDecl = doctype;
   }
-  entityRef() {}
   startTag() {}
   emptyTag() {}
   endTag() {}
@@ -17,7 +16,7 @@ function getDoctypeDeclOpt(chunks: string[], options?: SaxOptions) {
   const docReader = new DoctypeDeclReader();
   const parser = new SaxParser(docReader, options);
   for (const chunk of chunks) {
-    parser.write(chunk);
+    parser.parse(chunk, {stream: true});
   }
   return docReader.doctypeDecl;
 }

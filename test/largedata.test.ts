@@ -21,8 +21,7 @@ const DATASET = [
 function testRecursive(data: string) {
   const parser = new SaxParser(new CanonicalXmlWriter());
   expect(() => {
-    parser.write(data);
-    parser.end();
+    parser.parse(data);
   })
     .to.throw()
     .and.have.property("name", "RecursiveEntity");
@@ -36,10 +35,9 @@ describe("Large files", function() {
       });
       expect(
         () => {
-          parser.write(
+          parser.parse(
             fs.readFileSync(path.join("test/data", xmlFile), "utf-8"),
           );
-          parser.end();
         },
       )
         .to.throw()

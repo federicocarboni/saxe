@@ -5,9 +5,9 @@ export function toCanonicalOpt(chunks: string[], options?: SaxOptions) {
   const reader = new CanonicalXmlWriter();
   const parser = new SaxParser(reader, options);
   for (const chunk of chunks) {
-    parser.write(chunk);
+    parser.parse(chunk, {stream: true});
   }
-  parser.end();
+  parser.parse();
   return reader.output;
 }
 

@@ -78,8 +78,7 @@ class TreeBuilder implements SaxNamespaceReader {
 function getTree(input: string): Node | undefined {
   const treeBuilder = new TreeBuilder();
   const parser = new SaxNamespaceParser(treeBuilder);
-  parser.write(input);
-  parser.end();
+  parser.parse(input);
   return treeBuilder.root;
 }
 
