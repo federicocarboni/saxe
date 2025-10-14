@@ -12,7 +12,8 @@
     "fuzz": "jsfuzz fuzz/target.ts corpus -- --require tsm",
     "install": "npm run build",
     "test": "c8 mocha test/*.test.ts",
-    "lint": "dprint fmt && eslint ."
+    "lint": "dprint fmt && eslint .",
+    "doc": "typedoc"
   },
   "keywords": [],
   "author": {

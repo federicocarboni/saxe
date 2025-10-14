@@ -1,0 +1,14 @@
+{
+  "entryPoints": ["./src/index.ts"],
+  "out": "./docs",
+  "highlightLanguages": [
+    "css",
+    "html",
+    "javascript",
+    "json",
+    "typescript",
+    "xml",
+  ],
+  "lightHighlightTheme": "github-light",
+  "darkHighlightTheme": "github-dark-dimmed"
+}
