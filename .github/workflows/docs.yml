@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Check out Git repository
         id: checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Set up pnpm
         id: setup-pnpm
         uses: pnpm/action-setup@v4
