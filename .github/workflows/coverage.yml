@@ -1,0 +1,34 @@
+name: Coverage
+on:
+  push:
+    branches:
+      - trunk
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Git repository
+        id: checkout
+        uses: actions/checkout@v5
+      - name: Set up pnpm
+        id: setup-pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - name: Set up Node.js
+        id: setup-node
+        uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+      - id: install-dependencies
+        name: Install Node.js dependencies
+        run: pnpm install --frozen-lockfile
+      - id: test
+        name: Run Tests
+        run: pnpm test
+      - id: codecov
+        name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
