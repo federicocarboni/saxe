@@ -5,13 +5,10 @@ import * as streams from "stream/promises";
 import * as tar from "tar";
 
 import {expect} from "chai";
-import {
-  type Attributes,
-  SaxError,
-  SaxParser,
-  type SaxReader,
-} from "../../src/index.ts";
+import type {Attributes, SaxReader} from "../../src/index.ts";
+import {SaxError, SaxParser} from "../../src/index.ts";
 import {CanonicalXmlWriter} from "../canonical_xml.ts";
+import {IGNORED_TEST_CASES} from "../ignored_test_cases.ts";
 
 // Download and extract the test suite
 const XML_W3C_TEST_SUITE = "https://www.w3.org/XML/Test/xmlts20130923.tar.gz";
@@ -61,18 +58,36 @@ class TestCaseReader implements SaxReader {
     public testCases = new Map<string, TestCase[]>(),
   ) {}
   startTag(name: string, attributes: Attributes): void {
-    if (name === "TEST" && attributes.get("ENTITIES") === "none") {
+    if (
+      name === "TEST" &&
+      // Only general entities are supported
+      ["none", "general"].includes(attributes.get("ENTITIES")!) &&
+      // Filter out tests for previous editions
+      (!attributes.has("EDITION") ||
+        attributes.get("EDITION")!.split(" ").includes("5"))
+    ) {
       this.currentType = attributes.get("TYPE");
       this.currentUri = path.join(this.baseUri, attributes.get("URI")!);
       this.output = attributes.has("OUTPUT")
         ? path.join(this.baseUri, attributes.get("OUTPUT")!)
         : undefined;
+      const altOutput = path.join(
+        path.dirname(this.currentUri),
+        "out",
+        path.basename(this.currentUri),
+      );
+      if (
+        this.output === undefined &&
+        fs.statSync(altOutput, {throwIfNoEntry: false})?.isFile()
+      ) {
+        this.output = altOutput;
+      }
       this.currentId = attributes.get("ID");
     }
   }
   emptyTag(name: string, attributes: Attributes): void {
-    void name;
-    void attributes;
+    this.startTag(name, attributes);
+    this.endTag(name);
   }
   endTag(name: string): void {
     if (
@@ -138,9 +153,9 @@ const TEST_SUITE = [
   // NIST/OASIS test suite
   // "oasis/oasis.xml",
   // IBM tests
-  // "ibm/ibm_oasis_invalid.xml",
-  // "ibm/ibm_oasis_not-wf.xml",
-  // "ibm/ibm_oasis_valid.xml",
+  "ibm/ibm_oasis_invalid.xml",
+  "ibm/ibm_oasis_not-wf.xml",
+  "ibm/ibm_oasis_valid.xml",
 ];
 
 for (const xmlconf of TEST_SUITE) {
@@ -148,16 +163,21 @@ for (const xmlconf of TEST_SUITE) {
 }
 
 export function runTest(testCase: TestCase) {
-  return async function() {
-    // TODO: not all files are utf-8!
+  const it_ = IGNORED_TEST_CASES.includes(testCase.id)
+    ? it.skip
+    : it;
+  it_(`${testCase.id}: ${testCase.description}`, async function() {
     const content = await fs.promises.readFile(testCase.uri, "utf-8");
     const output = testCase.output !== undefined
       ? await fs.promises.readFile(testCase.output, "utf-8")
       : undefined;
     const toCanonical = () => {
       const canonicalizer = new CanonicalXmlWriter();
-      const parser = new SaxParser(canonicalizer);
-      for (const c of content) {
+      const parser = new SaxParser(canonicalizer, {
+        // IBM has some very long names in their tests
+        maxNameLength: 5000,
+      });
+      for (const c of content!) {
         parser.parse(c, {stream: true});
       }
       parser.parse();
@@ -170,7 +190,28 @@ export function runTest(testCase: TestCase) {
       expect(toCanonical)
         .throws().and.is.instanceOf(SaxError);
     }
-  };
+
+    const toCanonical2 = () => {
+      const canonicalizer = new CanonicalXmlWriter();
+      const parser = new SaxParser(canonicalizer, {
+        // IBM has some very long names in their tests
+        maxNameLength: 5000,
+        incompleteTextNodes: true
+      });
+      for (const c of content!) {
+        parser.parse(c, {stream: true});
+      }
+      parser.parse();
+      return canonicalizer.output;
+    };
+
+    if (testCase.type === "valid") {
+      expect(toCanonical2()).equals(output);
+    } else if (testCase.type === "not-wf") {
+      expect(toCanonical2)
+        .throws().and.is.instanceOf(SaxError);
+    }
+  });
 }
 
 export {testCases};
