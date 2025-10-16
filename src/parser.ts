@@ -1484,9 +1484,10 @@ export class SaxParser {
       this.readCp_(false);
       this.skipWhiteSpace_();
     }
-    if (this.chunk_.charCodeAt(this.index_) === Chars.CLOSE_PAREN) {
-      ++this.index_;
+    if (this.chunk_.charCodeAt(this.index_) !== Chars.CLOSE_PAREN) {
+      throw new SaxError("InvalidInternalSubset");
     }
+    ++this.index_;
   }
 
   /** @internal */
@@ -1528,6 +1529,7 @@ export class SaxParser {
       // Mixed
       if (this.chunk_.slice(this.index_, this.index_ + 7) === "#PCDATA") {
         this.index_ += 7;
+        let asteriskRequired = false;
         while (this.index_ < this.chunk_.length) {
           this.skipWhiteSpace_();
           const codeUnit = this.chunk_.charCodeAt(this.index_);
@@ -1538,11 +1540,14 @@ export class SaxParser {
           if (codeUnit !== Chars.VERTICAL_BAR) {
             throw new SaxError("InvalidInternalSubset");
           }
+          asteriskRequired = true;
           this.skipWhiteSpace_();
           this.readName_();
         }
         if (this.chunk_.charCodeAt(this.index_) === Chars.ASTERISK) {
           ++this.index_;
+        } else if (asteriskRequired) {
+          throw new SaxError("InvalidInternalSubset");
         }
       } else {
         this.readCp_(true);
@@ -1554,6 +1559,8 @@ export class SaxParser {
     } else if (this.chunk_.slice(this.index_, this.index_ + 3) === "ANY") {
       this.index_ += 3;
       this.skipWhiteSpace_();
+    } else {
+      throw new SaxError("InvalidInternalSubset");
     }
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
       throw new SaxError("InvalidInternalSubset");
