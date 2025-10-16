@@ -1,9 +1,12 @@
 import {expect} from "chai";
 import {
   type NamespaceAttributes,
+  type NamespaceResolver,
   type QName,
   SaxNamespaceParser,
   type SaxNamespaceReader,
+  XML_NAMESPACE,
+  XMLNS_NAMESPACE,
 } from "../src/index.ts";
 
 interface Node {
@@ -265,65 +268,132 @@ describe("namespace", function() {
   });
 });
 
-// class Reader implements SaxNamespaceReader {
-//   private depth_ = 0;
-//   constructor(
-//     private callback_: (
-//       depth: number,
-//       resolver: NamespaceResolver,
-//       name: QName,
-//     ) => void,
-//   ) {
-//   }
-//   startTag(
-//     name: QName,
-//     attributes: NamespaceAttributes,
-//     resolver: NamespaceResolver,
-//   ): void {
-//     console.log(attributes, resolver);
+class Reader implements SaxNamespaceReader {
+  private depth_ = 0;
+  constructor(
+    private callback_: (
+      resolver: NamespaceResolver,
+      depth: number,
+      name: QName,
+    ) => void,
+  ) {
+  }
+  startTag(
+    name: QName,
+    attributes: NamespaceAttributes,
+    resolver: NamespaceResolver,
+  ): void {
+    console.log(attributes, resolver);
 
-//     this.callback_(this.depth_, resolver, name);
-//     void attributes;
-//     this.depth_ += 1;
-//   }
-//   emptyTag(
-//     name: QName,
-//     attributes: NamespaceAttributes,
-//     resolver: NamespaceResolver,
-//   ): void {
-//     this.startTag(name, attributes, resolver);
-//     this.endTag(name, resolver);
-//   }
-//   endTag(name: QName, resolver: NamespaceResolver): void {
-//     // this.callback_(this.depth_, resolver, name);
-//     void name;
-//     void resolver;
-//   }
-//   text(text: string): void {
-//     void text;
-//   }
-// }
+    this.callback_(resolver, this.depth_, name);
+    void attributes;
+    this.depth_ += 1;
+  }
+  emptyTag(
+    name: QName,
+    attributes: NamespaceAttributes,
+    resolver: NamespaceResolver,
+  ): void {
+    this.startTag(name, attributes, resolver);
+    this.endTag(name, resolver);
+  }
+  endTag(name: QName, resolver: NamespaceResolver): void {
+    // this.callback_(this.depth_, resolver, name);
+    void name;
+    void resolver;
+  }
+  text(text: string): void {
+    void text;
+  }
+}
 
-// describe("NamespaceResolver", function() {
-//   it("works", function() {
-//     const reader = new Reader((depth, resolver) => {
-//       if (depth === 1) {
-//         expect(resolver.lookupPrefix("urn:a")).equals("foo");
-//         console.log(resolver.lookupNamespace("foo"));
-//         console.log(resolver.lookupNamespace("xml"));
-//         console.log(resolver.lookupNamespace("xmlns"));
-//         console.log(resolver.lookupPrefix("urn:a"));
-//         console.log(resolver.lookupPrefix("urn:b"));
-//       } else {
-//         console.log(resolver.lookupNamespace("foo"));
-//         console.log(resolver.lookupNamespace("xml"));
-//         console.log(resolver.lookupNamespace("xmlns"));
-//         console.log(resolver.lookupPrefix("urn:a"));
-//         console.log(resolver.lookupPrefix("urn:b"));
-//       }
-//     });
-//     const parser = new SaxNamespaceParser(reader);
-//     parser.write(`<doc xmlns:foo="urn:a"><foo:empty xmlns:bar="urn:a" /></doc>`);
-//     parser.end();
-//   });
-// });
+describe("NamespaceResolver", function() {
+  it("lookupNamespace does not accept the empty string", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupNamespace("")).equals(undefined);
+      expect(resolver.lookupNamespace()).equals("urn:a");
+    });
+    new SaxNamespaceParser(reader).parse(
+      `<doc xmlns="urn:a"></doc>`,
+    );
+  });
+  it("lookupNamespace returns the XML namespace for prefix 'xml'", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupNamespace("xml")).equals(XML_NAMESPACE);
+    });
+    new SaxNamespaceParser(reader).parse(
+      `<doc></doc>`,
+    );
+  });
+  it("lookupNamespace returns the XMLNS namespace for prefix 'xmlns'", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupNamespace("xmlns")).equals(XMLNS_NAMESPACE);
+    });
+    new SaxNamespaceParser(reader).parse(
+      `<doc></doc>`,
+    );
+  });
+  it("lookupNamespace returns the latest bound namespace", function() {
+    const reader = new Reader((resolver, depth) => {
+      if (depth === 1) {
+        expect(resolver.lookupNamespace("foo")).equals("urn:b");
+        expect(resolver.lookupNamespace("bar")).equals("urn:c");
+        expect(resolver.lookupNamespace()).equals("urn:d");
+      }
+    });
+    new SaxNamespaceParser(reader).parse(
+      `<doc xmlns:foo="urn:a" xmlns="urn:d" xmlns:bar="urn:c"><foo:empty xmlns:foo="urn:b" /></doc>`,
+    );
+  });
+  it("lookupNamespace returns undefined for undeclared prefixes", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupNamespace("foo")).equals(undefined);
+      expect(resolver.lookupNamespace()).equals(undefined);
+    });
+    new SaxNamespaceParser(reader).parse(`<doc></doc>`);
+  });
+  it("lookupPrefix does not accept the empty string", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupPrefix("")).equals(undefined);
+    });
+    new SaxNamespaceParser(reader).parse(`<doc xmlns="urn:a"></doc>`);
+  });
+  it("lookupPrefix returns 'xml' for the XML namespace", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupPrefix(XML_NAMESPACE)).equals("xml");
+    });
+    new SaxNamespaceParser(reader).parse(`<doc></doc>`);
+  });
+  it("lookupPrefix returns 'xmlns' for the XMLNS namespace", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupPrefix(XMLNS_NAMESPACE)).equals("xmlns");
+    });
+    new SaxNamespaceParser(reader).parse(`<doc></doc>`);
+  });
+  it("lookupPrefix returns the latest bound prefix", function() {
+    const reader = new Reader((resolver, depth) => {
+      if (depth === 1) {
+        expect(resolver.lookupPrefix("urn:a")).equals("foo");
+      }
+    });
+    new SaxNamespaceParser(reader).parse(
+      `<doc xmlns:foo="urn:a"><foo:empty xmlns:foo="urn:b" /></doc>`,
+    );
+  });
+  it("lookupPrefix returns element names first", function() {
+    const reader = new Reader((resolver, depth) => {
+      if (depth === 1) {
+        expect(resolver.lookupPrefix("urn:a")).equals("foo");
+      }
+    });
+    new SaxNamespaceParser(reader).parse(
+      `<doc><foo:empty xmlns:bar="urn:a" xmlns:foo="urn:a" /></doc>`,
+    );
+  });
+  it("lookupPrefix returns undefined for undeclared namespaces", function() {
+    const reader = new Reader((resolver) => {
+      expect(resolver.lookupPrefix("urn:a")).equals(undefined);
+    });
+    new SaxNamespaceParser(reader).parse(`<doc></doc>`);
+  });
+});
