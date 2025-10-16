@@ -57,5 +57,6 @@ export default defineConfig([{
     "@typescript-eslint/no-empty-object-type": ["error", {
       allowInterfaces: "with-single-extends",
     }],
+    "@typescript-eslint/consistent-type-imports": "error",
   },
 }, globalIgnores(["eslint.config.js", "lib", "coverage", "docs"])]);
