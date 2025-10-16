@@ -1,4 +1,5 @@
-import {type SaxOptions, SaxParser} from "../src/index.ts";
+import type {SaxOptions} from "../src/index.ts";
+import {SaxParser} from "../src/index.ts";
 import {CanonicalXmlWriter} from "./canonical_xml.ts";
 
 export function toCanonicalOpt(chunks: string[], options?: SaxOptions) {

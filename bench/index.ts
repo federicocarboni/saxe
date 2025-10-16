@@ -10,7 +10,8 @@ export interface ReadTokens {
   attributes: number;
 }
 
-import fs, {type ReadStream} from "fs";
+import type {ReadStream} from "fs";
+import fs from "fs";
 import {sax} from "./libs/sax.ts";
 import {saxe} from "./libs/saxe.ts";
 import {saxes} from "./libs/saxes.ts";

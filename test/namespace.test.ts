@@ -1,10 +1,12 @@
 import {expect} from "chai";
+import type {
+  NamespaceAttributes,
+  NamespaceResolver,
+  QName,
+  SaxNamespaceReader,
+} from "../src/index.ts";
 import {
-  type NamespaceAttributes,
-  type NamespaceResolver,
-  type QName,
   SaxNamespaceParser,
-  type SaxNamespaceReader,
   XML_NAMESPACE,
   XMLNS_NAMESPACE,
 } from "../src/index.ts";
@@ -313,25 +315,19 @@ describe("NamespaceResolver", function() {
       expect(resolver.lookupNamespace("")).equals(undefined);
       expect(resolver.lookupNamespace()).equals("urn:a");
     });
-    new SaxNamespaceParser(reader).parse(
-      `<doc xmlns="urn:a"></doc>`,
-    );
+    new SaxNamespaceParser(reader).parse(`<doc xmlns="urn:a"></doc>`);
   });
   it("lookupNamespace returns the XML namespace for prefix 'xml'", function() {
     const reader = new Reader((resolver) => {
       expect(resolver.lookupNamespace("xml")).equals(XML_NAMESPACE);
     });
-    new SaxNamespaceParser(reader).parse(
-      `<doc></doc>`,
-    );
+    new SaxNamespaceParser(reader).parse(`<doc></doc>`);
   });
   it("lookupNamespace returns the XMLNS namespace for prefix 'xmlns'", function() {
     const reader = new Reader((resolver) => {
       expect(resolver.lookupNamespace("xmlns")).equals(XMLNS_NAMESPACE);
     });
-    new SaxNamespaceParser(reader).parse(
-      `<doc></doc>`,
-    );
+    new SaxNamespaceParser(reader).parse(`<doc></doc>`);
   });
   it("lookupNamespace returns the latest bound namespace", function() {
     const reader = new Reader((resolver, depth) => {
