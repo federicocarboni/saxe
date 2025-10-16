@@ -2,6 +2,7 @@
 
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen)](https://federicocarboni.github.io/saxe/)
 [![Coverage](https://img.shields.io/codecov/c/github/federicocarboni/saxe?logo=codecov)](https://app.codecov.io/gh/federicocarboni/saxe)
+[![Bundle size](https://edge.bundlejs.com/badge?q=@federicocarboni/saxe)](https://bundlejs.com/?q=@federicocarboni/saxe)
 
 Light-weight and efficient SAX-style XML parser for JavaScript.
 
