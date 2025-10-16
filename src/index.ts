@@ -23,7 +23,12 @@ export type {
 } from "./parser.ts";
 export {SaxParser} from "./parser.ts";
 
-function escapeChar(c: string): string {
+/**
+ * @param c - A string containing a single character to escape.
+ * @returns - Returns a new string containing a predefined entity reference or
+ * decimal character reference corresponding to the specified character.
+ */
+export function xmlEscapeChar(c: string): string {
   switch (c.charAt(0)) {
     case "&":
       return "&amp;";
@@ -41,8 +46,10 @@ function escapeChar(c: string): string {
       return "&#10;";
     case "\r":
       return "&#13;";
+    case "":
+      return "";
     default:
-      return `${c.codePointAt(0)}`;
+      return `&#${c.codePointAt(0)};`;
   }
 }
 
@@ -68,10 +75,10 @@ function escapeChar(c: string): string {
  *
  * @example
  * ```ts
- * escape("<div>Fish & chips</div>");
+ * xmlEscape("<div>Fish & chips</div>");
  * // "&lt;div&gt;Fish &amp; chips&lt;/div&gt;"
  * ```
  */
-export function escape(s: string) {
-  return s.replace(/[&<>'"\t\n\r]/g, escapeChar);
+export function xmlEscape(s: string) {
+  return s.replace(/[&<>'"\t\n\r]/g, xmlEscapeChar);
 }

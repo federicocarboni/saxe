@@ -253,7 +253,7 @@ export interface EntityProvider {
    * even other entity references.
    *
    * If the entity value should be treated as literal plain text it should be
-   * escaped with {@linkcode escape} before returning it.
+   * escaped with {@linkcode xmlEscape} before returning it.
    *
    * ## Example
    *
@@ -265,7 +265,7 @@ export interface EntityProvider {
    *   }
    *   if (name === "boo") {
    *     // Parsed as the literal text '<bar>&baz;</bar>'
-   *     return escape("<bar>&baz;</bar>");
+   *     return xmlEscape("<bar>&baz;</bar>");
    *   }
    *   return undefined;
    * }
