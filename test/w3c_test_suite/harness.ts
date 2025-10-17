@@ -5,7 +5,7 @@ import * as streams from "stream/promises";
 import * as tar from "tar";
 
 import {expect} from "chai";
-import type {Attributes, SaxReader} from "../../src/index.ts";
+import type {Attributes, SaxOptions, SaxReader} from "../../src/index.ts";
 import {SaxError, SaxParser} from "../../src/index.ts";
 import {CanonicalXmlWriter} from "../canonical_xml.ts";
 import {IGNORED_TEST_CASES} from "../ignored_test_cases.ts";
@@ -101,6 +101,11 @@ class TestCaseReader implements SaxReader {
       } else {
         array = this.testCases.get(this.currentType)!;
       }
+      if (this.currentId === "ibm-not-wf-P88-ibm88n01.xml") {
+        this.description =
+          "Tests BaseChar with an illegal character. Illegal characters " +
+          "occur as the first character of the PITarget in the PI in the DTD";
+      }
       array.push({
         type: this.currentType,
         id: this.currentId,
@@ -171,11 +176,12 @@ export function runTest(testCase: TestCase) {
     const output = testCase.output !== undefined
       ? await fs.promises.readFile(testCase.output, "utf-8")
       : undefined;
-    const toCanonical = () => {
+    const toCanonical = (options: SaxOptions = {}) => {
       const canonicalizer = new CanonicalXmlWriter();
       const parser = new SaxParser(canonicalizer, {
         // IBM has some very long names in their tests
         maxNameLength: 5000,
+        ...options,
       });
       for (const c of content!) {
         parser.parse(c, {stream: true});
@@ -184,31 +190,15 @@ export function runTest(testCase: TestCase) {
       return canonicalizer.output;
     };
 
-    if (testCase.type === "valid") {
+    expect(testCase.type).oneOf(["valid", "invalid", "not-wf", "error"]);
+
+    if (testCase.type === "valid" || testCase.type === "invalid") {
       expect(toCanonical()).equals(output);
-    } else if (testCase.type === "not-wf") {
+      expect(toCanonical({incompleteTextNodes: true})).equals(output);
+    } else if (testCase.type === "not-wf" || testCase.type === "error") {
       expect(toCanonical)
         .throws().and.is.instanceOf(SaxError);
-    }
-
-    const toCanonical2 = () => {
-      const canonicalizer = new CanonicalXmlWriter();
-      const parser = new SaxParser(canonicalizer, {
-        // IBM has some very long names in their tests
-        maxNameLength: 5000,
-        incompleteTextNodes: true
-      });
-      for (const c of content!) {
-        parser.parse(c, {stream: true});
-      }
-      parser.parse();
-      return canonicalizer.output;
-    };
-
-    if (testCase.type === "valid") {
-      expect(toCanonical2()).equals(output);
-    } else if (testCase.type === "not-wf") {
-      expect(toCanonical2)
+      expect(() => toCanonical({incompleteTextNodes: true}))
         .throws().and.is.instanceOf(SaxError);
     }
   });
