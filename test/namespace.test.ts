@@ -238,14 +238,22 @@ describe("namespace", function() {
       });
   });
   it("not-wf: XMLNS namespace is reserved", function() {
-    expect(() => getTree('<root xmlns:x="http://www.w3.org/2000/xmlns/"><a:empty /></root>'))
+    expect(() =>
+      getTree(
+        '<root xmlns:x="http://www.w3.org/2000/xmlns/"><a:empty /></root>',
+      )
+    )
       .throws().and.includes({
         name: "ReservedNamespace",
         attribute: "xmlns:x",
       });
   });
   it("not-wf: XML namespace is reserved", function() {
-    expect(() => getTree('<root xmlns:x="http://www.w3.org/XML/1998/namespace"><a:empty /></root>'))
+    expect(() =>
+      getTree(
+        '<root xmlns:x="http://www.w3.org/XML/1998/namespace"><a:empty /></root>',
+      )
+    )
       .throws().and.includes({
         name: "ReservedNamespace",
         attribute: "xmlns:x",
@@ -398,7 +406,7 @@ describe("NamespaceAttributes", function() {
   });
   it("forEach()", function() {
     readAttributes((attributes) => {
-      let attrs: [QName, string][] = [];
+      const attrs: [QName, string][] = [];
       const thisArg = {};
       attributes.forEach(function(this: unknown, value, name, attributes2) {
         expect(this).equals(thisArg);

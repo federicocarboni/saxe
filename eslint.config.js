@@ -58,5 +58,14 @@ export default defineConfig([{
       allowInterfaces: "with-single-extends",
     }],
     "@typescript-eslint/consistent-type-imports": "error",
+    "@typescript-eslint/no-unused-vars": ["error", {
+      args: "all",
+      argsIgnorePattern: "^_",
+      caughtErrors: "all",
+      caughtErrorsIgnorePattern: "^_",
+      destructuredArrayIgnorePattern: "^_",
+      varsIgnorePattern: "^_",
+      ignoreRestSiblings: true,
+    }],
   },
 }, globalIgnores(["eslint.config.js", "lib", "coverage", "docs"])]);
