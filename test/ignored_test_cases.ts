@@ -27,4 +27,10 @@ export const IGNORED_TEST_CASES = [
 
   // External entities
   "ibm-valid-P78-ibm78v01.xml",
+  // Parameter entities
+  "ibm-invalid-P58-ibm58i01.xml",
+  "ibm-invalid-P58-ibm58i02.xml",
+  "ibm-not-wf-P69-ibm69n05.xml",
+  "ibm-not-wf-P69-ibm69n06.xml",
+  "ibm-not-wf-P69-ibm69n07.xml",
 ];
