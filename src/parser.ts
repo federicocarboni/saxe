@@ -402,6 +402,7 @@ const enum State {
 }
 
 // A bit of an abuse of const enum
+/** @internal */
 export const enum Flags {
   INIT = 0,
 
