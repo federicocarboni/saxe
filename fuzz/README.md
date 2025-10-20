@@ -9,12 +9,7 @@ hangs, throw unexpected errors or, in a word, bugs.
 
 ## How we do it
 
-To fuzz test JavaScript the library uses a fork of the [jsfuzz tool at GitLab].
-Jsfuzz doesn't support TypeScript or ES modules, the [jsfuzz fork] used allows
-to append extra arguments to the node command spawned, and `tsm` is used to
-transpile TypeScript on the fly.
+To fuzz test JavaScript the library uses [jsfuzz from GitLab].
 
-[jsfuzz tool at GitLab]:
+[jsfuzz from GitLab]:
 https://gitlab.com/gitlab-org/security-products/analyzers/fuzzers/jsfuzz
-[jsfuzz fork]:
-https://github.com/federicocarboni/jsfuzz
