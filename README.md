@@ -28,14 +28,12 @@ import {SaxParser} from "@federicocarboni/saxe";
 const parser = new SaxParser({
   startTag(name, attributes) {
     // Start tag: example
+    // Start tag: empty-tag [attr, value]
     console.log("Start tag:", name, ...attributes);
-  },
-  emptyTag(name, attributes) {
-    // Empty tag: empty-tag value
-    console.log("Empty tag:", name, attributes.get("attr"));
   },
   endTag(name) {
     // End tag: example
+    // End tag: empty-tag
     console.log("End tag:", name);
   },
   text(content) {

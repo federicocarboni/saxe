@@ -8,7 +8,6 @@ function getComment(...chunks: string[]) {
       comment = content;
     },
     startTag() {},
-    emptyTag() {},
     endTag() {},
     text() {},
   });

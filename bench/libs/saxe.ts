@@ -9,7 +9,6 @@ class Reader implements SaxReader {
   comments = 0;
   processingInstructions = 0;
   startTags = 0;
-  emptyTags = 0;
   endTags = 0;
   textNodes = 0;
   attributes = 0;
@@ -25,10 +24,6 @@ class Reader implements SaxReader {
   }
   startTag(_name: string, _attributes: ReadonlyMap<string, string>): void {
     ++this.startTags;
-    this.attributes += _attributes.size;
-  }
-  emptyTag(_name: string, _attributes: ReadonlyMap<string, string>): void {
-    ++this.emptyTags;
     this.attributes += _attributes.size;
   }
   endTag(_name: string): void {

@@ -181,16 +181,6 @@ export interface SaxReader extends SaxPrologReader {
    */
   startTag(name: string, attributes: Attributes): void;
   /**
-   * An empty tag.
-   *
-   * ```xml
-   * <element attr="value" />
-   * ```
-   * @param name - Name of the element.
-   * @param attributes - Attributes of the tag.
-   */
-  emptyTag(name: string, attributes: Attributes): void;
-  /**
    * An end tag.
    *
    * ```xml
@@ -516,14 +506,12 @@ const EXTERNAL_OR_PUBLIC_ID_RE =
  * const parser = new SaxParser({
  *   startTag(name, attributes) {
  *     // Start tag: example
+ *     // Start tag: empty-tag [attr, value]
  *     console.log("Start tag:", name, ...attributes);
- *   },
- *   emptyTag(name, attributes) {
- *     // Empty tag: empty-tag value
- *     console.log("Empty tag:", name, attributes.get("attr"));
  *   },
  *   endTag(name) {
  *     // End tag: example
+ *     // End tag: empty-tag
  *     console.log("End tag:", name);
  *   },
  *   text(content) {
@@ -2091,7 +2079,8 @@ export class SaxParser {
           ? State.MISC
           : State.TEXT_CONTENT;
       this.otherState_ = 0;
-      this.reader_.emptyTag(this.element_, this.attributes_);
+      this.reader_.startTag(this.element_, this.attributes_);
+      this.reader_.endTag(this.element_);
       this.element_ = "";
       this.attributes_ = new Map();
     } else {

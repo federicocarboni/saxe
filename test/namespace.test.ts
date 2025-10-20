@@ -14,7 +14,6 @@ import {
 interface Node {
   name: QName;
   attributes: [QName, string][];
-  empty: boolean;
   children: (Node | string)[];
 }
 
@@ -42,7 +41,6 @@ class TreeBuilder implements SaxNamespaceReader {
   private pushNode_(
     name: QName,
     attributes: NamespaceAttributes,
-    empty: boolean,
   ) {
     const node: Node = {
       name: copyQName(name),
@@ -50,7 +48,6 @@ class TreeBuilder implements SaxNamespaceReader {
         attributes,
         ([name, value]) => [copyQName(name), value],
       ),
-      empty,
       children: [] as Node[],
     };
     if (this.nodeStack_.length === 0) {
@@ -61,10 +58,7 @@ class TreeBuilder implements SaxNamespaceReader {
     this.nodeStack_.push(node);
   }
   startTag(name: QName, attributes: NamespaceAttributes): void {
-    this.pushNode_(name, attributes, false);
-  }
-  emptyTag(name: QName, attributes: NamespaceAttributes): void {
-    this.pushNode_(name, attributes, true);
+    this.pushNode_(name, attributes);
   }
   endTag(name: QName): void {
     void name;
@@ -100,103 +94,81 @@ describe("namespace", function() {
       {
         name: {name: "root", localName: "root"},
         attributes: [],
-        empty: false,
         children: [{
           name: {name: "empty", localName: "empty"},
           attributes: [[{name: "attr", localName: "attr"}, "value"]],
-          empty: true,
+          children: [],
+        }, {
+          name: {name: "ns", localName: "ns", namespace: "urn:default"},
+          attributes: [[{
+            name: "xmlns",
+            localName: "xmlns",
+            namespace: "http://www.w3.org/2000/xmlns/",
+          }, "urn:default"], [{
+            name: "xmlns:a",
+            localName: "a",
+            prefix: "xmlns",
+            namespace: "http://www.w3.org/2000/xmlns/",
+          }, "urn:a"]],
           children: [{
-            name: {name: "ns", localName: "ns", namespace: "urn:default"},
+            name: {name: "empty", localName: "empty", namespace: "urn:default"},
+            attributes: [[{name: "attr", localName: "attr"}, "value"]],
+            children: [],
+          }, {
+            name: {
+              name: "a:empty",
+              localName: "empty",
+              prefix: "a",
+              namespace: "urn:a",
+            },
+            attributes: [[{
+              name: "a:attr",
+              localName: "attr",
+              prefix: "a",
+              namespace: "urn:a",
+            }, "value"]],
+            children: [],
+          }, {
+            name: {name: "ns", localName: "ns", namespace: "urn:default-other"},
             attributes: [[{
               name: "xmlns",
               localName: "xmlns",
               namespace: "http://www.w3.org/2000/xmlns/",
-            }, "urn:default"], [
-              {
-                name: "xmlns:a",
-                localName: "a",
-                prefix: "xmlns",
-                namespace: "http://www.w3.org/2000/xmlns/",
-              },
-              "urn:a",
-            ]],
-            empty: false,
+            }, "urn:default-other"], [{
+              name: "xmlns:a",
+              localName: "a",
+              prefix: "xmlns",
+              namespace: "http://www.w3.org/2000/xmlns/",
+            }, "urn:a-other"]],
             children: [{
               name: {
-                name: "empty",
+                name: "a:empty",
                 localName: "empty",
-                namespace: "urn:default",
+                prefix: "a",
+                namespace: "urn:a-other",
               },
-              attributes: [[{name: "attr", localName: "attr"}, "value"]],
-              empty: true,
-              children: [{
-                name: {
-                  name: "a:empty",
-                  localName: "empty",
-                  prefix: "a",
-                  namespace: "urn:a",
-                },
-                attributes: [[{
-                  name: "a:attr",
-                  localName: "attr",
-                  prefix: "a",
-                  namespace: "urn:a",
-                }, "value"]],
-                empty: true,
-                children: [{
-                  name: {
-                    name: "ns",
-                    localName: "ns",
-                    namespace: "urn:default-other",
-                  },
-                  attributes: [[
-                    {
-                      name: "xmlns",
-                      localName: "xmlns",
-                      namespace: "http://www.w3.org/2000/xmlns/",
-                    },
-                    "urn:default-other",
-                  ], [{
-                    name: "xmlns:a",
-                    localName: "a",
-                    prefix: "xmlns",
-                    namespace: "http://www.w3.org/2000/xmlns/",
-                  }, "urn:a-other"]],
-                  empty: false,
-                  children: [{
-                    name: {
-                      name: "a:empty",
-                      localName: "empty",
-                      prefix: "a",
-                      namespace: "urn:a-other",
-                    },
-                    attributes: [[{
-                      name: "a:attr",
-                      localName: "attr",
-                      prefix: "a",
-                      namespace: "urn:a-other",
-                    }, "value"]],
-                    empty: true,
-                    children: [],
-                  }, {
-                    name: {
-                      name: "a:empty",
-                      localName: "empty",
-                      prefix: "a",
-                      namespace: "urn:a",
-                    },
-                    attributes: [[{
-                      name: "a:attr",
-                      localName: "attr",
-                      prefix: "a",
-                      namespace: "urn:a",
-                    }, "value"]],
-                    empty: true,
-                    children: [],
-                  }],
-                }],
-              }],
+              attributes: [[{
+                name: "a:attr",
+                localName: "attr",
+                prefix: "a",
+                namespace: "urn:a-other",
+              }, "value"]],
+              children: [],
             }],
+          }, {
+            name: {
+              name: "a:empty",
+              localName: "empty",
+              prefix: "a",
+              namespace: "urn:a",
+            },
+            attributes: [[{
+              name: "a:attr",
+              localName: "attr",
+              prefix: "a",
+              namespace: "urn:a",
+            }, "value"]],
+            children: [],
           }],
         }],
       } satisfies Node,
@@ -274,7 +246,6 @@ describe("namespace", function() {
           namespace: "http://www.w3.org/2000/xmlns/",
         }, "http://www.w3.org/XML/1998/namespace"]],
         children: [],
-        empty: false,
       } satisfies Node,
     );
   });
@@ -310,14 +281,6 @@ class Reader implements SaxNamespaceReader {
   ): void {
     this.callback_(resolver, this.depth_, name, attributes);
     this.depth_ += 1;
-  }
-  emptyTag(
-    name: QName,
-    attributes: NamespaceAttributes,
-    resolver: NamespaceResolver,
-  ): void {
-    this.startTag(name, attributes, resolver);
-    this.endTag(name, resolver);
   }
   endTag(name: QName, resolver: NamespaceResolver): void {
     // this.callback_(this.depth_, resolver, name);

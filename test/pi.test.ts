@@ -11,7 +11,6 @@ function getPi(...chunks: string[]) {
       pi = {target, content};
     },
     startTag() {},
-    emptyTag() {},
     endTag() {},
     text() {},
   });

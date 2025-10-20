@@ -85,10 +85,6 @@ class TestCaseReader implements SaxReader {
       this.currentId = attributes.get("ID");
     }
   }
-  emptyTag(name: string, attributes: Attributes): void {
-    this.startTag(name, attributes);
-    this.endTag(name);
-  }
   endTag(name: string): void {
     if (
       name === "TEST" &&

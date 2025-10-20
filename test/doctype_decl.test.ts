@@ -8,7 +8,6 @@ class DoctypeDeclReader implements SaxReader {
     this.doctypeDecl = doctype;
   }
   startTag() {}
-  emptyTag() {}
   endTag() {}
   text() {}
 }

@@ -4,7 +4,6 @@ export interface ReadTokens {
   comments: number;
   processingInstructions: number;
   startTags: number;
-  emptyTags: number;
   endTags: number;
   textNodes: number;
   attributes: number;

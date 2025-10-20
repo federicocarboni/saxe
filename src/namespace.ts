@@ -151,22 +151,6 @@ export interface SaxNamespaceReader extends SaxPrologReader {
     resolver: NamespaceResolver,
   ): void;
   /**
-   * An empty tag.
-   *
-   * ```xml
-   * <element attr="value" />
-   * ```
-   * @param name - Name of the element.
-   * @param attributes - Attributes of the tag.
-   * @param resolver - Namespace resolver relative to the current element,
-   * should not be used outside the handler.
-   */
-  emptyTag(
-    name: QName,
-    attributes: NamespaceAttributes,
-    resolver: NamespaceResolver,
-  ): void;
-  /**
    * An end tag.
    *
    * ```xml
@@ -515,13 +499,6 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     const qName = this.parseQName_(name, false);
     this.elementPrefixes_.push(qName.prefix ?? "");
     this.reader_.startTag(qName, nsAttributes, this);
-  }
-  emptyTag(name: string, attributes: Attributes) {
-    const nsAttributes = this.handleAttributes_(attributes);
-    const qName = this.parseQName_(name, false);
-    this.elementPrefixes_.push(qName.prefix ?? "");
-    this.reader_.emptyTag(qName, nsAttributes, this);
-    this.popPrefixes_();
   }
   endTag(name: string) {
     this.reader_.endTag(this.parseQName_(name, false), this);

@@ -14,7 +14,6 @@ class XmlDeclReader implements SaxReader {
     return true;
   }
   startTag(): void {}
-  emptyTag(): void {}
   endTag(): void {}
   text(): void {}
 }

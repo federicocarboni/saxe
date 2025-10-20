@@ -15,7 +15,6 @@ export function sax(
   let comments = 0;
   let processingInstructions = 0;
   let startTags = 0;
-  let emptyTags = 0;
   let endTags = 0;
   let textNodes = 0;
   let attributes = 0;
@@ -36,11 +35,7 @@ export function sax(
   };
 
   parser.onopentagstart = (tag) => {
-    if (tag.isSelfClosing) {
-      ++emptyTags;
-    } else {
-      ++startTags;
-    }
+    ++startTags;
   };
 
   parser.onclosetag = () => {
@@ -52,7 +47,7 @@ export function sax(
   };
 
   // A little help for CDATA
-  parser.onopencdata = () => {
+  parser.oncdata = () => {
     ++textNodes;
   };
 
@@ -82,7 +77,6 @@ export function sax(
       comments,
       processingInstructions,
       startTags,
-      emptyTags,
       endTags,
       textNodes,
       attributes,

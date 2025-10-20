@@ -12,7 +12,6 @@ export function saxes(
   let comments = 0;
   let processingInstructions = 0;
   let startTags = 0;
-  let emptyTags = 0;
   let endTags = 0;
   let textNodes = 0;
   let attributes = 0;
@@ -35,11 +34,7 @@ export function saxes(
   });
 
   parser.on("opentag", (tag) => {
-    if (tag.isSelfClosing) {
-      ++emptyTags;
-    } else {
-      ++startTags;
-    }
+    ++startTags;
   });
 
   parser.on("closetag", () => {
@@ -81,7 +76,6 @@ export function saxes(
       comments,
       processingInstructions,
       startTags,
-      emptyTags,
       endTags,
       textNodes,
       attributes,
