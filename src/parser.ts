@@ -570,8 +570,6 @@ export class SaxParser {
   /** @internal */
   private maxEntityDepth_: number;
 
-  /** @internal */
-  private offset_ = 0;
   // State
   /** @internal */
   private chunk_ = "";
@@ -722,7 +720,6 @@ export class SaxParser {
     while (this.index_ < this.chunk_.length) {
       this.parseStep_();
     }
-    this.offset_ += this.chunk_.length;
     this.chunk_ = cr ? "\r" : "";
     this.index_ = 0;
   }
