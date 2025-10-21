@@ -31,8 +31,7 @@ function escapeDataChars(value: string) {
 export class CanonicalXmlWriter implements SaxReader {
   public output = "";
   // No XML or DOCTYPE declarations in Canonical XML
-  // xml?(declaration: XmlDeclaration): void {
-  //   throw new Error("Method not implemented.");
+  // xmlDecl?(declaration: XmlDeclaration): void {
   // }
   doctype(): void {
   }

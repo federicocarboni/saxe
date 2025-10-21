@@ -130,7 +130,7 @@ export interface SaxPrologReader {
    *
    * @param declaration -
    */
-  xml?(declaration: XmlDeclaration): void;
+  xmlDecl?(declaration: XmlDeclaration): void;
   /**
    * Document type declaration.
    *
@@ -887,7 +887,7 @@ export class SaxParser {
     // this.version_ = xmlDecl.version;
     // this.encoding_ = xmlDecl.encoding;
     this.standalone_ = xmlDecl.standalone;
-    this.reader_.xml?.(xmlDecl);
+    this.reader_.xmlDecl?.(xmlDecl);
     this.state_ = State.MISC;
     this.element_ = "";
   }

@@ -4,7 +4,7 @@ import {SaxParser} from "../src/index.ts";
 
 class XmlDeclReader implements SaxReader {
   declaration: XmlDeclaration | undefined = undefined;
-  xml?(declaration: XmlDeclaration): void {
+  xmlDecl?(declaration: XmlDeclaration): void {
     this.declaration = declaration;
   }
   doctype?(): void {}

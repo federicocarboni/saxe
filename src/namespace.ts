@@ -378,8 +378,8 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     }
     return undefined;
   }
-  xml?(declaration: XmlDeclaration) {
-    return this.reader_.xml?.(declaration);
+  xmlDecl?(declaration: XmlDeclaration) {
+    return this.reader_.xmlDecl?.(declaration);
   }
   doctype?(doctype: Doctype) {
     // doctype name must match QName syntactically but it is not resolved
