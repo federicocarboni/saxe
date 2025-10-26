@@ -168,10 +168,9 @@ export interface SaxDtdReader {
   internalEntityDecl?(entity: InternalEntityDecl): void;
   notationDecl?(notation: NotationDecl): void;
   parameterEntityRef?(name: string): void;
-  endDtdSubset?(): void;
 }
 
-export interface SaxPrologReader {
+export interface SaxPrologReader extends SaxDtdReader {
   /**
    * XML declaration of the document.
    *
@@ -193,21 +192,6 @@ export interface SaxPrologReader {
    * @param doctype -
    */
   doctype?(doctype: Doctype): void;
-  /**
-   * Start of the internal DTD subset. Always called after {@linkcode doctype},
-   * or not called if there is no internal subset.
-   *
-   * ```xml
-   * <!DOCTYPE example [
-   *   <!ELEMENT example EMPTY>
-   * ]>
-   * ```
-   *
-   * @returns - Returns a declaration reader to receive markup declarations. If
-   * this handler is not defined or returns `undefined` then the application is
-   * not notified of any markup declarations processed by the parser.
-   */
-  startDtdSubset?(): SaxDtdReader | undefined;
   /**
    * A processing instruction.
    *
@@ -609,8 +593,6 @@ export class SaxParser {
 
   /** @internal */
   private reader_: SaxReader;
-  /** @internal */
-  private dtdReader_: SaxDtdReader = {};
   /** @internal */
   private entityProvider_: EntityProvider | undefined;
 
@@ -1060,10 +1042,6 @@ export class SaxParser {
     }
     if (codeUnit === Chars.OPEN_BRACKET) {
       this.doctypeEnd_();
-      const dtdReader = this.reader_.startDtdSubset?.();
-      if (dtdReader != null) {
-        this.dtdReader_ = dtdReader;
-      }
       this.state_ = State.INTERNAL_SUBSET;
     } else {
       this.state_ = State.EXTERNAL_ID;
@@ -1426,8 +1404,8 @@ export class SaxParser {
       }
       this.skipWhiteSpace_();
       let isTokenized = true;
-      if (this.chunk_.charCodeAt(this.index_) !== Chars.OPEN_PAREN) {
-        const start = this.index_;
+      const start = this.index_;
+      if (this.chunk_.charCodeAt(start) !== Chars.OPEN_PAREN) {
         while (
           this.index_ < this.chunk_.length &&
           !isWhiteSpace(this.chunk_.charCodeAt(this.index_))
@@ -1445,11 +1423,13 @@ export class SaxParser {
       } else {
         this.readNotationOrEnumeration_(/* isNotation */ false);
       }
+      const attType = this.chunk_.slice(start, this.index_);
       if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         throw new SaxError("InvalidInternalSubset");
       }
       this.skipWhiteSpace_();
       let hasDefault = true;
+      let defaultDecl;
       const hash = this.chunk_.charCodeAt(this.index_);
       if (hash === Chars.HASH) {
         const start = this.index_;
@@ -1460,7 +1440,7 @@ export class SaxParser {
         ) {
           ++this.index_;
         }
-        const defaultDecl = this.chunk_.slice(start, this.index_);
+        defaultDecl = this.chunk_.slice(start, this.index_);
         if (ATT_DEFAULT_DECLS.indexOf(defaultDecl) === -1) {
           throw new SaxError("InvalidInternalSubset");
         }
@@ -1506,6 +1486,17 @@ export class SaxParser {
           isTokenized_: isTokenized,
         });
       }
+      this.reader_.attributeDecl?.({
+        element,
+        attribute,
+        type: attType,
+        defaultDecl: defaultDecl as
+          | "#REQUIRED"
+          | "#IMPLIED"
+          | "#FIXED"
+          | undefined,
+        defaultValue,
+      });
     }
     this.skipWhiteSpace_();
   }
@@ -1526,7 +1517,7 @@ export class SaxParser {
     if (this.chunk_.charCodeAt(this.index_) !== Chars.GT) {
       throw new SaxError("InvalidInternalSubset");
     }
-    this.dtdReader_.notationDecl?.({
+    this.reader_.notationDecl?.({
       name,
       publicId: matches[2],
       systemId: matches[4],
