@@ -60,8 +60,9 @@ class TestCaseReader implements SaxReader {
   startTag(name: string, attributes: Attributes): void {
     if (
       name === "TEST" &&
-      // Only general entities are supported
-      ["none", "general"].includes(attributes.get("ENTITIES")!) &&
+      (!attributes.has("ENTITIES") ||
+        // Only general entities are supported
+        ["none", "general"].includes(attributes.get("ENTITIES")!)) &&
       // Filter out tests for previous editions
       (!attributes.has("EDITION") ||
         attributes.get("EDITION")!.split(" ").includes("5"))
@@ -152,11 +153,19 @@ const TEST_SUITE = [
   // Fuji Xerox "Japanese Documents"
   // "japanese/japanese.xml",
   // NIST/OASIS test suite
-  // "oasis/oasis.xml",
+  "oasis/oasis.xml",
   // IBM tests
   "ibm/ibm_oasis_invalid.xml",
   "ibm/ibm_oasis_not-wf.xml",
   "ibm/ibm_oasis_valid.xml",
+  // Edinburgh University tests
+  "eduni/errata-2e/errata2e.xml",
+  // "eduni/xml-1.1/xml11.xml",
+  // "eduni/namespaces/1.0/rmt-ns10.xml",
+  // "eduni/namespaces/1.1/rmt-ns11.xml",
+  "eduni/errata-3e/errata3e.xml",
+  // "eduni/namespaces/errata-1e/errata1e.xml",
+  "eduni/errata-4e/errata4e.xml",
 ];
 
 for (const xmlconf of TEST_SUITE) {
@@ -189,8 +198,13 @@ export function runTest(testCase: TestCase) {
     expect(testCase.type).oneOf(["valid", "invalid", "not-wf", "error"]);
 
     if (testCase.type === "valid" || testCase.type === "invalid") {
-      expect(toCanonical()).equals(output);
-      expect(toCanonical({incompleteTextNodes: true})).equals(output);
+      if (output !== undefined) {
+        expect(toCanonical()).equals(output);
+        expect(toCanonical({incompleteTextNodes: true})).equals(output);
+      } else {
+        toCanonical();
+        toCanonical({incompleteTextNodes: true});
+      }
     } else if (testCase.type === "not-wf" || testCase.type === "error") {
       expect(toCanonical)
         .throws().and.is.instanceOf(SaxError);
