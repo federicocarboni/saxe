@@ -1252,6 +1252,9 @@ export class SaxParser {
     const isParameter = this.chunk_.charCodeAt(this.index_) === Chars.PERCENT;
     if (isParameter) {
       ++this.index_;
+      if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
+        throw new SaxError("InvalidInternalSubset");
+      }
       this.skipWhiteSpace_();
     }
     const entityName = this.readName_();
