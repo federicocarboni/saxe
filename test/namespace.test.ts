@@ -249,16 +249,88 @@ describe("namespace", function() {
       } satisfies Node,
     );
   });
-  it("wf: xmlns prefix in element name", function() {
+  it("wf: doctype name matches QName", function() {
+    expect(
+      getTree(
+        "<!DOCTYPE doc:doc [ <!ELEMENT doc:doc EMPTY> ]><doc/>",
+      ),
+    ).deep.equals({
+      name: {localName: "doc", name: "doc"},
+      attributes: [],
+      children: [],
+    });
+  });
+  it("wf: element name in DTD matches QName", function() {
+    expect(
+      getTree(
+        "<!DOCTYPE doc [ <!ELEMENT doc:doc EMPTY> ]><doc/>",
+      ),
+    ).deep.equals({
+      name: {localName: "doc", name: "doc"},
+      attributes: [],
+      children: [],
+    });
+  });
+  it("not-wf: doctype name must match QName", function() {
+    expect(() => getTree("<!DOCTYPE doc: []><doc/>"))
+      .throws()
+      .and.includes({
+        name: "InvalidQName",
+      });
+  });
+  it("not-wf: element name in DTD must match QName", function() {
     expect(() =>
       getTree(
-        '<root xmlns="urn:default"><xmlns:empty /></root>',
+        "<!DOCTYPE doc [ <!ELEMENT doc: EMPTY> ]><doc/>",
       )
     )
       .throws()
       .and.includes({
-        name: "ReservedPrefix",
-        element: "xmlns:empty",
+        name: "InvalidQName",
+      });
+  });
+  it("not-wf: attribute name in DTD must match QName", function() {
+    expect(() =>
+      getTree(
+        "<!DOCTYPE doc [ <!ATTLIST doc foo: #REQUIRED> ]><doc/>",
+      )
+    )
+      .throws()
+      .and.includes({
+        name: "InvalidQName",
+      });
+  });
+  it("not-wf: notation name must match NCName", function() {
+    expect(() =>
+      getTree(
+        "<!DOCTYPE doc [ <!NOTATION ent: PUBLIC \"ent\"> ]><doc/>",
+      )
+    )
+      .throws()
+      .and.includes({
+        name: "InvalidNcName",
+      });
+  });
+  it("not-wf: entity name must match NCName", function() {
+    expect(() =>
+      getTree(
+        "<!DOCTYPE doc [ <!ENTITY ent: \"ent\"> ]><doc/>",
+      )
+    )
+      .throws()
+      .and.includes({
+        name: "InvalidNcName",
+      });
+  });
+  it("not-wf: PI target must match NCName", function() {
+    expect(() =>
+      getTree(
+        "<?foo: x?><doc/>",
+      )
+    )
+      .throws()
+      .and.includes({
+        name: "InvalidNcName",
       });
   });
 });
@@ -307,25 +379,33 @@ describe("NamespaceAttributes", function() {
   describe("get()", function() {
     it("returns a plain attribute", function() {
       readAttributes((attributes) => {
+        expect(attributes.has("foo")).equals(true);
         expect(attributes.get("foo")).equals("bar");
+        expect(attributes.has("foo", "urn:x")).equals(false);
         expect(attributes.get("foo", "urn:x")).equals(undefined);
       }, '<doc foo="bar"></doc>');
     });
     it("returns a namespaced attribute", function() {
       readAttributes((attributes) => {
+        expect(attributes.has("foo")).equals(false);
         expect(attributes.get("foo")).equals(undefined);
+        expect(attributes.has("foo", "urn:x")).equals(true);
         expect(attributes.get("foo", "urn:x")).equals("bar");
       }, '<doc xmlns:x="urn:x" x:foo="bar"></doc>');
     });
     it("returns undefined for qualified names", function() {
       readAttributes((attributes) => {
+        expect(attributes.has("x:foo")).equals(false);
         expect(attributes.get("x:foo")).equals(undefined);
+        expect(attributes.has("x:foo", "urn:x")).equals(false);
         expect(attributes.get("x:foo", "urn:x")).equals(undefined);
       }, '<doc xmlns:x="urn:x" x:foo="bar"></doc>');
     });
     it("returns undefined for unknown attributes", function() {
       readAttributes((attributes) => {
+        expect(attributes.has("foo")).equals(false);
         expect(attributes.get("foo")).equals(undefined);
+        expect(attributes.has("foo", "urn:foo")).equals(false);
         expect(attributes.get("foo", "urn:foo")).equals(undefined);
       }, "<doc></doc>");
     });
