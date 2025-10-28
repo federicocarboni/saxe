@@ -181,6 +181,32 @@ describe("namespace", function() {
         element: "a:empty",
       });
   });
+  it("not-wf: namespace not declared in attribute", function() {
+    expect(() =>
+      getTree('<root xmlns="urn:default"><empty a:attr="value" /></root>')
+    )
+      .throws().and.includes({
+        name: "UndeclaredPrefix",
+        attribute: "a:attr",
+      });
+  });
+  it("not-wf: invalid tag QName", function() {
+    expect(() => getTree("<root: />"))
+      .throws().and.includes({
+        name: "InvalidQName",
+        element: "root:",
+      });
+    expect(() => getTree("<:root />"))
+      .throws().and.includes({
+        name: "InvalidQName",
+        element: ":root",
+      });
+    expect(() => getTree("<a:root:b />"))
+      .throws().and.includes({
+        name: "InvalidQName",
+        element: "a:root:b",
+      });
+  });
   it("not-wf: invalid prefix", function() {
     expect(() => getTree('<root xmlns:a:="urn:default"><a:empty /></root>'))
       .throws().and.includes({
@@ -193,6 +219,13 @@ describe("namespace", function() {
       .throws().and.includes({
         name: "PrefixUndeclaring",
         attribute: "xmlns:a",
+      });
+  });
+  it("not-wf: xmlns prefix as element tag", function() {
+    expect(() => getTree("<root><xmlns:empty /></root>"))
+      .throws().and.includes({
+        name: "ReservedPrefix",
+        element: "xmlns:empty",
       });
   });
   it("not-wf: xmlns reserved prefix", function() {
@@ -303,7 +336,7 @@ describe("namespace", function() {
   it("not-wf: notation name must match NCName", function() {
     expect(() =>
       getTree(
-        "<!DOCTYPE doc [ <!NOTATION ent: PUBLIC \"ent\"> ]><doc/>",
+        '<!DOCTYPE doc [ <!NOTATION ent: PUBLIC "ent"> ]><doc/>',
       )
     )
       .throws()
@@ -314,7 +347,7 @@ describe("namespace", function() {
   it("not-wf: entity name must match NCName", function() {
     expect(() =>
       getTree(
-        "<!DOCTYPE doc [ <!ENTITY ent: \"ent\"> ]><doc/>",
+        '<!DOCTYPE doc [ <!ENTITY ent: "ent"> ]><doc/>',
       )
     )
       .throws()
