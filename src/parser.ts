@@ -1168,13 +1168,17 @@ export class SaxParser {
   }
 
   /** @internal */
-  protected readName_() {
+  private readName_() {
     if (!isNameStartChar(this.chunk_.codePointAt(this.index_)!)) {
       throw new SaxError("InvalidInternalSubset");
     }
     return this.readNameCharacters_(0);
   }
   // Allow namespace parser to override this
+  /** @internal */
+  protected checkQName_(name: string) {
+    void name;
+  }
   /** @internal */
   protected checkNcName_(name: string) {
     void name;
@@ -1330,6 +1334,7 @@ export class SaxParser {
     this.index_ += 8;
     this.skipWhiteSpace_();
     const element = this.readName_();
+    this.checkQName_(element);
     let attlist = this.attlists_.get(element);
     if (attlist === undefined) {
       attlist = new Map();
@@ -1345,6 +1350,7 @@ export class SaxParser {
         break;
       }
       const attribute = this.readName_();
+      this.checkQName_(attribute);
       if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
         throw new SaxError("InvalidInternalSubset");
       }
@@ -1504,7 +1510,7 @@ export class SaxParser {
   private readElementDecl_() {
     this.index_ += 8;
     this.skipWhiteSpace_();
-    this.readName_();
+    this.checkQName_(this.readName_());
     if (!isWhiteSpace(this.chunk_.charCodeAt(this.index_))) {
       throw new SaxError("InvalidInternalSubset");
     }
@@ -1528,7 +1534,7 @@ export class SaxParser {
           }
           asteriskRequired = true;
           this.skipWhiteSpace_();
-          this.readName_();
+          this.checkQName_(this.readName_());
         }
         if (this.chunk_.charCodeAt(this.index_) === Chars.ASTERISK) {
           ++this.index_;

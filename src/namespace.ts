@@ -543,10 +543,8 @@ export class SaxNamespaceParser extends SaxParser {
     }
   }
   /** @internal */
-  protected override readName_(): string {
-    const name = super.readName_();
+  protected override checkQName_(name: string) {
     checkQName(name);
-    return name;
   }
   /** @internal */
   protected override checkNcName_(name: string): void {
