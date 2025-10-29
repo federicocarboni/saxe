@@ -1118,7 +1118,7 @@ export class SaxParser {
     if (!isNameStartChar(codePoint)) {
       throw new SaxError("InvalidInternalSubset");
     }
-    this.textLength_ = 0;
+    this.element_ = String.fromCodePoint(codePoint);
     this.state_ = State.INTERNAL_SUBSET_PE_REF;
   }
 
@@ -2101,7 +2101,7 @@ export class SaxParser {
   private appendTextContent_(start: number) {
     const chunk = this.chunk_.slice(start, this.index_);
     this.textLength_ += chunk.length;
-    if (this.textLength_ >= this.maxTextLength_) {
+    if (this.textLength_ > this.maxTextLength_) {
       throw new SaxError("LimitExceeded");
     }
     this.content_ += chunk;
@@ -2399,7 +2399,7 @@ export class SaxParser {
     }
     const chunk = normalizeLineEndings(content);
     this.textLength_ += chunk.length;
-    if (this.textLength_ >= this.maxTextLength_) {
+    if (this.textLength_ > this.maxTextLength_) {
       throw new SaxError("LimitExceeded");
     }
     this.content_ += chunk;
