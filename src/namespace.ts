@@ -407,10 +407,10 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
       name.indexOf(":", colon + 1) !== -1 ||
       !isNameStartChar(name.charCodeAt(colon + 1))
     ) {
-      throw new SaxError("InvalidQName", {
-        attribute: isAttribute ? name : undefined,
-        element: isAttribute ? undefined : name,
-      });
+      throw new SaxError(
+        "InvalidQName",
+        isAttribute ? {attribute: name} : {element: name},
+      );
     }
     const prefix = colon === -1 ? undefined : name.slice(0, colon);
     if (!isAttribute && prefix === "xmlns") {
@@ -423,10 +423,10 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
       ? (name === "xmlns" ? XMLNS_NAMESPACE : undefined)
       : this.lookupNamespace(prefix);
     if (prefix !== undefined && namespace === undefined) {
-      throw new SaxError("UndeclaredPrefix", {
-        attribute: isAttribute ? name : undefined,
-        element: isAttribute ? undefined : name,
-      });
+      throw new SaxError(
+        "UndeclaredPrefix",
+        isAttribute ? {attribute: name} : {element: name},
+      );
     }
     return {name, localName, prefix, namespace};
   }
@@ -444,15 +444,12 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
         continue;
       }
       const prefix = name.slice(6);
-      if (prefix.slice(0, 3).toLowerCase() === "xml") {
-        // xmlns must not be declared, xml may be declared but must be bound to
-        // the same namespace.
-        if (prefix === "xmlns" || prefix === "xml" && value !== XML_NAMESPACE) {
-          throw new SaxError("ReservedPrefix", {attribute: name});
-        }
-        // Attempting to set a prefix starting with XML (case-insensitive) is
-        // not allowed but they should not be used unless defined by other
-        // specifications.
+      // xmlns must not be declared, xml may be declared but must be bound to
+      // the same namespace.
+      if (prefix === "xmlns" || prefix === "xml" && value !== XML_NAMESPACE) {
+        throw new SaxError("ReservedPrefix", {attribute: name});
+      }
+      if (prefix === "xml") {
         continue;
       }
       // These namespaces are reserved and must not be bound to any other
