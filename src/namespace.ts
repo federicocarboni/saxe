@@ -460,7 +460,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
       if (value === XML_NAMESPACE || value === XMLNS_NAMESPACE) {
         throw new SaxError("ReservedNamespace", {attribute: name});
       }
-      if (value === "") {
+      if (value === "" && prefix !== "") {
         throw new SaxError("PrefixUndeclaring", {attribute: name});
       }
       const shadowed = this.namespaces_.get(prefix);
