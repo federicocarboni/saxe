@@ -66,4 +66,9 @@ export const IGNORED_TEST_CASES = [
 
   // DTD validation
   "rmt-e2e-34",
+
+  // URI validation
+  "rmt-ns10-004",
+  "rmt-ns10-005",
+  "rmt-ns10-006",
 ];

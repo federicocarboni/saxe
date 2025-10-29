@@ -6,7 +6,7 @@ import * as tar from "tar";
 
 import {expect} from "chai";
 import type {Attributes, SaxOptions, SaxReader} from "../../src/index.ts";
-import {SaxError, SaxParser} from "../../src/index.ts";
+import {SaxError, SaxNamespaceParser, SaxParser} from "../../src/index.ts";
 import {CanonicalXmlWriter} from "../canonical_xml.ts";
 import {IGNORED_TEST_CASES} from "../ignored_test_cases.ts";
 
@@ -53,9 +53,11 @@ class TestCaseReader implements SaxReader {
   private currentId: string | undefined = undefined;
   private description = "";
   private output: string | undefined = undefined;
+  private recommendation: string | undefined = undefined;
   constructor(
     public baseUri: string,
     public testCases = new Map<string, TestCase[]>(),
+    public nsTestCases = new Map<string, TestCase[]>(),
   ) {}
   startTag(name: string, attributes: Attributes): void {
     if (
@@ -84,6 +86,7 @@ class TestCaseReader implements SaxReader {
         this.output = altOutput;
       }
       this.currentId = attributes.get("ID");
+      this.recommendation = attributes.get("RECOMMENDATION");
     }
   }
   endTag(name: string): void {
@@ -92,11 +95,14 @@ class TestCaseReader implements SaxReader {
       this.currentType !== undefined && this.currentUri !== undefined &&
       this.currentId !== undefined
     ) {
+      const testCases = this.recommendation?.startsWith("NS1.0")
+        ? this.nsTestCases
+        : this.testCases;
       let array: TestCase[];
-      if (!this.testCases.has(this.currentType)) {
-        this.testCases.set(this.currentType, array = []);
+      if (!testCases.has(this.currentType)) {
+        testCases.set(this.currentType, array = []);
       } else {
-        array = this.testCases.get(this.currentType)!;
+        array = testCases.get(this.currentType)!;
       }
       if (this.currentId === "ibm-not-wf-P88-ibm88n01.xml") {
         this.description =
@@ -115,6 +121,7 @@ class TestCaseReader implements SaxReader {
       this.currentUri = undefined;
       this.currentId = undefined;
       this.output = undefined;
+      this.recommendation = undefined;
       this.description = "";
     }
   }
@@ -124,11 +131,16 @@ class TestCaseReader implements SaxReader {
 }
 
 const testCases = new Map<string, TestCase[]>();
+const nsTestCases = new Map<string, TestCase[]>();
 
 async function getTestCases(xmlconf: string) {
   const testPath = path.join("xmlconf", xmlconf);
   const test = fs.createReadStream(testPath, "utf-8");
-  const reader = new TestCaseReader(path.dirname(testPath), testCases);
+  const reader = new TestCaseReader(
+    path.dirname(testPath),
+    testCases,
+    nsTestCases,
+  );
   const parser = new SaxParser(reader);
   test.on("data", (data) => {
     try {
@@ -161,18 +173,21 @@ const TEST_SUITE = [
   // Edinburgh University tests
   "eduni/errata-2e/errata2e.xml",
   // "eduni/xml-1.1/xml11.xml",
-  // "eduni/namespaces/1.0/rmt-ns10.xml",
   // "eduni/namespaces/1.1/rmt-ns11.xml",
   "eduni/errata-3e/errata3e.xml",
-  // "eduni/namespaces/errata-1e/errata1e.xml",
   "eduni/errata-4e/errata4e.xml",
+  "eduni/namespaces/1.0/rmt-ns10.xml",
+  "eduni/namespaces/errata-1e/errata1e.xml",
 ];
 
 for (const xmlconf of TEST_SUITE) {
   await getTestCases(xmlconf);
 }
 
-export function runTest(testCase: TestCase) {
+function runTestWith(
+  testCase: TestCase,
+  toCanonical: (content: string, options?: SaxOptions) => void,
+) {
   const it_ = IGNORED_TEST_CASES.includes(testCase.id)
     ? it.skip
     : it;
@@ -181,37 +196,69 @@ export function runTest(testCase: TestCase) {
     const output = testCase.output !== undefined
       ? await fs.promises.readFile(testCase.output, "utf-8")
       : undefined;
-    const toCanonical = (options: SaxOptions = {}) => {
-      const canonicalizer = new CanonicalXmlWriter();
-      const parser = new SaxParser(canonicalizer, {
-        // IBM has some very long names in their tests
-        maxNameLength: 5000,
-        ...options,
-      });
-      for (const c of content!) {
-        parser.parse(c, {stream: true});
-      }
-      parser.parse();
-      return canonicalizer.output;
-    };
 
     expect(testCase.type).oneOf(["valid", "invalid", "not-wf", "error"]);
 
     if (testCase.type === "valid" || testCase.type === "invalid") {
       if (output !== undefined) {
-        expect(toCanonical()).equals(output);
-        expect(toCanonical({incompleteTextNodes: true})).equals(output);
+        expect(toCanonical(content)).equals(output);
+        expect(toCanonical(content, {incompleteTextNodes: true})).equals(
+          output,
+        );
       } else {
-        toCanonical();
-        toCanonical({incompleteTextNodes: true});
+        toCanonical(content);
+        toCanonical(content, {incompleteTextNodes: true});
       }
     } else if (testCase.type === "not-wf" || testCase.type === "error") {
-      expect(toCanonical)
+      expect(() => toCanonical(content))
         .throws().and.is.instanceOf(SaxError);
-      expect(() => toCanonical({incompleteTextNodes: true}))
+      expect(() => toCanonical(content, {incompleteTextNodes: true}))
         .throws().and.is.instanceOf(SaxError);
     }
   });
 }
 
-export {testCases};
+export function runNsTest(testCase: TestCase) {
+  runTestWith(testCase, (content, options) => {
+    const parser = new SaxNamespaceParser({
+      xmlDecl() {},
+      doctype() {},
+      comment() {},
+      processingInstruction() {},
+      startTag() {
+      },
+      endTag() {
+      },
+      entityRef() {
+        return false;
+      },
+      text() {},
+    }, {
+      // IBM has some very long names in their tests
+      maxNameLength: 5000,
+      ...options,
+    });
+    for (const c of content!) {
+      parser.parse(c, {stream: true});
+    }
+    parser.parse();
+  });
+}
+
+export function runTest(testCase: TestCase) {
+  runTestWith(testCase, (content, options) => {
+    const canonicalizer = new CanonicalXmlWriter();
+    const parser = new SaxParser(canonicalizer, {
+      // IBM has some very long names in their tests
+      maxNameLength: 5000,
+      ...options,
+    });
+    for (const c of content!) {
+      parser.parse(c, {stream: true});
+    }
+    parser.parse();
+    return canonicalizer.output;
+  });
+}
+
+export {nsTestCases, testCases};
