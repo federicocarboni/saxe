@@ -229,6 +229,9 @@ class NamespaceAttributes_ implements NamespaceAttributes {
     const key = attribute.namespace !== undefined
       ? `${attribute.namespace}:${attribute.localName}`
       : attribute.localName;
+    if (this.map_.has(key)) {
+      throw new SaxError("AttributeRedefined", {attribute: attribute.name});
+    }
     this.map_.set(key, attribute);
   }
   /** @internal */
