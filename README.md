@@ -20,6 +20,19 @@ Light-weight and efficient SAX-style XML parser for JavaScript.
 - Syntax error tolerance
 - Source code analysis or LSP features
 
+#### XML 1.1 and Namespaces in XML 1.1
+
+XML 1.1 and Namespaces in XML 1.1 are not supported. Documents declaring version
+`1.1` are parsed as XML `1.0`, so features exclusive to version `1.1` are not
+recognized.
+
+Modern UTF-8 web content is exclusively XML 1.0, which makes XML 1.1 and its
+namespaces mostly irrelevant.
+
+XML 1.1 is used almost exclusively in legacy or specialized contexts where its
+niche features and better EBCDIC support might be useful. See
+[XML - Wikipedia § Versions 1.0 and 1.1](https://en.wikipedia.org/wiki/XML#1.0_and_1.1).
+
 ## Example
 
 ```js
