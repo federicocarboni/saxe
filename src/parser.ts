@@ -932,7 +932,7 @@ export class SaxParser {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       this.state_ = State.DOCTYPE_NAME_END;
-      this.parseDoctypeNameEnd_();
+      this.checkQName_(this.element_);
     }
   }
 

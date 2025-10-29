@@ -382,9 +382,6 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     return this.reader_.xmlDecl?.(declaration);
   }
   doctype?(doctype: Doctype) {
-    // doctype name must match QName syntactically but it is not resolved
-    // because it is not an element or attribute name
-    checkQName(doctype.name);
     return this.reader_.doctype?.(doctype);
   }
   /** @internal */
