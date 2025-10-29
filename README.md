@@ -67,7 +67,7 @@ parser.parse("</example>");
 ## Document Type Declaration
 
 Many[^1] JavaScript XML parsers simplify handling of the internal DTD subset,
-either not checking for well-formedness or ignoring its declarations.
+by either not checking for well-formedness or ignoring its declarations.
 
 Internal DTD subset parsing is required even for non-validating[^2] processors,
 this parser implements the entire specification:
