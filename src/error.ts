@@ -5,13 +5,6 @@
 const ERRORS = {
   LimitExceeded: () => "Limit exceeded",
 
-  // Encoding errors
-  // TODO: encoding support?
-  // EncodingNotSupported: ({encoding}: SaxErrorOptions) =>
-  //   `Encoding '${encoding}' is not supported`,
-  // EncodingInvalidData: ({encoding}: SaxErrorOptions) =>
-  //   `Data is not valid for encoding '${encoding}'`,
-
   // XMLDecl
   InvalidXmlDecl: () => "XML declaration is not well-formed",
   // doctypedecl
@@ -53,8 +46,8 @@ const ERRORS = {
   InvalidNcName: () => "NCName contains colon ':'",
   UndeclaredPrefix: () => "Namespace prefix is not declared",
   PrefixUndeclaring: () => "Namespace prefix undeclaring is not supported",
-  ReservedPrefix: () => "Namespace prefix starting with 'XML' is reserved",
-  ReservedNamespace: () => "Namespace is reserved",
+  ReservedPrefix: () => "Namespace prefixes 'xml' and 'xmlns' are reserved",
+  ReservedNamespace: () => "XML and XMLNS namespaces are reserved",
 } as const;
 
 /**
