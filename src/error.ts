@@ -98,9 +98,6 @@ const ERRORS = {
 export type SaxErrorName = keyof typeof ERRORS;
 
 export interface SaxErrorOptions extends ErrorOptions {
-  /** @internal */
-  offset?: number | undefined;
-  encoding?: string | undefined;
   element?: string | undefined;
   attribute?: string | undefined;
   entity?: string | undefined;
@@ -120,14 +117,6 @@ export class SaxError extends Error {
   // name is also one of the only properties that is preserved if the error is
   // serialized or cloned.
   override name: SaxErrorName;
-  /**
-   * Offset in the document, in UTF-16 code units, at which the error occurred.
-   * Only set for parsing errors.
-   * @internal Does not work quite right at the moment
-   */
-  offset?: number | undefined;
-  /** Encoding of the document or entity. Only set for decoding errors. */
-  encoding?: string | undefined;
   /** Name of the element that caused the error, if any. */
   element?: string | undefined;
   /** Name of the attribute that caused the error, if any. */
@@ -149,8 +138,6 @@ export class SaxError extends Error {
       "cause" in options ? {cause: options.cause} : undefined,
     );
     this.name = name;
-    this.offset = options.offset;
-    this.encoding = options.encoding;
     this.element = options.element;
     this.attribute = options.attribute;
     this.entity = options.entity;
