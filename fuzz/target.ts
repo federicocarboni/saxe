@@ -1,8 +1,20 @@
 import {SaxError, SaxParser} from "../src/index.ts";
 import {CanonicalXmlWriter} from "../test/canonical_xml.ts";
 
+function decodeUtf8(data: Buffer) {
+  const decoder = new TextDecoder("utf-8", {fatal: true});
+  try {
+    return decoder.decode(data);
+  } catch {
+    return undefined;
+  }
+}
+
 export function fuzz(data: Buffer) {
-  const str = data.toString("utf-8");
+  const str = decodeUtf8(data);
+  if (str === undefined) {
+    return;
+  }
   const writer1 = new CanonicalXmlWriter();
   const writer2 = new CanonicalXmlWriter();
   const parser1 = new SaxParser(writer1, {incompleteTextNodes: true});
