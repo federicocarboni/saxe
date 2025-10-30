@@ -11,7 +11,7 @@
   "types": "./lib/index.d.ts",
   "scripts": {
     "build": "tsc && esbuild src/index.ts --outdir=lib/ --bundle --format=esm --target=es2017 --mangle-props=_\\$ --sourcemap",
-    "fuzz": "cross-env NODE_OPTIONS=\"--require tsm\" jsfuzz fuzz/target.ts corpus",
+    "fuzz": "esbuild fuzz/target.ts --outdir=fuzz/ --bundle --format=cjs && jsfuzz fuzz/target.js fuzz/corpus",
     "test": "c8 mocha test/*.test.ts",
     "lint": "dprint fmt && eslint .",
     "doc": "typedoc",
