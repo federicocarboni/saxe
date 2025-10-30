@@ -9,6 +9,7 @@ Light-weight and efficient SAX-style XML parser for JavaScript.
 ## Goals
 
 - Full XML 1.0 standard conformance
+- Full Namespace in XML 1.0 standard conformance
 - Simple and terse API
 - Reduced code footprint
 - Set a base for other standards built on XML (e.g. XHTML)
