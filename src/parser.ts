@@ -295,10 +295,11 @@ export interface SaxOptions {
    */
   maxNameLength?: number | undefined;
   /**
-   * Maximum size allowed for an attribute map.
-   * @default 2_000
+   * Maximum size allowed for the attributes in a single tag. Counts the total
+   * combined length of names and values of attributes.
+   * @default 12_000_000
    */
-  maxAttributes?: number | undefined;
+  maxAttributesLength?: number | undefined;
   /**
    * Maximum size allowed for a text node.
    *
@@ -550,7 +551,7 @@ export class SaxParser {
   /** @internal */
   private maxNameLength_: number;
   /** @internal */
-  private maxAttributes_: number;
+  private maxAttributesLength_: number;
   /** @internal */
   private maxTextLength_: number;
   /** @internal */
@@ -580,6 +581,9 @@ export class SaxParser {
   // incompleteTextNodes is enabled.
   /** @internal */
   private textLength_ = 0;
+  // Total combined size of attribute names and values
+  /** @internal */
+  private attributesLength_ = 0;
 
   /** @internal */
   private elements_: string[] = [];
@@ -596,10 +600,10 @@ export class SaxParser {
   /** @internal */
   private element_ = "";
   // Current text content, contains decoded and normalized content
-  // or current attribute value (or XML Decl attribute value)
+  // or current attribute value
   /** @internal */
   private content_ = "";
-  // Current attribute name (or XML Decl attribute value)
+  // Current attribute name
   /** @internal */
   private attribute_ = "";
   /** @internal */
@@ -660,7 +664,7 @@ export class SaxParser {
       this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
     }
     this.maxNameLength_ = options.maxNameLength ?? 2_000;
-    this.maxAttributes_ = options.maxAttributes ?? 2_000;
+    this.maxAttributesLength_ = options.maxAttributesLength ?? 10_000_000;
     this.maxTextLength_ = options.maxTextLength ?? 10_000_000;
     this.maxEntityLength_ = options.maxEntityLength ?? 1_000_000;
     this.maxEntityDepth_ = options.maxEntityDepth ?? 10;
@@ -1892,7 +1896,8 @@ export class SaxParser {
     }
     for (const [attribute, {default_}] of attlist) {
       if (default_ !== undefined && !this.attributes_.has(attribute)) {
-        if (this.attributes_.size >= this.maxAttributes_) {
+        this.attributesLength_ += attribute.length + default_.length;
+        if (this.attributesLength_ > this.maxAttributesLength_) {
           throw new SaxError("LimitExceeded");
         }
         this.attributes_.set(attribute, default_);
@@ -1905,10 +1910,13 @@ export class SaxParser {
     this.setDefaultAttributes_();
     this.state_ = State.TEXT_CONTENT;
     this.otherState_ = 0;
-    this.reader_.startTag(this.element_, this.attributes_);
-    this.elements_.push(this.element_);
+    this.attributesLength_ = 0;
+    const element = this.element_;
+    const attributes = this.attributes_;
     this.element_ = "";
     this.attributes_ = new Map();
+    this.elements_.push(element);
+    this.reader_.startTag(element, attributes);
   }
 
   /** @internal */
@@ -2054,7 +2062,9 @@ export class SaxParser {
           const value = attlist !== undefined && attlist.isTokenized_
             ? normalizeAttributeValue(this.content_)
             : this.content_;
-          if (this.attributes_.size >= this.maxAttributes_) {
+          this.attributesLength_ += this.attribute_.length +
+            this.content_.length;
+          if (this.attributesLength_ > this.maxAttributesLength_) {
             throw new SaxError("LimitExceeded");
           }
           this.attributes_.set(this.attribute_, value);
@@ -2081,17 +2091,16 @@ export class SaxParser {
   private parseEmptyTag_() {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       ++this.index_;
-      this.setDefaultAttributes_();
+      // Empty tags emit startTag and endTag right away
+      const element = this.element_;
+      this.startTagEnd_();
+      this.reader_.endTag(element);
+      this.elements_.pop();
       // Empty tag could still be the root element
       this.state_ =
         this.elements_.length === 0 && this.entityStack_.length === 0
           ? State.MISC
           : State.TEXT_CONTENT;
-      this.otherState_ = 0;
-      this.reader_.startTag(this.element_, this.attributes_);
-      this.reader_.endTag(this.element_);
-      this.element_ = "";
-      this.attributes_ = new Map();
     } else {
       throw new SaxError("InvalidStartTag");
     }
@@ -2496,17 +2505,16 @@ export class SaxParser {
       throw new SaxError("InvalidEndTag");
     }
     if (this.elements_.pop() !== this.element_) {
-      throw new SaxError("TagNameMismatch", {
-        element: this.element_,
-      });
+      throw new SaxError("TagNameMismatch", {element: this.element_});
     }
     ++this.index_;
     this.state_ = this.elements_.length === 0 && this.entityStack_.length === 0
       ? State.MISC
       : State.TEXT_CONTENT;
     this.otherState_ = 0;
-    this.reader_.endTag(this.element_);
+    const element = this.element_;
     this.element_ = "";
+    this.reader_.endTag(element);
   }
 
   // Internal functions
