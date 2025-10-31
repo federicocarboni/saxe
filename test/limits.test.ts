@@ -56,42 +56,41 @@ describe("limits", function() {
   });
   it("start tag attributes", function() {
     testLimit(
-      '<a a="" b="" c="" d="" e="" f="" g="" h="" i="" j="" k=""></a>',
-      {maxAttributes: 10},
+      '<a a="1" b="2" c="3" d="4" e="5" f="" ></a>',
+      {maxAttributesLength: 10},
     );
     expect(
       toCanonicalOpt([
-        '<a a="" b="" c="" d="" e="" f="" g="" h="" i="" j=""></a>',
-      ], {maxNameLength: 10}),
-    ).equals('<a a="" b="" c="" d="" e="" f="" g="" h="" i="" j=""></a>');
+        '<a a="1" b="2" c="3" d="4" e="5"></a>',
+      ], {maxAttributesLength: 10}),
+    ).equals('<a a="1" b="2" c="3" d="4" e="5"></a>');
   });
   it("start tag default attributes", function() {
     testLimit(
       '<!DOCTYPE a [<!ATTLIST a k CDATA "">]><a a="" b="" c="" d="" e="" f="" g="" h="" i="" j=""></a>',
-      {maxAttributes: 10},
+      {maxAttributesLength: 10},
     );
     expect(
       toCanonicalOpt([
         '<!DOCTYPE a [<!ATTLIST a j CDATA "">]><a a="" b="" c="" d="" e="" f="" g="" h="" i=""></a>',
-      ], {maxNameLength: 10}),
+      ], {maxAttributesLength: 10}),
     ).equals('<a a="" b="" c="" d="" e="" f="" g="" h="" i="" j=""></a>');
   });
   it("start tag attribute value", function() {
     testLimit('<a a="aaaaaaaaaaa"></a>', {maxTextLength: 10});
-    expect(toCanonicalOpt(['<a a="aaaaaaaaaa"></a>'], {maxNameLength: 10}))
+    expect(toCanonicalOpt(['<a a="aaaaaaaaaa"></a>'], {maxTextLength: 10}))
       .equals('<a a="aaaaaaaaaa"></a>');
   });
   it("start tag attribute value is checked before normalization", function() {
     testLimit(
-      '<!DOCTYPE a [<!ATTLIST a a NMTOKEN #REQUIRED>]><a a=" aaaaaaaaaa"></a>',
-      {maxTextLength: 10},
+      '<!DOCTYPE a [<!ATTLIST a a NMTOKEN #REQUIRED>]><a a=" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></a>',
+      {maxTextLength: 32},
     );
     expect(
       toCanonicalOpt([
-        '<!DOCTYPE a [<!ATTLIST a a NMTOKEN #REQUIRED>]><a a=" aaaaaaaaa"></a>',
-      ], {maxNameLength: 10}),
-    )
-      .equals('<a a="aaaaaaaaa"></a>');
+        '<!DOCTYPE a [<!ATTLIST a a NMTOKEN #REQUIRED>]><a a=" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></a>',
+      ], {maxTextLength: 32}),
+    ).equals('<a a="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></a>');
   });
   it("text", function() {
     testLimit("<a>aaaaaaaaaaa</a>", {maxTextLength: 10});
