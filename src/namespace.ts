@@ -206,37 +206,21 @@ export interface SaxNamespaceReader extends SaxPrologReader {
 }
 
 /** @internal */
-interface AttributeNs extends QName {
-  value: string;
-}
-
-/** @internal */
-function getQName(attribute: AttributeNs): QName {
-  return {
-    name: attribute.name,
-    localName: attribute.localName,
-    prefix: attribute.prefix,
-    namespace: attribute.namespace,
-  };
-}
-
-/** @internal */
 class NamespaceAttributes_ implements NamespaceAttributes {
   /** @internal */
-  private map_ = new Map<string, AttributeNs>();
-  /** @internal */
-  add_(attribute: AttributeNs) {
-    const key = attribute.namespace !== undefined
-      ? `${attribute.namespace}:${attribute.localName}`
-      : attribute.localName;
-    if (this.map_.has(key)) {
-      throw new SaxError("AttributeRedefined", {attribute: attribute.name});
-    }
-    this.map_.set(key, attribute);
+  private map_: Map<string, [QName, string]>;
+  constructor() {
+    this.map_ = new Map();
   }
   /** @internal */
-  iter_() {
-    return this.map_.values();
+  add_(name: QName, value: string) {
+    const key = name.namespace !== undefined
+      ? `${name.namespace}:${name.localName}`
+      : name.localName;
+    if (this.map_.has(key)) {
+      throw new SaxError("AttributeRedefined", {attribute: name.name});
+    }
+    this.map_.set(key, [name, value]);
   }
   get size() {
     return this.map_.size;
@@ -248,7 +232,7 @@ class NamespaceAttributes_ implements NamespaceAttributes {
     }
     const key = namespace != null ? `${namespace}:${name}` : name;
     const attribute = this.map_.get(key);
-    return attribute !== undefined ? attribute.value : undefined;
+    return attribute !== undefined ? attribute[1] : undefined;
   }
   has(name: string, namespace?: string | undefined): boolean {
     return this.get(name, namespace) !== undefined;
@@ -261,32 +245,29 @@ class NamespaceAttributes_ implements NamespaceAttributes {
     ) => void,
     thisArg: unknown = undefined,
   ) {
-    for (const attribute of this.iter_()) {
-      callbackfn.call(thisArg, attribute.value, getQName(attribute), this);
+    for (const [name, value] of this.map_.values()) {
+      callbackfn.call(thisArg, value, name, this);
     }
   }
   *keys(): IterableIterator<QName> {
-    for (const attribute of this.iter_()) {
-      yield getQName(attribute);
+    for (const [name] of this.map_.values()) {
+      yield name;
     }
   }
   *values(): IterableIterator<string> {
-    for (const attribute of this.iter_()) {
-      yield attribute.value;
+    for (const [, value] of this.map_.values()) {
+      yield value;
     }
   }
   *entries(): IterableIterator<[QName, string]> {
-    for (const attribute of this.iter_()) {
-      yield [getQName(attribute), attribute.value];
+    for (const attribute of this.map_.values()) {
+      yield attribute;
     }
   }
   [Symbol.iterator]() {
     return this.entries();
   }
 }
-
-/** @internal */
-export type {NamespaceAttributes_};
 
 function checkQName(name: string) {
   const colon = name.indexOf(":");
@@ -468,8 +449,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
       this.prefixBindings_.set(this.elementPrefixes_.length, bindings);
     }
     for (const [name, value] of attributes) {
-      const attribute = Object.assign(this.parseQName_(name, true), {value});
-      nsAttributes.add_(attribute);
+      nsAttributes.add_(this.parseQName_(name, true), value);
     }
     return nsAttributes;
   }
