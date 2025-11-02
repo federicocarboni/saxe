@@ -3,7 +3,7 @@
 import type {ReadStream} from "fs";
 import type {ReadTokens} from "../index.ts";
 
-import {SaxParser, SaxHandler} from "../../src/index.ts";
+import {SaxHandler, SaxParser} from "../../src/index.ts";
 
 class Handler implements SaxHandler {
   comments = 0;

@@ -3,9 +3,9 @@ import {SaxError} from "./error.ts";
 import type {
   Attributes,
   Doctype,
+  SaxHandler,
   SaxOptions,
   SaxPrologHandler,
-  SaxHandler,
   XmlDeclaration,
 } from "./parser.ts";
 import {Flags, SaxParser} from "./parser.ts";
