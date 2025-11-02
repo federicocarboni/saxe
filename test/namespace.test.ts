@@ -17,8 +17,13 @@ interface Node {
   children: (Node | string)[];
 }
 
-function copyQName(name: QName): QName {
-  const nameCopy: QName = {
+function copyQName(name: QName) {
+  const nameCopy: {
+    name: string;
+    localName: string;
+    prefix?: string;
+    namespace?: string;
+  } = {
     name: name.name,
     localName: name.localName,
   };
