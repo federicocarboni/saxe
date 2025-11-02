@@ -13,13 +13,13 @@ import {Flags, SaxParser} from "./parser.ts";
 /** A qualified XML name for elements or attributes. */
 export interface QName {
   /** Qualified name of the element or attribute. */
-  name: string;
+  readonly name: string;
   /** Local part of the name. */
-  localName: string;
+  readonly localName: string;
   /** Prefix part of the name, if any. */
-  prefix?: string | undefined;
+  readonly prefix?: string | undefined;
   /** Namespace URI, if any. */
-  namespace?: string | undefined;
+  readonly namespace?: string | undefined;
 }
 
 /**
@@ -203,6 +203,16 @@ export interface SaxNamespaceReader extends SaxPrologReader {
     isCDataSection: boolean,
     resolver: NamespaceResolver,
   ): void;
+}
+
+/** @internal */
+class QName_ implements QName {
+  constructor(
+    readonly name: string,
+    readonly localName: string,
+    readonly prefix?: string | undefined,
+    readonly namespace?: string | undefined,
+  ) {}
 }
 
 /** @internal */
@@ -409,7 +419,7 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
         isAttribute ? {attribute: name} : {element: name},
       );
     }
-    return {name, localName, prefix, namespace};
+    return new QName_(name, localName, prefix, namespace);
   }
   /** @internal */
   private handleAttributes_(attributes: Attributes): NamespaceAttributes {
