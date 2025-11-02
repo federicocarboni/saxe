@@ -3,9 +3,9 @@ import {SaxError} from "./error.ts";
 import type {
   Attributes,
   Doctype,
+  SaxHandler,
   SaxOptions,
   SaxPrologHandler,
-  SaxHandler,
   XmlDeclaration,
 } from "./parser.ts";
 import {Flags, SaxParser} from "./parser.ts";
@@ -20,6 +20,17 @@ export interface QName {
   readonly prefix?: string | undefined;
   /** Namespace URI, if any. */
   readonly namespace?: string | undefined;
+  /**
+   * Returns `true` if the `QName` matches the provided local name and namespace
+   * URI.
+   *
+   * @param localName - The local part of the name to match against.
+   * @param namespace - The namespace URI to match against. If not specified, it
+   * only matches if the `QName` also has no namespace URI.
+   * @returns - Returns `true` if the `QName` matches the provided local name
+   * and namespace URI, `false` otherwise.
+   */
+  matches(localName: string, namespace?: string | undefined): boolean;
 }
 
 /**
@@ -213,6 +224,10 @@ class QName_ implements QName {
     readonly prefix?: string | undefined,
     readonly namespace?: string | undefined,
   ) {}
+  matches(localName: string, namespace?: string | undefined): boolean {
+    return this.localName === localName &&
+      this.namespace === (namespace ?? undefined);
+  }
 }
 
 /** @internal */

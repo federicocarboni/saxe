@@ -11,19 +11,21 @@ import {
   XMLNS_NAMESPACE,
 } from "../src/index.ts";
 
+type PlainQName = {
+  name: string;
+  localName: string;
+  prefix?: string;
+  namespace?: string;
+};
+
 interface Node {
-  name: QName;
-  attributes: [QName, string][];
+  name: PlainQName;
+  attributes: [PlainQName, string][];
   children: (Node | string)[];
 }
 
 function copyQName(name: QName) {
-  const nameCopy: {
-    name: string;
-    localName: string;
-    prefix?: string;
-    namespace?: string;
-  } = {
+  const nameCopy: PlainQName = {
     name: name.name,
     localName: name.localName,
   };
