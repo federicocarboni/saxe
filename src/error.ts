@@ -74,7 +74,7 @@ const ERRORS = {
  * - `InvalidCharRef` Character reference to invalid character
  * - `InvalidChar` Content contains an invalid character
  * - `InvalidCDataEnd` Content contains invalid sequence ']]>'
- * - `InvalidCData` Content appears outside root element
+ * - `InvalidContent` Content appears outside root element
  * - `InvalidStartTag` Start tag is not well-formed
  * - `InvalidEndTag` End tag is not well-formed
  * - `InvalidAttributeValue` Attribute value contains a literal '<'
