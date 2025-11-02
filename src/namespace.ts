@@ -41,22 +41,22 @@ export interface NamespaceAttributes {
    * // ✔ No namespace
    * attributes.get("href")
    * ```
-   * @param name - Local name of the attribute. Qualified names are not
+   * @param localName - Local name of the attribute. Qualified names are not
    * supported.
    * @param namespace - Namespace URI for attributes with a namespace.
    * @returns - Returns the value of the attribute with the specified name and
    * namespace. If there is no attribute with the specified name and namespace
    * `undefined` is returned.
    */
-  get(name: string, namespace?: string | undefined): string | undefined;
+  get(localName: string, namespace?: string | undefined): string | undefined;
   /**
    * Returns `true` if the specified attribute is present, `false` otherwise.
-   * @param name - Local name of the attribute.
+   * @param localName - Local name of the attribute.
    * @param namespace - Namespace URI for attributes with a namespace.
    * @returns - Returns a boolean value indicating whether an attribute with the
    * specified name and namespace is present.
    */
-  has(name: string, namespace?: string | undefined): boolean;
+  has(localName: string, namespace?: string | undefined): boolean;
   /**
    * Executes `callbackfn` for each attribute.
    * @param callbackfn -
@@ -235,17 +235,17 @@ class NamespaceAttributes_ implements NamespaceAttributes {
   get size() {
     return this.map_.size;
   }
-  get(name: string, namespace?: string | undefined): string | undefined {
+  get(localName: string, namespace?: string | undefined): string | undefined {
     // Name must be an NCName
-    if (name.indexOf(":") !== -1) {
+    if (localName.indexOf(":") !== -1) {
       return undefined;
     }
-    const key = namespace != null ? `${namespace}:${name}` : name;
+    const key = namespace != null ? `${namespace}:${localName}` : localName;
     const attribute = this.map_.get(key);
     return attribute !== undefined ? attribute[1] : undefined;
   }
-  has(name: string, namespace?: string | undefined): boolean {
-    return this.get(name, namespace) !== undefined;
+  has(localName: string, namespace?: string | undefined): boolean {
+    return this.get(localName, namespace) !== undefined;
   }
   forEach(
     callbackfn: (
