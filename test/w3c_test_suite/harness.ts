@@ -5,7 +5,7 @@ import * as streams from "stream/promises";
 import * as tar from "tar";
 
 import {expect} from "chai";
-import type {Attributes, SaxOptions, SaxReader} from "../../src/index.ts";
+import type {Attributes, SaxHandler, SaxOptions} from "../../src/index.ts";
 import {SaxError, SaxNamespaceParser, SaxParser} from "../../src/index.ts";
 import {CanonicalXmlWriter} from "../canonical_xml.ts";
 import {IGNORED_TEST_CASES} from "../ignored_test_cases.ts";
@@ -47,7 +47,7 @@ interface TestCase {
   output: string | undefined;
 }
 
-class TestCaseReader implements SaxReader {
+class TestCaseHandler implements SaxHandler {
   private currentType: string | undefined = undefined;
   private currentUri: string | undefined = undefined;
   private currentId: string | undefined = undefined;
@@ -136,12 +136,12 @@ const nsTestCases = new Map<string, TestCase[]>();
 async function getTestCases(xmlconf: string) {
   const testPath = path.join("xmlconf", xmlconf);
   const test = fs.createReadStream(testPath, "utf-8");
-  const reader = new TestCaseReader(
+  const handler = new TestCaseHandler(
     path.dirname(testPath),
     testCases,
     nsTestCases,
   );
-  const parser = new SaxParser(reader);
+  const parser = new SaxParser(handler);
   test.on("data", (data) => {
     try {
       parser.parse(data as string, {stream: true});

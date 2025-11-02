@@ -1,9 +1,9 @@
 import {expect} from "chai";
-import type {Attributes, SaxReader} from "../src/index.ts";
+import type {Attributes, SaxHandler} from "../src/index.ts";
 import {SaxParser} from "../src/index.ts";
 import {CanonicalXmlWriter} from "./canonical_xml.ts";
 
-class CanonicalEntityReader implements SaxReader {
+class CanonicalEntityHandler implements SaxHandler {
   public entity: string | undefined;
   public canonical: CanonicalXmlWriter;
   constructor() {
@@ -25,8 +25,8 @@ class CanonicalEntityReader implements SaxReader {
 }
 
 function getEntity(entities: Record<string, string>, ...chunks: string[]) {
-  const reader = new CanonicalEntityReader();
-  const parser = new SaxParser(reader, {
+  const handler = new CanonicalEntityHandler();
+  const parser = new SaxParser(handler, {
     entityProvider: {
       getEntity(entity: string): string | undefined {
         return entities.hasOwnProperty(entity)
@@ -39,7 +39,7 @@ function getEntity(entities: Record<string, string>, ...chunks: string[]) {
     parser.parse(chunk, {stream: true});
   }
   parser.parse();
-  return {entity: reader.entity, output: reader.canonical.output};
+  return {entity: handler.entity, output: handler.canonical.output};
 }
 
 describe("general entity reference", function() {

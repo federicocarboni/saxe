@@ -1,8 +1,8 @@
 import {expect} from "chai";
-import type {SaxReader, XmlDeclaration} from "../src/index.ts";
+import type {SaxHandler, XmlDeclaration} from "../src/index.ts";
 import {SaxParser} from "../src/index.ts";
 
-class XmlDeclReader implements SaxReader {
+class XmlDeclHandler implements SaxHandler {
   declaration: XmlDeclaration | undefined = undefined;
   xmlDecl?(declaration: XmlDeclaration): void {
     this.declaration = declaration;
@@ -19,13 +19,13 @@ class XmlDeclReader implements SaxReader {
 }
 
 function getXmlDecl(...chunks: string[]) {
-  const reader = new XmlDeclReader();
-  const parser = new SaxParser(reader);
+  const handler = new XmlDeclHandler();
+  const parser = new SaxParser(handler);
   for (const chunk of chunks) {
     parser.parse(chunk, {stream: true});
   }
   parser.parse();
-  return reader.declaration;
+  return handler.declaration;
 }
 
 describe("XML Declaration", function() {

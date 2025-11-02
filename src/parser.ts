@@ -120,7 +120,7 @@ export interface Attributes {
   [Symbol.iterator](): IterableIterator<[string, string]>;
 }
 
-export interface SaxPrologReader {
+export interface SaxPrologHandler {
   /**
    * XML declaration of the document.
    *
@@ -169,7 +169,7 @@ export interface SaxPrologReader {
 /**
  * https://www.w3.org/TR/REC-xml/
  */
-export interface SaxReader extends SaxPrologReader {
+export interface SaxHandler extends SaxPrologHandler {
   /**
    * Start tag.
    *
@@ -322,7 +322,7 @@ export interface SaxOptions {
    */
   entityProvider?: EntityProvider | undefined;
   /**
-   * Emit {@linkcode SaxReader.text} as soon as data becomes available.
+   * Emit {@linkcode SaxHandler.text} as soon as data becomes available.
    *
    * By default, the parser collects text content as it were forming a DOM Text
    * Node (or CDATA Section Node), even when text spans multiple chunks. This
@@ -330,7 +330,7 @@ export interface SaxOptions {
    * is reached.
    *
    * Enabling this option prevents any buffering and causes the parser to emit
-   * {@linkcode SaxReader.text} as soon as data becomes available.
+   * {@linkcode SaxHandler.text} as soon as data becomes available.
    * @default false
    */
   incompleteTextNodes?: boolean | undefined;
@@ -397,7 +397,7 @@ const enum State {
 export const enum Flags {
   INIT = 0,
 
-  // Option flags, these are turned on or off depending on SaxReader and
+  // Option flags, these are turned on or off depending on SaxHandler and
   // SaxOptions and do not change as more input is read.
 
   // Capture Processing Instructions or ignore them.
@@ -493,7 +493,7 @@ const EXTERNAL_OR_PUBLIC_ID_RE =
  * A streaming SAX-style XML parser.
  *
  * `SaxParser` processes input incrementally, notifying the provided
- * {@linkcode SaxReader} of parsing events such as start tags, end tags and
+ * {@linkcode SaxHandler} of parsing events such as start tags, end tags and
  * text content. Because the parser does not construct a tree representation
  * of the document it is possible to process very large inputs efficiently.
  *
@@ -525,9 +525,9 @@ const EXTERNAL_OR_PUBLIC_ID_RE =
  * parser.parse("</example>");
  * ```
  *
- * @see {@linkcode SaxReader}
+ * @see {@linkcode SaxHandler}
  * @see {@linkcode SaxOptions}
- * @see {@linkcode SaxNamespaceReader}
+ * @see {@linkcode SaxNamespaceHandler}
  * @see {@linkcode SaxNamespaceParser}
  */
 export class SaxParser {
@@ -543,7 +543,7 @@ export class SaxParser {
   // slower than `charCodeAt`.
 
   /** @internal */
-  private reader_: SaxReader;
+  private handler_: SaxHandler;
   /** @internal */
   private entityProvider_: EntityProvider | undefined;
 
@@ -642,16 +642,19 @@ export class SaxParser {
   /** @internal */
   private standalone_: boolean | undefined = undefined;
 
-  constructor(reader: SaxReader, options: SaxOptions | undefined = undefined) {
+  constructor(
+    handler: SaxHandler,
+    options: SaxOptions | undefined = undefined,
+  ) {
     if (options == null) {
       options = {};
     }
-    this.reader_ = reader;
+    this.handler_ = handler;
     // Avoid capturing information that will be ignored
-    if (this.reader_.processingInstruction != null) {
+    if (this.handler_.processingInstruction != null) {
       this.flags_ |= Flags.CAPTURE_PI;
     }
-    if (this.reader_.comment != null) {
+    if (this.handler_.comment != null) {
       this.flags_ |= Flags.CAPTURE_COMMENT;
     }
     if (options.incompleteTextNodes) {
@@ -672,7 +675,7 @@ export class SaxParser {
   }
 
   /**
-   * Parses XML from `input` and notifies the reader of parsing events such as
+   * Parses XML from `input` and notifies the handler of parsing events such as
    * start tags, end tags and text content.
    * @param input - A string containing the XML data to parse.
    * @param options -
@@ -891,7 +894,7 @@ export class SaxParser {
     // this.version_ = xmlDecl.version;
     // this.encoding_ = xmlDecl.encoding;
     this.standalone_ = xmlDecl.standalone;
-    this.reader_.xmlDecl?.(xmlDecl);
+    this.handler_.xmlDecl?.(xmlDecl);
     this.state_ = State.MISC;
     this.element_ = "";
   }
@@ -979,7 +982,7 @@ export class SaxParser {
     if (doctype === undefined) {
       throw new SaxError("InvalidDoctypeDecl");
     }
-    this.reader_.doctype?.(doctype);
+    this.handler_.doctype?.(doctype);
     this.element_ = "";
     this.state_ = State.MISC;
   }
@@ -1709,7 +1712,7 @@ export class SaxParser {
   /** @internal */
   private piEnd_() {
     if (this.flags_ & Flags.CAPTURE_PI) {
-      this.reader_.processingInstruction?.(this.element_, this.content_);
+      this.handler_.processingInstruction?.(this.element_, this.content_);
     }
     this.element_ = "";
     this.content_ = "";
@@ -1831,7 +1834,7 @@ export class SaxParser {
     if (this.chunk_.charCodeAt(this.index_) === Chars.GT) {
       ++this.index_;
       if (this.flags_ & Flags.CAPTURE_COMMENT) {
-        this.reader_.comment?.(this.content_);
+        this.handler_.comment?.(this.content_);
       }
       this.content_ = "";
       this.state_ = this.otherState_;
@@ -1916,7 +1919,7 @@ export class SaxParser {
     this.element_ = "";
     this.attributes_ = new Map();
     this.elements_.push(element);
-    this.reader_.startTag(element, attributes);
+    this.handler_.startTag(element, attributes);
   }
 
   /** @internal */
@@ -2094,7 +2097,7 @@ export class SaxParser {
       // Empty tags emit startTag and endTag right away
       const element = this.element_;
       this.startTagEnd_();
-      this.reader_.endTag(element);
+      this.handler_.endTag(element);
       this.elements_.pop();
       // Empty tag could still be the root element
       this.state_ =
@@ -2184,7 +2187,7 @@ export class SaxParser {
       this.state_ !== State.TEXT_CONTENT ||
       this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES
     ) {
-      this.reader_.text(this.content_, false);
+      this.handler_.text(this.content_, false);
       this.content_ = "";
     }
     ++this.index_;
@@ -2259,7 +2262,7 @@ export class SaxParser {
           // just return any value from getGeneralEntity to suppress the error)
           this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED ||
           // Allow the application to handle undeclared entities in content.
-          !this.reader_.entityRef?.(this.entity_)
+          !this.handler_.entityRef?.(this.entity_)
         ) {
           throw new SaxError("UndeclaredEntity", {
             entity: this.entity_,
@@ -2430,7 +2433,7 @@ export class SaxParser {
         }
       }
       if (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES) {
-        this.reader_.text(this.content_, true);
+        this.handler_.text(this.content_, true);
         this.content_ = "";
       }
     } else {
@@ -2455,7 +2458,7 @@ export class SaxParser {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit === Chars.GT) {
       ++this.index_;
-      this.reader_.text(this.content_, true);
+      this.handler_.text(this.content_, true);
       this.state_ = State.TEXT_CONTENT;
       this.otherState_ = 0;
       this.content_ = "";
@@ -2514,7 +2517,7 @@ export class SaxParser {
     this.otherState_ = 0;
     const element = this.element_;
     this.element_ = "";
-    this.reader_.endTag(element);
+    this.handler_.endTag(element);
   }
 
   // Internal functions

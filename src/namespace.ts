@@ -4,8 +4,8 @@ import type {
   Attributes,
   Doctype,
   SaxOptions,
-  SaxPrologReader,
-  SaxReader,
+  SaxPrologHandler,
+  SaxHandler,
   XmlDeclaration,
 } from "./parser.ts";
 import {Flags, SaxParser} from "./parser.ts";
@@ -95,7 +95,7 @@ export interface NamespaceResolver {
    *
    * This function acts as if [DOM Node `lookupNamespaceURI`] were called on the
    * current element being parsed, usually the element of the last call to
-   * {@linkcode SaxNamespaceReader.startTag}.
+   * {@linkcode SaxNamespaceHandler.startTag}.
    *
    * [DOM Node `lookupNamespaceURI`]:
    * https://dom.spec.whatwg.org/#dom-node-lookupnamespaceuri
@@ -122,7 +122,7 @@ export interface NamespaceResolver {
    *
    * This function acts as if [DOM Node `lookupPrefix`] were called on the
    * current element being parsed, usually the element of the last call to
-   * {@linkcode SaxNamespaceReader.startTag}.
+   * {@linkcode SaxNamespaceHandler.startTag}.
    *
    * [DOM Node `lookupPrefix`]:
    * https://dom.spec.whatwg.org/#dom-node-lookupprefix
@@ -133,7 +133,7 @@ export interface NamespaceResolver {
   lookupPrefix(namespace: string): string | undefined;
 }
 
-export interface SaxNamespaceReader extends SaxPrologReader {
+export interface SaxNamespaceHandler extends SaxPrologHandler {
   /**
    * Start tag.
    *
@@ -170,7 +170,7 @@ export interface SaxNamespaceReader extends SaxPrologReader {
    * </root>
    * ```
    *
-   * This handler is equivalent to {@linkcode SaxReader.entityRef} except it
+   * This handler is equivalent to {@linkcode SaxHandler.entityRef} except it
    * has access to the namespace resolver of the current element.
    * @param name - Name of the entity.
    * @param resolver - Namespace resolver relative to the current element,
@@ -189,7 +189,7 @@ export interface SaxNamespaceReader extends SaxPrologReader {
    * </element>
    * ```
    *
-   * This handler is equivalent to {@linkcode SaxReader.text} except it has
+   * This handler is equivalent to {@linkcode SaxHandler.text} except it has
    * access to the namespace resolver of the current element.
    * {@linkcode entityRef}.
    * @param content - Text content.
@@ -296,7 +296,7 @@ export const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
 export const XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
 
 /** @internal */
-class NamespaceResolver_ implements SaxReader, NamespaceResolver {
+class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
   // prefix -> namespace URI
   /** @internal */
   private namespaces_ = new Map<string, string>([
@@ -311,9 +311,9 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
   /** @internal */
   private elementPrefixes_: string[] = [];
   /** @internal */
-  private reader_: SaxNamespaceReader;
-  constructor(reader: SaxNamespaceReader) {
-    this.reader_ = reader;
+  private handler_: SaxNamespaceHandler;
+  constructor(handler: SaxNamespaceHandler) {
+    this.handler_ = handler;
   }
   lookupNamespace(prefix?: string | undefined): string | undefined {
     if (prefix === "") {
@@ -373,22 +373,22 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     return undefined;
   }
   xmlDecl?(declaration: XmlDeclaration) {
-    return this.reader_.xmlDecl?.(declaration);
+    return this.handler_.xmlDecl?.(declaration);
   }
   doctype?(doctype: Doctype) {
-    return this.reader_.doctype?.(doctype);
+    return this.handler_.doctype?.(doctype);
   }
   /** @internal */
   processingInstruction?(target: string, content: string) {
-    return this.reader_.processingInstruction!(target, content);
+    return this.handler_.processingInstruction!(target, content);
   }
   /** @internal */
   comment?(text: string) {
-    return this.reader_.comment!(text);
+    return this.handler_.comment!(text);
   }
   /** @internal */
   entityRef?(entityName: string) {
-    return !!this.reader_.entityRef?.(entityName, this);
+    return !!this.handler_.entityRef?.(entityName, this);
   }
   /** @internal */
   private parseQName_(name: string, isAttribute: boolean): QName {
@@ -485,14 +485,14 @@ class NamespaceResolver_ implements SaxReader, NamespaceResolver {
     const nsAttributes = this.handleAttributes_(attributes);
     const qName = this.parseQName_(name, false);
     this.elementPrefixes_.push(qName.prefix ?? "");
-    this.reader_.startTag(qName, nsAttributes, this);
+    this.handler_.startTag(qName, nsAttributes, this);
   }
   endTag(name: string) {
-    this.reader_.endTag(this.parseQName_(name, false), this);
+    this.handler_.endTag(this.parseQName_(name, false), this);
     this.popPrefixes_();
   }
   text(content: string, isCDataSection: boolean) {
-    return this.reader_.text(content, isCDataSection, this);
+    return this.handler_.text(content, isCDataSection, this);
   }
 }
 
@@ -504,7 +504,7 @@ export interface SaxNamespaceOptions extends SaxOptions {
  *
  * `SaxNamespaceParser` works the same way as {@linkcode SaxParser} except
  * instead of plain strings it resolves namespace information and passes
- * {@linkcode QName} to the reader for element and attribute names.
+ * {@linkcode QName} to the handler for element and attribute names.
  *
  * Additionally, document content handlers are provided with a
  * {@linkcode NamespaceResolver} to resolve namespaces and prefixes
@@ -512,20 +512,20 @@ export interface SaxNamespaceOptions extends SaxOptions {
  *
  * @see {@linkcode SaxParser}
  * @see {@linkcode SaxNamespaceOptions}
- * @see {@linkcode SaxNamespaceReader}
+ * @see {@linkcode SaxNamespaceHandler}
  * @see {@linkcode QName}
  * @see {@linkcode NamespaceResolver}
  */
 export class SaxNamespaceParser extends SaxParser {
   constructor(
-    reader: SaxNamespaceReader,
+    handler: SaxNamespaceHandler,
     options: SaxNamespaceOptions | undefined = undefined,
   ) {
-    super(new NamespaceResolver_(reader), options);
-    if (reader.processingInstruction == null) {
+    super(new NamespaceResolver_(handler), options);
+    if (handler.processingInstruction == null) {
       this.flags_ &= ~Flags.CAPTURE_PI;
     }
-    if (reader.comment == null) {
+    if (handler.comment == null) {
       this.flags_ &= ~Flags.CAPTURE_COMMENT;
     }
   }

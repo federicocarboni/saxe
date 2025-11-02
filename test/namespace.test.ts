@@ -3,7 +3,7 @@ import type {
   NamespaceAttributes,
   NamespaceResolver,
   QName,
-  SaxNamespaceReader,
+  SaxNamespaceHandler,
 } from "../src/index.ts";
 import {
   SaxNamespaceParser,
@@ -37,7 +37,7 @@ function copyQName(name: QName) {
 }
 
 // Builds a very basic DOM from an XML document
-class TreeBuilder implements SaxNamespaceReader {
+class TreeBuilder implements SaxNamespaceHandler {
   // lookupNamespace?(prefix: string | undefined): string | undefined {
   //   throw new Error("Method not implemented.");
   // }
@@ -373,7 +373,7 @@ describe("namespace", function() {
   });
 });
 
-class Reader implements SaxNamespaceReader {
+class Handler implements SaxNamespaceHandler {
   private depth_ = 0;
   constructor(
     private callback_: (
@@ -407,7 +407,7 @@ function readAttributes(
   input: string,
 ) {
   new SaxNamespaceParser(
-    new Reader((_resolver, _depth, _name, attributes) => {
+    new Handler((_resolver, _depth, _name, attributes) => {
       callback(attributes);
     }),
   ).parse(input);
@@ -519,7 +519,7 @@ function readResolver(
   input: string,
 ) {
   new SaxNamespaceParser(
-    new Reader((resolver, depth, _name, _attributes) => {
+    new Handler((resolver, depth, _name, _attributes) => {
       callback(resolver, depth);
     }),
   ).parse(input);

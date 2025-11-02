@@ -3,9 +3,9 @@
 import type {ReadStream} from "fs";
 import type {ReadTokens} from "../index.ts";
 
-import {SaxParser, SaxReader} from "../../src/index.ts";
+import {SaxParser, SaxHandler} from "../../src/index.ts";
 
-class Reader implements SaxReader {
+class Handler implements SaxHandler {
   comments = 0;
   processingInstructions = 0;
   startTags = 0;
@@ -39,8 +39,8 @@ export function saxe(
   callback: (tokens: ReadTokens | undefined, error?: unknown) => void,
   ignoreDtd?: boolean,
 ) {
-  const reader = new Reader();
-  const parser = new SaxParser(reader, {
+  const handler = new Handler();
+  const parser = new SaxParser(handler, {
     // maxAttributes: 20_000_000,
     maxNameLength: 10_000_000,
     maxTextLength: 10_000_010,
@@ -70,6 +70,6 @@ export function saxe(
       callback(undefined, error);
       return;
     }
-    callback(reader);
+    callback(handler);
   });
 }

@@ -4,8 +4,8 @@ export type {
   NamespaceAttributes,
   NamespaceResolver,
   QName,
+  SaxNamespaceHandler,
   SaxNamespaceOptions,
-  SaxNamespaceReader,
 } from "./namespace.ts";
 export {
   SaxNamespaceParser,
@@ -16,9 +16,9 @@ export type {
   Attributes,
   Doctype,
   EntityProvider,
+  SaxHandler,
   SaxOptions,
   SaxParseOptions,
-  SaxReader,
   XmlDeclaration,
 } from "./parser.ts";
 export {SaxParser} from "./parser.ts";

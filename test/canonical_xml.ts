@@ -1,10 +1,10 @@
-// This module implements a SaxReader which produces the Canonical XML
+// This module implements a SaxHandler which produces the Canonical XML
 // representation of the parsed document.
 // This was written to test the parser using the W3C XML Test Suite but is also
-// a good SaxReader example and may be used as a practical reference on how to
+// a good SaxHandler example and may be used as a practical reference on how to
 // use SaxParser.
 
-import type {Attributes, SaxReader} from "../src/index.ts";
+import type {Attributes, SaxHandler} from "../src/index.ts";
 
 function escapeDataChars(value: string) {
   return value.replace(/[&<>"\t\n\r]/g, (val) => {
@@ -28,7 +28,7 @@ function escapeDataChars(value: string) {
   });
 }
 
-export class CanonicalXmlWriter implements SaxReader {
+export class CanonicalXmlWriter implements SaxHandler {
   public output = "";
   // No XML or DOCTYPE declarations in Canonical XML
   // xmlDecl?(declaration: XmlDeclaration): void {

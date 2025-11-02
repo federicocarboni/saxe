@@ -1,8 +1,8 @@
 import {expect} from "chai";
-import type {Doctype, SaxOptions, SaxReader} from "../src/index.ts";
+import type {Doctype, SaxOptions, SaxHandler} from "../src/index.ts";
 import {SaxParser} from "../src/index.ts";
 
-class DoctypeDeclReader implements SaxReader {
+class DoctypeDeclHandler implements SaxHandler {
   public doctypeDecl: Doctype | undefined;
   doctype(doctype: Doctype): void {
     this.doctypeDecl = doctype;
@@ -13,12 +13,12 @@ class DoctypeDeclReader implements SaxReader {
 }
 
 function getDoctypeDeclOpt(chunks: string[], options?: SaxOptions) {
-  const docReader = new DoctypeDeclReader();
-  const parser = new SaxParser(docReader, options);
+  const docHandler = new DoctypeDeclHandler();
+  const parser = new SaxParser(docHandler, options);
   for (const chunk of chunks) {
     parser.parse(chunk, {stream: true});
   }
-  return docReader.doctypeDecl;
+  return docHandler.doctypeDecl;
 }
 function getDoctypeDecl(...chunks: string[]) {
   return getDoctypeDeclOpt(chunks);
