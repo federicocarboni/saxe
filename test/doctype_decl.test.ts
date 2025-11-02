@@ -1,5 +1,5 @@
 import {expect} from "chai";
-import type {Doctype, SaxOptions, SaxHandler} from "../src/index.ts";
+import type {Doctype, SaxHandler, SaxOptions} from "../src/index.ts";
 import {SaxParser} from "../src/index.ts";
 
 class DoctypeDeclHandler implements SaxHandler {
