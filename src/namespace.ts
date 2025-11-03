@@ -286,7 +286,7 @@ function checkQName(name: string) {
     (colon === 0 ||
       colon === name.length - 1 ||
       name.indexOf(":", colon + 1) !== -1 ||
-      !isNameStartChar(name.charCodeAt(colon + 1)))
+      !isNameStartChar(name.codePointAt(colon + 1)!))
   ) {
     throw new SaxError("InvalidQName");
   }
@@ -396,7 +396,7 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
     if (
       colon === 0 || colon === name.length - 1 ||
       name.indexOf(":", colon + 1) !== -1 ||
-      !isNameStartChar(name.charCodeAt(colon + 1))
+      !isNameStartChar(name.codePointAt(colon + 1)!)
     ) {
       throw new SaxError(
         "InvalidQName",

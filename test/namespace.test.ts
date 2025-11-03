@@ -179,6 +179,30 @@ describe("namespace", function() {
       } satisfies Node,
     );
   });
+  it("wf: astral characters", function() {
+    expect(getTree(`<😀:😀 xmlns:😀="urn:a" />`)).deep.equals(
+      {
+        name: {
+          localName: "😀",
+          name: "😀:😀",
+          namespace: "urn:a",
+          prefix: "😀",
+        },
+        attributes: [
+          [
+            {
+              localName: "😀",
+              name: "xmlns:😀",
+              namespace: "http://www.w3.org/2000/xmlns/",
+              prefix: "xmlns",
+            },
+            "urn:a",
+          ],
+        ],
+        children: [],
+      },
+    );
+  });
   it("not-wf: namespace not declared", function() {
     expect(() => getTree('<root xmlns="urn:default"><a:empty /></root>'))
       .throws().and.includes({
