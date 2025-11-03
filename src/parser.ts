@@ -297,7 +297,7 @@ export interface SaxOptions {
   /**
    * Maximum size allowed for the attributes in a single tag. Counts the total
    * combined length of names and values of attributes.
-   * @default 12_000_000
+   * @default 10_000_000
    */
   maxAttributesLength?: number | undefined;
   /**
