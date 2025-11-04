@@ -1758,7 +1758,6 @@ export class SaxParser {
       this.piEnd_();
     } else {
       this.state_ = State.PI_CONTENT;
-      this.parsePiContent_();
     }
   }
 
@@ -1823,9 +1822,6 @@ export class SaxParser {
       this.state_ = State.COMMENT_END;
     } else {
       this.state_ = State.COMMENT;
-      // Handle the rest of the chunk without incurring in the overhead of a
-      // next iteration in the main loop.
-      this.parseComment_();
     }
   }
 
@@ -1966,7 +1962,6 @@ export class SaxParser {
       this.startTagEnd_();
     } else if (isWhiteSpace(codeUnit)) {
       this.state_ = State.START_TAG;
-      this.parseStartTag_();
     } else if (codeUnit === Chars.SLASH) {
       this.state_ = State.EMPTY_TAG;
     } else {
@@ -2483,7 +2478,6 @@ export class SaxParser {
     if (isNameStartChar(codePoint)) {
       this.state_ = State.END_TAG;
       this.element_ = String.fromCodePoint(codePoint);
-      this.parseEndTag_();
     } else {
       throw new SaxError("InvalidEndTag");
     }
@@ -2494,7 +2488,6 @@ export class SaxParser {
     this.element_ += this.readNameCharacters_(this.element_.length);
     if (this.index_ < this.chunk_.length) {
       this.state_ = State.END_TAG_END;
-      this.parseEndTagEnd_();
     }
   }
 
