@@ -37,6 +37,8 @@ export const IGNORED_TEST_CASES = [
   "ibm-valid-P58-ibm58v01.xml",
   "ibm-valid-P58-ibm58v02.xml",
   "ibm-valid-P82-ibm82v01.xml",
+  "ibm-invalid-P58-ibm58i01.xml",
+  "ibm-invalid-P58-ibm58i02.xml",
 
   // Unparsed entity in entity value (validation)
   "rmt-e2e-55",
@@ -51,11 +53,7 @@ export const IGNORED_TEST_CASES = [
   "invalid-bo-6",
   "rmt-e2e-22",
   // Parameter entities
-  "ibm-invalid-P58-ibm58i01.xml",
-  "ibm-invalid-P58-ibm58i02.xml",
   "ibm-not-wf-P69-ibm69n05.xml",
-  "ibm-not-wf-P69-ibm69n06.xml",
-  "ibm-not-wf-P69-ibm69n07.xml",
   "rmt-e3e-13",
 
   // xml:space is not implemented
