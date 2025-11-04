@@ -116,7 +116,7 @@ Document Type Declaration processing may (at user option) be disabled altogether
 to prevent any attack based on them.
 
 ```js
-new SaxParser(reader, {
+new SaxParser(handler, {
   // Reject any DOCTYPE declaration
   dtd: "prohibit",
 
@@ -126,7 +126,7 @@ new SaxParser(reader, {
   // Enforce stricter limits over strings and values
   // collected during parsing.
   maxNameLength: 500,
-  maxAttributes: 500,
+  maxAttributesLength: 1000,
   maxTextLength: 10000,
   maxEntityLength: 1000,
   maxEntityDepth: 5,
