@@ -8,7 +8,7 @@ case. They are intended to validate the general performance characteristics of
 each implementation in different conditions.
 
 Data reported below is only indicative and is not as accurate as it could be.
-Last run on 15/11/2025:
+Last run on 2025/11/05:
 
 - saxe git-b376dfc
 - [isaacs/sax-js] v1.4.2
