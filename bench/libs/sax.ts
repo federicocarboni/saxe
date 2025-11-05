@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import type {ReadStream} from "fs";
-import type {ReadTokens} from "../index.ts";
+import type {BenchOptions, ReadTokens} from "../index.ts";
 
 import sax1 from "sax";
 
@@ -11,6 +11,7 @@ sax1.MAX_BUFFER_LENGTH = 20_000_000;
 export function sax(
   readable: ReadStream,
   callback: (tokens: ReadTokens | undefined, error?: unknown) => void,
+  options?: BenchOptions,
 ) {
   let comments = 0;
   let processingInstructions = 0;
@@ -20,7 +21,10 @@ export function sax(
   let attributes = 0;
 
   // Kept on default configuration, strict mode is not compliant anyway.
-  const parser = new sax1.SAXParser();
+  const parser = new sax1.SAXParser(false, {xmlns: options?.namespaces});
+
+  parser.onerror = () => {
+  };
 
   parser.oncomment = () => {
     ++comments;
@@ -30,11 +34,7 @@ export function sax(
     ++processingInstructions;
   };
 
-  parser.onattribute = () => {
-    ++attributes;
-  };
-
-  parser.onopentagstart = (tag) => {
+  parser.onopentag = () => {
     ++startTags;
   };
 
@@ -45,8 +45,6 @@ export function sax(
   parser.ontext = () => {
     ++textNodes;
   };
-
-  // A little help for CDATA
   parser.oncdata = () => {
     ++textNodes;
   };

@@ -1,13 +1,14 @@
 /* eslint-disable */
 
 import type {ReadStream} from "fs";
-import type {ReadTokens} from "../index.ts";
+import type {BenchOptions, ReadTokens} from "../index.ts";
 
 import {SaxesParser} from "saxes";
 
 export function saxes(
   readable: ReadStream,
   callback: (tokens: ReadTokens | undefined, error?: unknown) => void,
+  options?: BenchOptions,
 ) {
   let comments = 0;
   let processingInstructions = 0;
@@ -18,7 +19,7 @@ export function saxes(
 
   // Kept on default configuration, strict mode is not compliant anyway.
   const parser = new SaxesParser({
-    // xmlns: true
+    xmlns: options?.namespaces,
   });
 
   parser.on("comment", () => {
@@ -29,11 +30,7 @@ export function saxes(
     ++processingInstructions;
   });
 
-  parser.on("attribute", () => {
-    ++attributes;
-  });
-
-  parser.on("opentag", (tag) => {
+  parser.on("opentag", () => {
     ++startTags;
   });
 
@@ -41,11 +38,10 @@ export function saxes(
     ++endTags;
   });
 
+  // text and cdata are separate events
   parser.on("text", () => {
     ++textNodes;
   });
-
-  // A little help for CDATA
   parser.on("cdata", () => {
     ++textNodes;
   });
