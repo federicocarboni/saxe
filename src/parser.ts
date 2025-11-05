@@ -404,14 +404,13 @@ export const enum Flags {
   CAPTURE_PI = 1 << 0,
   // Capture Comments or ignore them.
   CAPTURE_COMMENT = 1 << 1,
-  EMIT_CDATA_SECTION = 1 << 2,
   // These are boolean properties in SaxOptions
-  OPT_INCOMPLETE_TEXT_NODES = 1 << 3,
-  // OPT_TEXT_ONLY_ENTITIES = 1 << 4,
+  OPT_INCOMPLETE_TEXT_NODES = 1 << 2,
 
   // Runtime flags:
+  SEEN_ROOT = 1 << 3,
   SEEN_DOCTYPE = 1 << 4,
-  SEEN_ROOT = 1 << 5,
+  STANDALONE = 1 << 5,
   EXTERNAL_ID_PUBLIC = 1 << 6,
   EXTERNAL_ID_SYSTEM = 1 << 7,
   IGNORE_INT_SUBSET_DECL = 1 << 8,
@@ -632,15 +631,6 @@ export class SaxParser {
   //  * `xml:lang` attribute.
   //  */
   // readonly xmlLang?: string | undefined;
-
-  // XML Declaration attributes are held onto because they may be useful
-  // (e.g. XML 1.1) in the future?
-  // /** @internal */
-  // private version_: string | undefined = undefined;
-  // /** @internal */
-  // private encoding_: string | undefined = undefined;
-  /** @internal */
-  private standalone_: boolean | undefined = undefined;
 
   constructor(
     handler: SaxHandler,
@@ -893,7 +883,9 @@ export class SaxParser {
     const xmlDecl = parseXmlDecl(this.element_);
     // this.version_ = xmlDecl.version;
     // this.encoding_ = xmlDecl.encoding;
-    this.standalone_ = xmlDecl.standalone;
+    if (xmlDecl.standalone) {
+      this.flags_ |= Flags.STANDALONE;
+    }
     this.handler_.xmlDecl?.(xmlDecl);
     this.state_ = State.MISC;
     this.element_ = "";
@@ -1143,7 +1135,7 @@ export class SaxParser {
     }
     ++this.index_;
     this.state_ = State.INTERNAL_SUBSET;
-    if (!this.standalone_) {
+    if (!(this.flags_ & Flags.STANDALONE)) {
       this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
     }
   }
@@ -2249,7 +2241,7 @@ export class SaxParser {
           // [..] [For] non-validating processors [..], the rule that an entity
           // must be declared is a well-formedness constraint only if
           // standalone="yes"
-          this.standalone_ ||
+          (this.flags_ & Flags.STANDALONE) ||
           // It is an error if an attribute value contains a reference to an
           // entity for which no declaration has been read
           // This is not a fatal error but recovering from here is too
