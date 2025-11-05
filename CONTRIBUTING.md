@@ -57,14 +57,11 @@ instead.
 
 ### Style Guide
 
-This library follows the [Google JavaScript Style Guide], except it uses double
+This library follows the [Google TypeScript Style Guide], except it uses double
 quotes `"` instead of single quotes `'` for regular strings.
 
-That guide was intended for code targeting the Google Closure Compiler so ignore
-anything which is not relevant for TypeScript or plain JavaScript.
-
-[Google JavaScript Style Guide]:
-https://google.github.io/styleguide/jsguide.html
+[Google TypeScript Style Guide]:
+https://google.github.io/styleguide/tsguide.html
 
 #### Short Style Guide
 
