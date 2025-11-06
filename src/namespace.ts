@@ -162,25 +162,6 @@ export interface SaxNamespaceHandler extends SaxPrologHandler {
    */
   endTag(name: QName, resolver: NamespaceResolver): void;
   /**
-   * A general entity reference.
-   *
-   * ```xml
-   * <root>
-   *   &entity;
-   * </root>
-   * ```
-   *
-   * This handler is equivalent to {@linkcode SaxHandler.entityRef} except it
-   * has access to the namespace resolver of the current element.
-   * @param name - Name of the entity.
-   * @param resolver - Namespace resolver relative to the current element,
-   * should not be used outside the handler.
-   * @returns - Returns `true` if entity `name` was recognized. If the function
-   * is not defined or returns `false` the parser throws an `UndeclaredEntity`
-   * error.
-   */
-  entityRef?(name: string, resolver: NamespaceResolver): boolean;
-  /**
    * Text content.
    *
    * ```xml
@@ -385,10 +366,6 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
   /** @internal */
   comment?(text: string) {
     return this.handler_.comment!(text);
-  }
-  /** @internal */
-  entityRef?(entityName: string) {
-    return !!this.handler_.entityRef?.(entityName, this);
   }
   /** @internal */
   private parseQName_(name: string, isAttribute: boolean): QName {

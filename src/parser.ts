@@ -190,27 +190,6 @@ export interface SaxHandler extends SaxPrologHandler {
    */
   endTag(name: string): void;
   /**
-   * A general entity reference in document content for which the parser has no
-   * declarations. Undeclared entities in attribute values are always an error.
-   *
-   * ```xml
-   * <root>
-   *   &entity;
-   * </root>
-   * ```
-   *
-   * This function is intended to be called only for references to undeclared
-   * entities. If the replacement text of entities can be provided, consider
-   * using {@linkcode SaxOptions.entityProvider} instead so that entities are
-   * expanded automatically.
-   *
-   * @param name - Name of the entity.
-   * @returns - Returns `true` if entity `name` was recognized. If the function
-   * is not defined or returns `false` the parser throws an `UndeclaredEntity`
-   * error.
-   */
-  entityRef?(name: string): boolean;
-  /**
    * Text content.
    *
    * ```xml
@@ -223,8 +202,6 @@ export interface SaxHandler extends SaxPrologHandler {
    * Text Node. {@linkcode SaxOptions.incompleteTextNodes} may be used to emit
    * text events as soon as more data is available.
    *
-   * Entity references not recognized by the parser are handled in
-   * {@linkcode entityRef}.
    * @param content - Text content.
    * @param isCDataSection - Boolean value `true` if content originated from a
    * CDATA section or `false` if it is regular text.
@@ -2230,80 +2207,62 @@ export class SaxParser {
       ) {
         throw new SaxError("ExternalEntity", {entity: this.entity_});
       }
-      // Allow the application to set a default value for an entity not
-      // declared in internal markup declarations.
-      if (entityValue === EntityDecl.EXTERNAL || entityValue === undefined) {
+      if (
+        // WFC: Entity Declared
+        // When standalone="yes" the application is not allowed to provide a
+        // value for the entity because it would violate the WFC.
+        !(this.flags_ & Flags.STANDALONE) &&
+        // External entities are not resolved by the parser, control over them
+        // is delegated to the user supplied entity provider.
+        (entityValue === undefined || entityValue === EntityDecl.EXTERNAL)
+      ) {
+        // Allow the application to provide values for entities.
         entityValue = this.entityProvider_?.getEntity(this.entity_);
       }
-      if (entityValue == null) {
-        if (
-          // WFC: Entity Declared
-          // [..] [For] non-validating processors [..], the rule that an entity
-          // must be declared is a well-formedness constraint only if
-          // standalone="yes"
-          (this.flags_ & Flags.STANDALONE) ||
-          // It is an error if an attribute value contains a reference to an
-          // entity for which no declaration has been read
-          // This is not a fatal error but recovering from here is too
-          // complicated and not generally useful (an application can still
-          // just return any value from getGeneralEntity to suppress the error)
-          this.otherState_ === State.START_TAG_ATTR_VALUE_QUOTED ||
-          // Allow the application to handle undeclared entities in content.
-          !this.handler_.entityRef?.(this.entity_)
-        ) {
-          throw new SaxError("UndeclaredEntity", {
-            entity: this.entity_,
-          });
-        }
-      } else {
-        this.entityLength_ += entityValue.length;
-        if (
-          this.entityLength_ > this.maxEntityLength_ ||
-          this.entityStack_.length >= this.maxEntityDepth_
-        ) {
-          throw new SaxError("LimitExceeded");
-        }
-        this.entityStack_.push(this.entity_);
-        const index = this.index_;
-        const chunk = this.chunk_;
-        const quote = this.quote_;
-        const elements = this.elements_;
-        const otherState = this.otherState_;
-
-        this.index_ = 0;
-        this.chunk_ = "" + entityValue;
-        this.quote_ = -1;
-        this.elements_ = [];
-        this.state_ = this.otherState_;
-        this.otherState_ = 0;
-        this.entity_ = "";
-
-        while (this.index_ < this.chunk_.length) {
-          this.parseStep_();
-        }
-
-        // https://www.w3.org/TR/REC-xml/#intern-replacement
-        // [...] references MUST be contained entirely within the literal entity
-        // value.
-        // TODO: error handling
-        // if (isAttValue && this.state_ !== State.START_TAG_ATTR_VALUE_QUOTED) {
-        //   throw this.createSaxError_("INVALID_ATTRIBUTE_VALUE");
-        // }
-        // Entity value must match content production
-        if (this.elements_.length !== 0 || this.state_ !== otherState) {
-          throw new SaxError("UnexpectedEof");
-        }
-
-        this.entityStack_.pop();
-        if (this.entityStack_.length === 0) {
-          this.entityLength_ = 0;
-        }
-        this.index_ = index;
-        this.chunk_ = chunk;
-        this.quote_ = quote;
-        this.elements_ = elements;
-        this.otherState_ = this.state_;
+      if (entityValue == null || entityValue === EntityDecl.EXTERNAL) {
+        // #22: Undeclared entities are not supported anymore. If applications
+        // wish to recover they can return a default value in entity provider.
+        throw new SaxError("UndeclaredEntity", {entity: this.entity_});
       }
+      this.entityLength_ += entityValue.length;
+      if (
+        this.entityLength_ > this.maxEntityLength_ ||
+        this.entityStack_.length >= this.maxEntityDepth_
+      ) {
+        throw new SaxError("LimitExceeded");
+      }
+      this.entityStack_.push(this.entity_);
+      const index = this.index_;
+      const chunk = this.chunk_;
+      const quote = this.quote_;
+      const elements = this.elements_;
+      const otherState = this.otherState_;
+      this.index_ = 0;
+      this.chunk_ = "" + entityValue;
+      this.quote_ = -1;
+      this.elements_ = [];
+      this.state_ = this.otherState_;
+      this.otherState_ = 0;
+      this.entity_ = "";
+      while (this.index_ < this.chunk_.length) {
+        this.parseStep_();
+      }
+      // https://www.w3.org/TR/REC-xml/#intern-replacement
+      // [...] references MUST be contained entirely within the literal entity
+      // value.
+      // Entity value must match content production
+      if (this.elements_.length !== 0 || this.state_ !== otherState) {
+        throw new SaxError("UnexpectedEof");
+      }
+      this.entityStack_.pop();
+      if (this.entityStack_.length === 0) {
+        this.entityLength_ = 0;
+      }
+      this.index_ = index;
+      this.chunk_ = chunk;
+      this.quote_ = quote;
+      this.elements_ = elements;
+      this.otherState_ = this.state_;
     }
     this.state_ = this.otherState_;
     this.otherState_ = 0;

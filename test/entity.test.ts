@@ -1,72 +1,47 @@
 import {expect} from "chai";
-import type {Attributes, SaxHandler} from "../src/index.ts";
-import {SaxParser} from "../src/index.ts";
-import {CanonicalXmlWriter} from "./canonical_xml.ts";
+import {toCanonicalOpt} from "./template.ts";
 
-class CanonicalEntityHandler implements SaxHandler {
-  public entity: string | undefined;
-  public canonical: CanonicalXmlWriter;
-  constructor() {
-    this.canonical = new CanonicalXmlWriter();
-  }
-  entityRef(entity: string): boolean {
-    this.entity = entity;
-    return true;
-  }
-  startTag(name: string, attributes: Attributes): void {
-    this.canonical.startTag(name, attributes);
-  }
-  endTag(name: string): void {
-    this.canonical.endTag(name);
-  }
-  text(content: string): void {
-    this.canonical.text(content);
-  }
-}
-
-function getEntity(entities: Record<string, string>, ...chunks: string[]) {
-  const handler = new CanonicalEntityHandler();
-  const parser = new SaxParser(handler, {
+function toCanonicalWithEntities(
+  entities: Record<string, string>,
+  ...chunks: string[]
+) {
+  return toCanonicalOpt(chunks, {
     entityProvider: {
       getEntity(entity: string): string | undefined {
-        return entities.hasOwnProperty(entity)
+        return Object.hasOwn(entities, entity)
           ? entities[entity]
           : undefined;
       },
     },
   });
-  for (const chunk of chunks) {
-    parser.parse(chunk, {stream: true});
-  }
-  parser.parse();
-  return {entity: handler.entity, output: handler.canonical.output};
 }
 
 describe("general entity reference", function() {
   it("wf: general entity reference in content", function() {
-    expect(getEntity({}, "<root>&entity;</root>").entity).equals("entity");
+    expect(toCanonicalWithEntities({entity: "entity"}, "<root>&entity;</root>"))
+      .equals("<root>entity</root>");
   });
   it("wf: declared general entity reference in content", function() {
     expect(
-      getEntity(
+      toCanonicalWithEntities(
         {},
         "<!DOCTYPE root [<!ENTITY entity '<element attribute=&#34;value&#34;></element>'>]><root>&entity;</root>",
-      ).output,
+      ),
     ).equals('<root><element attribute="value"></element></root>');
   });
   it("wf: general entity reference in attribute value", function() {
     expect(
-      getEntity({
+      toCanonicalWithEntities({
         entity: "entity value",
-      }, '<root value="&entity;"></root>').output,
+      }, '<root value="&entity;"></root>'),
     ).equals('<root value="entity value"></root>');
   });
   it("not-wf: undeclared general entity reference in attribute value", function() {
-    expect(() => getEntity({}, '<root value="&entity;"></root>'))
+    expect(() => toCanonicalWithEntities({}, '<root value="&entity;"></root>'))
       .to.throw().and.have.property("name", "UndeclaredEntity");
   });
   it("not-wf: general entity reference starting with invalid character", function() {
-    expect(() => getEntity({}, '<root value="&.entity;"></root>'))
+    expect(() => toCanonicalWithEntities({}, '<root value="&.entity;"></root>'))
       .to.throw().and.have.property("name", "InvalidEntityRef");
   });
 });
