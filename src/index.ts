@@ -19,6 +19,7 @@ export type {
   SaxHandler,
   SaxOptions,
   SaxParseOptions,
+  SaxPrologHandler,
   XmlDeclaration,
 } from "./parser.ts";
 export {SaxParser} from "./parser.ts";
