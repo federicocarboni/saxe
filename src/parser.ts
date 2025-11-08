@@ -259,7 +259,7 @@ export interface SaxOptions {
    *   `InvalidDoctypeDecl` if the document has one.
    * - `"ignore"` - `DOCTYPE` declarations are allowed and checked for syntax
    *   errors but do not affect parsing of the document.
-   * @default "process"
+   * @defaultValue "process"
    */
   dtd?: "process" | "prohibit" | "ignore" | undefined;
   // Limiting the memory usage of the parser is one of, if not the, most
@@ -268,30 +268,30 @@ export interface SaxOptions {
   /**
    * Maximum size allowed for a markup identifier. Applies to tag names, public
    * and system identifiers.
-   * @default 2_000
+   * @defaultValue 2_000
    */
   maxNameLength?: number | undefined;
   /**
    * Maximum size allowed for the attributes in a single tag. Counts the total
    * combined length of names and values of attributes.
-   * @default 10_000_000
+   * @defaultValue 10_000_000
    */
   maxAttributesLength?: number | undefined;
   /**
    * Maximum size allowed for a text node.
    *
    * Also applies to comments and processing instructions.
-   * @default 10_000_000
+   * @defaultValue 10_000_000
    */
   maxTextLength?: number | undefined;
   /**
    * Maximum size allowed for an entity value, including nested entities.
-   * @default 1_000_000
+   * @defaultValue 1_000_000
    */
   maxEntityLength?: number | undefined;
   /**
    * Maximum nesting depth allowed for entities.
-   * @default 10
+   * @defaultValue 10
    */
   maxEntityDepth?: number | undefined;
   /**
@@ -308,7 +308,7 @@ export interface SaxOptions {
    *
    * Enabling this option prevents any buffering and causes the parser to emit
    * {@linkcode SaxHandler.text} as soon as data becomes available.
-   * @default false
+   * @defaultValue false
    */
   incompleteTextNodes?: boolean | undefined;
 }
@@ -457,7 +457,7 @@ export interface SaxParseOptions {
    * A boolean value indicating whether additional data follows in subsequent
    * calls to {@linkcode SaxParser.parse}. Set to `true` to process input in
    * chunks, and `false` for the final chunk or if the input is not chunked.
-   * @default false
+   * @defaultValue false
    */
   stream?: boolean | undefined;
 }
