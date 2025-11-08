@@ -172,7 +172,6 @@ export interface SaxNamespaceHandler extends SaxPrologHandler {
    *
    * This handler is equivalent to {@linkcode SaxHandler.text} except it has
    * access to the namespace resolver of the current element.
-   * {@linkcode entityRef}.
    * @param content - Text content.
    * @param isCDataSection - Boolean value `true` if content originated from a
    * CDATA section or `false` if it is regular text.
