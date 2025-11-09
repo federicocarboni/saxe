@@ -10,7 +10,7 @@ import {SaxError} from "./error.ts";
 import {parseXmlDecl} from "./xml_decl.ts";
 
 /**
- * XML declaration (XMLDecl).
+ * XML declaration.
  *
  * ```xml
  * <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
@@ -35,7 +35,7 @@ export interface XmlDeclaration {
    */
   encoding?: string | undefined;
   /**
-   * Standalone value declared in the XML Declaration.
+   * Standalone value declared in the XML declaration.
    *
    * `true` when set to `yes`, `false` when set to `no`, or `undefined` when
    * unspecified.
@@ -47,7 +47,7 @@ export interface XmlDeclaration {
  * Document type declaration.
  *
  * ```xml
- * <!DOCTYPE example PUBLIC "-//Example//example doc" "http://example.org/example.dtd">
+ * <!DOCTYPE example PUBLIC "-//Example//example" "./example.dtd">
  * ```
  */
 export interface Doctype {
@@ -128,14 +128,14 @@ export interface SaxPrologHandler {
    * <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
    * ```
    *
-   * @param declaration -
+   * @param xmlDecl -
    */
-  xmlDecl?(declaration: XmlDeclaration): void;
+  xmlDecl?(xmlDecl: XmlDeclaration): void;
   /**
    * Document type declaration.
    *
    * ```xml
-   * <!DOCTYPE example PUBLIC "-//Example//example doc" "http://example.org/example.dtd">
+   * <!DOCTYPE example PUBLIC "-//Example//example" "./example.dtd">
    * ```
    *
    * This handler is called before parsing any markup declarations.
@@ -149,9 +149,10 @@ export interface SaxPrologHandler {
    * <?target content?>
    * ```
    *
-   * @param target - PI target, used to identify the application to which the
-   * instruction is directed.
-   * @param content - PI content, whitespace is not trimmed or normalized.
+   * @param target - Processing instruction target, used to identify the
+   * application to which the instruction is directed.
+   * @param content - Processing instruction content, whitespace is not trimmed
+   * or normalized.
    */
   processingInstruction?(target: string, content: string): void;
   /**
