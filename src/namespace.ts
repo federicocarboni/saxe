@@ -259,17 +259,17 @@ class NamespaceAttributes_ implements NamespaceAttributes {
   }
 }
 
-function checkQName(name: string) {
+/**
+ * Returns `true` if the provided name is a well-formed *QName*. `name` must
+ * be a well-formed *Name*.
+ * @internal
+ */
+function isNameWellFormedQName(name: string) {
   const colon = name.indexOf(":");
-  if (
-    colon !== -1 &&
-    (colon === 0 ||
-      colon === name.length - 1 ||
-      name.indexOf(":", colon + 1) !== -1 ||
-      !isNameStartChar(name.codePointAt(colon + 1)!))
-  ) {
-    throw new SaxError("InvalidQName");
-  }
+  return colon === -1 ||
+    colon !== 0 && colon !== name.length - 1 &&
+      name.indexOf(":", colon + 1) === -1 &&
+      isNameStartChar(name.codePointAt(colon + 1)!);
 }
 
 export const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
@@ -368,17 +368,13 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
   }
   /** @internal */
   private parseQName_(name: string, isAttribute: boolean): QName {
-    const colon = name.indexOf(":");
-    if (
-      colon === 0 || colon === name.length - 1 ||
-      name.indexOf(":", colon + 1) !== -1 ||
-      !isNameStartChar(name.codePointAt(colon + 1)!)
-    ) {
+    if (!isNameWellFormedQName(name)) {
       throw new SaxError(
         "InvalidQName",
         isAttribute ? {attribute: name} : {element: name},
       );
     }
+    const colon = name.indexOf(":");
     const prefix = colon === -1 ? undefined : name.slice(0, colon);
     if (!isAttribute && prefix === "xmlns") {
       // xmlns must not appear as the prefix of element names
@@ -507,7 +503,9 @@ export class SaxNamespaceParser extends SaxParser {
   }
   /** @internal */
   protected override checkQName_(name: string) {
-    checkQName(name);
+    if (!isNameWellFormedQName(name)) {
+      throw new SaxError("InvalidQName");
+    }
   }
   /** @internal */
   protected override checkNcName_(name: string): void {
