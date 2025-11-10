@@ -4,8 +4,8 @@ import type {
   Attributes,
   Doctype,
   SaxHandler,
+  SaxLexicalHandler,
   SaxOptions,
-  SaxPrologHandler,
   XmlDeclaration,
 } from "./parser.ts";
 import {Flags, SaxParser} from "./parser.ts";
@@ -133,7 +133,7 @@ export interface NamespaceResolver {
   lookupPrefix(namespace: string): string | undefined;
 }
 
-export interface SaxNamespaceHandler extends SaxPrologHandler {
+export interface SaxNamespaceHandler extends SaxLexicalHandler {
   /**
    * Start tag.
    *
@@ -173,14 +173,11 @@ export interface SaxNamespaceHandler extends SaxPrologHandler {
    * This handler is equivalent to {@linkcode SaxHandler.text} except it has
    * access to the namespace resolver of the current element.
    * @param content - Text content.
-   * @param isCDataSection - Boolean value `true` if content originated from a
-   * CDATA section or `false` if it is regular text.
    * @param resolver - Namespace resolver relative to the current element,
    * should not be used outside the handler.
    */
   text(
     content: string,
-    isCDataSection: boolean,
     resolver: NamespaceResolver,
   ): void;
 }
@@ -367,6 +364,14 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
     return this.handler_.comment!(text);
   }
   /** @internal */
+  startCDataSection?(): void {
+    return this.handler_.startCDataSection?.();
+  }
+  /** @internal */
+  endCDataSection?(): void {
+    return this.handler_.endCDataSection?.();
+  }
+  /** @internal */
   private parseQName_(name: string, isAttribute: boolean): QName {
     if (!isNameWellFormedQName(name)) {
       throw new SaxError(
@@ -463,8 +468,8 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
     this.handler_.endTag(this.parseQName_(name, false), this);
     this.popPrefixes_();
   }
-  text(content: string, isCDataSection: boolean) {
-    return this.handler_.text(content, isCDataSection, this);
+  text(content: string) {
+    return this.handler_.text(content, this);
   }
 }
 

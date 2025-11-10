@@ -120,7 +120,7 @@ export interface Attributes {
   [Symbol.iterator](): IterableIterator<[string, string]>;
 }
 
-export interface SaxPrologHandler {
+export interface SaxLexicalHandler {
   /**
    * XML declaration of the document.
    *
@@ -165,12 +165,28 @@ export interface SaxPrologHandler {
    * @param content - Comment content, whitespace is not trimmed or normalized.
    */
   comment?(content: string): void;
+  /**
+   * Start of a CDATA section.
+   *
+   * ```xml
+   * <![CDATA[
+   * ```
+   */
+  startCDataSection?(): void;
+  /**
+   * End of a CDATA section.
+   *
+   * ```xml
+   * ]]>
+   * ```
+   */
+  endCDataSection?(): void;
 }
 
 /**
  * https://www.w3.org/TR/REC-xml/
  */
-export interface SaxHandler extends SaxPrologHandler {
+export interface SaxHandler extends SaxLexicalHandler {
   /**
    * Start tag.
    *
@@ -204,10 +220,8 @@ export interface SaxHandler extends SaxPrologHandler {
    * text events as soon as more data is available.
    *
    * @param content - Text content.
-   * @param isCDataSection - Boolean value `true` if content originated from a
-   * CDATA section or `false` if it is regular text.
    */
-  text(content: string, isCDataSection: boolean): void;
+  text(content: string): void;
 }
 
 export interface EntityProvider {
@@ -2152,7 +2166,7 @@ export class SaxParser {
       this.state_ !== State.TEXT_CONTENT ||
       this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES
     ) {
-      this.handler_.text(this.content_, false);
+      this.handler_.text(this.content_);
       this.content_ = "";
     }
     ++this.index_;
@@ -2340,6 +2354,7 @@ export class SaxParser {
     if (this.element_ === "CDATA[") {
       this.state_ = State.CDATA_SECTION;
       this.element_ = "";
+      this.handler_.startCDataSection?.();
     } else if (this.element_.length === 6) {
       throw new SaxError("InvalidContent");
     }
@@ -2380,7 +2395,7 @@ export class SaxParser {
         }
       }
       if (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES) {
-        this.handler_.text(this.content_, true);
+        this.handler_.text(this.content_);
         this.content_ = "";
       }
     } else {
@@ -2405,7 +2420,8 @@ export class SaxParser {
     const codeUnit = this.chunk_.charCodeAt(this.index_);
     if (codeUnit === Chars.GT) {
       ++this.index_;
-      this.handler_.text(this.content_, true);
+      this.handler_.text(this.content_);
+      this.handler_.endCDataSection?.();
       this.state_ = State.TEXT_CONTENT;
       this.otherState_ = 0;
       this.content_ = "";

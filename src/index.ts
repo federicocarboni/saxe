@@ -17,9 +17,9 @@ export type {
   Doctype,
   EntityProvider,
   SaxHandler,
+  SaxLexicalHandler,
   SaxOptions,
   SaxParseOptions,
-  SaxPrologHandler,
   XmlDeclaration,
 } from "./parser.ts";
 export {SaxParser} from "./parser.ts";
