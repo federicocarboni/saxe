@@ -8,7 +8,7 @@ export interface ReadTokens {
   textNodes: number;
   attributes: number;
 }
-import {summary, bench, run} from "mitata";
+import {bench, run, summary} from "mitata";
 
 import type {ReadStream} from "fs";
 import fs from "fs";
@@ -109,17 +109,19 @@ for (const testCase of SYNTHETIC) {
   });
   summary(() => {
     bench("saxe (ns) " + testCase, function*() {
-      yield () => runTestCaseSaxe("../test/data/" + testCase, {namespaces: true});
+      yield () =>
+        runTestCaseSaxe("../test/data/" + testCase, {namespaces: true});
     });
     bench("sax (ns) " + testCase, function*() {
-      yield () => runTestCaseSax("../test/data/" + testCase, {namespaces: true});
+      yield () =>
+        runTestCaseSax("../test/data/" + testCase, {namespaces: true});
     });
     bench("saxes (ns) " + testCase, function*() {
-      yield () => runTestCaseSaxes("../test/data/" + testCase, {namespaces: true});
+      yield () =>
+        runTestCaseSaxes("../test/data/" + testCase, {namespaces: true});
     });
   });
 }
-
 
 const TEST_CASES = [
   "dblp.xml",
