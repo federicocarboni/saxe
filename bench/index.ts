@@ -13,7 +13,7 @@ import {bench, run, summary} from "mitata";
 import type {ReadStream} from "fs";
 import fs from "fs";
 import {SaxError} from "../src/error.ts";
-import {SaxOptions} from "../src/parser.ts";
+import type {SaxOptions} from "../src/parser.ts";
 import {sax} from "./libs/sax.ts";
 import {saxe} from "./libs/saxe.ts";
 import {saxes} from "./libs/saxes.ts";
@@ -162,11 +162,10 @@ for (const testCase of TEST_CASES) {
 }
 
 await run({
-  format: {
-    json: {
-      debug: false,
-      samples: false,
-    },
-  },
-  // format: "markdown"
+  // format: {
+  //   json: {
+  //     debug: false,
+  //     samples: false,
+  //   },
+  // },
 });
