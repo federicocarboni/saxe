@@ -1,5 +1,8 @@
 import {expect} from "chai";
 import {SaxError} from "../src/error.ts";
+import type {SaxLexicalHandler} from "../src/index.ts";
+import {SaxParser} from "../src/index.ts";
+import {CanonicalXmlWriter} from "./canonical_xml.ts";
 import {toCanonical} from "./template.ts";
 
 describe("tags", function() {
@@ -72,14 +75,45 @@ describe("text content", function() {
   });
 });
 
+class CDataCanonicalXml extends CanonicalXmlWriter
+  implements SaxLexicalHandler
+{
+  private isCData = false;
+  startCDataSection(): void {
+    this.output += "<![CDATA[";
+    this.isCData = true;
+  }
+  override text(content: string): void {
+    if (this.isCData) {
+      this.output += content;
+    } else {
+      super.text(content);
+    }
+  }
+  endCDataSection(): void {
+    this.output += "]]>";
+    this.isCData = false;
+  }
+}
+
+function toCDataCanonical(...chunks: string[]) {
+  const handler = new CDataCanonicalXml();
+  const parser = new SaxParser(handler);
+  for (const chunk of chunks) {
+    parser.parse(chunk, {stream: true});
+  }
+  parser.parse();
+  return handler.output;
+}
+
 describe("CDATA sections", function() {
   it("wf: CDATA section containing multiple brackets", function() {
-    expect(toCanonical("<root><![CDATA[ [[[[[[[[]]]]]]]]]]></root>"))
-      .equals("<root> [[[[[[[[]]]]]]]]</root>");
+    expect(toCDataCanonical("<root><![CDATA[ [[[[[[[[]]]]]]]]]]></root>"))
+      .equals("<root><![CDATA[ [[[[[[[[]]]]]]]]]]></root>");
   });
   it("wf: CDATA section split across multiple chunks", function() {
     expect(
-      toCanonical(
+      toCDataCanonical(
         "<root><![CDATA[",
         "]",
         "]",
@@ -91,6 +125,6 @@ describe("CDATA sections", function() {
         "</root>",
       ),
     )
-      .equals("<root>]]content]]content]]</root>");
+      .equals("<root><![CDATA[]]content]]]]>content]]</root>");
   });
 });
