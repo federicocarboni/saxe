@@ -9,7 +9,7 @@
   "dependencies": {
     "fast-xml-parser": "^5.3.1",
     "mitata": "^1.0.34",
-    "sax": "^1.4.2",
+    "sax": "^1.4.3",
     "saxes": "^6.0.0",
     "tsm": "^2.3.0"
   },
