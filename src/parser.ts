@@ -278,7 +278,7 @@ export interface SaxOptions {
    * https://cheatsheetseries.owasp.org/cheatsheets/XML_Security_Cheat_Sheet.html#xml-entity-expansion
    * [XXE attacks]:
    * https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
-   * [XML DoS attacks]
+   * [XML DoS attacks]:
    * https://cheatsheetseries.owasp.org/cheatsheets/XML_Security_Cheat_Sheet.html#quadratic-blowup
    *
    * ### `"prohibit"`
