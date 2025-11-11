@@ -20,14 +20,14 @@ function testLimit(chunk: string, options?: SaxOptions) {
   expect(() => {
     const parser = new SaxParser(new CanonicalXmlWriter(), {
       ...options,
-      incompleteTextNodes: true,
+      incrementalText: true,
     });
     parser.parse(chunk);
   }).throws().instanceOf(SaxError).includes({name: "LimitExceeded"});
   expect(() => {
     const parser = new SaxParser(new CanonicalXmlWriter(), {
       ...options,
-      incompleteTextNodes: true,
+      incrementalText: true,
     });
     for (const c of chunk) {
       parser.parse(c, {stream: true});

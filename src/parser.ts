@@ -216,7 +216,7 @@ export interface SaxHandler extends SaxLexicalHandler {
    * ```
    *
    * By default, the parser collects text content as if it were forming a DOM
-   * Text Node. {@linkcode SaxOptions.incompleteTextNodes} may be used to emit
+   * Text Node. {@linkcode SaxOptions.incrementalText} may be used to emit
    * text events as soon as more data is available.
    *
    * @param content - Text content.
@@ -362,7 +362,7 @@ export interface SaxOptions {
    * {@linkcode SaxHandler.text} as soon as data becomes available.
    * @defaultValue false
    */
-  incompleteTextNodes?: boolean | undefined;
+  incrementalText?: boolean | undefined;
 }
 
 const enum State {
@@ -434,7 +434,7 @@ export const enum Flags {
   // Capture Comments or ignore them.
   CAPTURE_COMMENT = 1 << 1,
   // These are boolean properties in SaxOptions
-  OPT_INCOMPLETE_TEXT_NODES = 1 << 2,
+  OPT_INCREMENTAL_TEXT = 1 << 2,
 
   // Runtime flags:
   SEEN_ROOT = 1 << 3,
@@ -676,8 +676,8 @@ export class SaxParser {
     if (this.handler_.comment != null) {
       this.flags_ |= Flags.CAPTURE_COMMENT;
     }
-    if (options.incompleteTextNodes) {
-      this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
+    if (options.incrementalText) {
+      this.flags_ |= Flags.OPT_INCREMENTAL_TEXT;
     }
     const dtd = options.dtd;
     if (dtd === "prohibit") {
@@ -2201,7 +2201,7 @@ export class SaxParser {
     // Emit text content as needed
     if (
       this.state_ !== State.TEXT_CONTENT ||
-      this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES
+      this.flags_ & Flags.OPT_INCREMENTAL_TEXT
     ) {
       this.handler_.text(this.content_);
       this.content_ = "";
@@ -2431,7 +2431,7 @@ export class SaxParser {
           this.content_ = this.content_.slice(0, -1);
         }
       }
-      if (this.flags_ & Flags.OPT_INCOMPLETE_TEXT_NODES) {
+      if (this.flags_ & Flags.OPT_INCREMENTAL_TEXT) {
         this.handler_.text(this.content_);
         this.content_ = "";
       }

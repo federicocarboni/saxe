@@ -202,17 +202,17 @@ function runTestWith(
     if (testCase.type === "valid" || testCase.type === "invalid") {
       if (output !== undefined) {
         expect(toCanonical(content)).equals(output);
-        expect(toCanonical(content, {incompleteTextNodes: true})).equals(
+        expect(toCanonical(content, {incrementalText: true})).equals(
           output,
         );
       } else {
         toCanonical(content);
-        toCanonical(content, {incompleteTextNodes: true});
+        toCanonical(content, {incrementalText: true});
       }
     } else if (testCase.type === "not-wf" || testCase.type === "error") {
       expect(() => toCanonical(content))
         .throws().and.is.instanceOf(SaxError);
-      expect(() => toCanonical(content, {incompleteTextNodes: true}))
+      expect(() => toCanonical(content, {incrementalText: true}))
         .throws().and.is.instanceOf(SaxError);
     }
   });
