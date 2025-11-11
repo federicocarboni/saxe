@@ -7,6 +7,8 @@ const ERRORS = {
 
   // XMLDecl
   InvalidXmlDecl: () => "XML declaration is not well-formed",
+  ProhibitedDoctypeDecl: () =>
+    "DOCTYPE declaration is prohibited by configuration",
   // doctypedecl
   InvalidDoctypeDecl: () => "DOCTYPE declaration is not well-formed",
   // All well-formed-ness errors in the internal subset are grouped here

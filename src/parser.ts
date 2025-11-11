@@ -260,23 +260,64 @@ export interface EntityProvider {
 
 export interface SaxOptions {
   /**
-   * Set behavior for document type declarations.
+   * Control how document type declarations are handled.
    *
-   * By default, internal document type declarations are processed, so attribute
-   * lists declarations apply normalization and default values to attributes and
-   * internal entities are recognized and expanded.
+   * Most XML attacks are based on [entity expansion], which depends on DTD
+   * processing.
    *
-   * Restricting document type declarations may be preferable where DoS attacks
-   * are a concern or where higher priority protocols explicitly prohibit them.
+   * {@linkcode SaxParser} and {@linkcode SaxNamespaceParser} are non-validating
+   * parsers and do not support external entities. Regardless of configuration,
+   * external entities are never resolved or fetched, so they do not risk [XXE
+   * attacks].
    *
-   * - `"process"` - Default, internal declarations are processed normally.
-   * - `"prohibit"` - `DOCTYPE` declarations are prohibited by throwing
-   *   `InvalidDoctypeDecl` if the document has one.
-   * - `"ignore"` - `DOCTYPE` declarations are allowed and checked for syntax
-   *   errors but do not affect parsing of the document.
-   * @defaultValue "process"
+   * Internal DTD processing, however, is required for all XML parsers and is
+   * therefore implemented to the specification. To prevent [XML DoS attacks]
+   * support for this feature must be enabled explicitly as needed.
+   *
+   * [entity expansion]:
+   * https://cheatsheetseries.owasp.org/cheatsheets/XML_Security_Cheat_Sheet.html#xml-entity-expansion
+   * [XXE attacks]:
+   * https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
+   * [XML DoS attacks]
+   * https://cheatsheetseries.owasp.org/cheatsheets/XML_Security_Cheat_Sheet.html#quadratic-blowup
+   *
+   * ### `"prohibit"`
+   *
+   * Completely disables DTDs. `DOCTYPE` declarations, even empty ones throw
+   * `ProhibitedDoctypeDecl`, guaranteeing both security and data integrity.
+   * This is the default and safest option, following OWASP recommendations.
+   *
+   * ### `"ignore"`
+   *
+   * Disables processing of DTDs. `DOCTYPE` declarations are tolerated and
+   * checked for syntax errors but markup declarations do not affect parsing
+   * of the document content.
+   *
+   * ### `"process"`
+   *
+   * Enables processing of DTDs. Internal markup declarations are parsed and
+   * processed. Attribute list declarations apply normalization and default
+   * values, and entity declarations are recognized.
+   *
+   * The parser cannot access external markup declarations, so they never affect
+   * processing of the document. Only the internal DTD subset is ever processed.
+   *
+   * Enabling DTD processing may be preferred where strict alignment with DOM
+   * web standards is necessary. DoS attacks are always mitigated by the
+   * security limits imposed, which users are encouraged to tighten further.
+   *
+   * @defaultValue "prohibit"
    */
-  dtd?: "process" | "prohibit" | "ignore" | undefined;
+  dtd?: "prohibit" | "ignore" | "process" | undefined;
+  /**
+   * An entity provider to use when the value for an entity was not read.
+   *
+   * Entity values returned by the entity provider are not affected by the
+   * {@linkcode dtd} option. This option can only be recommended for limited,
+   * trusted sets of entities, or it could expose the application to DoS
+   * attacks.
+   */
+  entityProvider?: EntityProvider | undefined;
   // Limiting the memory usage of the parser is one of, if not the, most
   // important security proofing step for XML.
   // https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
@@ -309,10 +350,6 @@ export interface SaxOptions {
    * @defaultValue 10
    */
   maxEntityDepth?: number | undefined;
-  /**
-   * An entity provider to use when the parser has no declaration for an entity.
-   */
-  entityProvider?: EntityProvider | undefined;
   /**
    * Emit {@linkcode SaxHandler.text} as soon as data becomes available.
    *
@@ -643,10 +680,10 @@ export class SaxParser {
       this.flags_ |= Flags.OPT_INCOMPLETE_TEXT_NODES;
     }
     const dtd = options.dtd;
-    if (dtd === "ignore") {
-      this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
-    } else if (dtd === "prohibit") {
+    if (dtd === "prohibit") {
       this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
+    } else if (dtd !== "process") {
+      this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
     }
     this.maxNameLength_ = options.maxNameLength ?? 2_000;
     this.maxAttributesLength_ = options.maxAttributesLength ?? 10_000_000;
@@ -895,7 +932,7 @@ export class SaxParser {
       isWhiteSpace(this.element_.charCodeAt(6))
     ) {
       if (this.flags_ & Flags.PROHIBIT_DOCTYPE_DECL) {
-        throw new SaxError("InvalidDoctypeDecl");
+        throw new SaxError("ProhibitedDoctypeDecl");
       }
       this.flags_ |= Flags.SEEN_DOCTYPE;
       this.state_ = State.DOCTYPE_DECL;
