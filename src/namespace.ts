@@ -176,10 +176,7 @@ export interface SaxNamespaceHandler extends SaxLexicalHandler {
    * @param resolver - Namespace resolver relative to the current element,
    * should not be used outside the handler.
    */
-  text(
-    content: string,
-    resolver: NamespaceResolver,
-  ): void;
+  text(content: string, resolver: NamespaceResolver): void;
 }
 
 /** @internal */
