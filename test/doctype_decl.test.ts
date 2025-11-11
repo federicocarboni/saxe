@@ -14,7 +14,7 @@ class DoctypeDeclHandler implements SaxHandler {
 
 function getDoctypeDeclOpt(chunks: string[], options?: SaxOptions) {
   const docHandler = new DoctypeDeclHandler();
-  const parser = new SaxParser(docHandler, options);
+  const parser = new SaxParser(docHandler, {dtd: "process", ...options});
   for (const chunk of chunks) {
     parser.parse(chunk, {stream: true});
   }
@@ -134,6 +134,6 @@ describe("Document type declaration", function() {
     expect(() =>
       getDoctypeDeclOpt(["<!DOCTYPE doctypeName><root/>"], {dtd: "prohibit"})
     )
-      .throws().and.has.property("name", "InvalidDoctypeDecl");
+      .throws().and.has.property("name", "ProhibitedDoctypeDecl");
   });
 });

@@ -4,7 +4,7 @@ import {CanonicalXmlWriter} from "./canonical_xml.ts";
 
 export function toCanonicalOpt(chunks: string[], options?: SaxOptions) {
   const handler = new CanonicalXmlWriter();
-  const parser = new SaxParser(handler, options);
+  const parser = new SaxParser(handler, {dtd: "process", ...options});
   for (const chunk of chunks) {
     parser.parse(chunk, {stream: true});
   }

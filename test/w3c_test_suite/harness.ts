@@ -229,11 +229,9 @@ export function runNsTest(testCase: TestCase) {
       },
       endTag() {
       },
-      entityRef() {
-        return false;
-      },
       text() {},
     }, {
+      dtd: "process",
       // IBM has some very long names in their tests
       maxNameLength: 5000,
       ...options,
@@ -249,6 +247,7 @@ export function runTest(testCase: TestCase) {
   runTestWith(testCase, (content, options) => {
     const canonicalizer = new CanonicalXmlWriter();
     const parser = new SaxParser(canonicalizer, {
+      dtd: "process",
       // IBM has some very long names in their tests
       maxNameLength: 5000,
       ...options,

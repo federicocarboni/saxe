@@ -15,7 +15,7 @@ import {
   XmlDeclaration,
 } from "../../src/index.ts";
 
-class Handler implements SaxNamespaceHandler {
+class Handler {
   comments = 0;
   processingInstructions = 0;
   startTags = 0;
@@ -30,19 +30,16 @@ class Handler implements SaxNamespaceHandler {
     ++this.processingInstructions;
   }
   startTag(
-    _name: any,
+    _name: unknown,
     _attributes: {readonly size: number},
   ): void {
     ++this.startTags;
     this.attributes += _attributes.size;
   }
-  endTag(_name: any): void {
+  endTag(_name: unknown): void {
     ++this.endTags;
   }
-  text(
-    _content: string,
-    _isCDataSection: boolean,
-  ): void {
+  text(_content: string): void {
     ++this.textNodes;
   }
 }
@@ -54,7 +51,7 @@ export function saxe(
 ) {
   const handler = new Handler();
   const saxOptions = {
-    dtd: options?.dtd,
+    dtd: options?.dtd ?? "process",
     maxNameLength: 10_000_000,
     maxTextLength: 10_000_010,
     maxAttributesLength: 10_000_100,

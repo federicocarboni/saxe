@@ -19,7 +19,7 @@ const DATASET = [
 ];
 
 function testRecursive(data: string) {
-  const parser = new SaxParser(new CanonicalXmlWriter());
+  const parser = new SaxParser(new CanonicalXmlWriter(), {dtd: "process"});
   expect(() => {
     parser.parse(data);
   })
@@ -31,6 +31,7 @@ describe("Large files", function() {
   for (const xmlFile of DATASET) {
     it(xmlFile, async function() {
       const parser = new SaxParser(new CanonicalXmlWriter(), {
+        dtd: "process",
         maxTextLength: 5_000_000,
       });
       expect(

@@ -5,6 +5,7 @@ import {CanonicalXmlWriter} from "./canonical_xml.ts";
 import {toCanonicalOpt} from "./template.ts";
 
 function testLimit(chunk: string, options?: SaxOptions) {
+  options = {dtd: "process", ...options};
   expect(() => {
     const parser = new SaxParser(new CanonicalXmlWriter(), options);
     parser.parse(chunk);
