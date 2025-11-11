@@ -318,38 +318,6 @@ export interface SaxOptions {
    * attacks.
    */
   entityProvider?: EntityProvider | undefined;
-  // Limiting the memory usage of the parser is one of, if not the, most
-  // important security proofing step for XML.
-  // https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
-  /**
-   * Maximum size allowed for a markup identifier. Applies to tag names, public
-   * and system identifiers.
-   * @defaultValue 2_000
-   */
-  maxNameLength?: number | undefined;
-  /**
-   * Maximum size allowed for the attributes in a single tag. Counts the total
-   * combined length of names and values of attributes.
-   * @defaultValue 10_000_000
-   */
-  maxAttributesLength?: number | undefined;
-  /**
-   * Maximum size allowed for a text node.
-   *
-   * Also applies to comments and processing instructions.
-   * @defaultValue 10_000_000
-   */
-  maxTextLength?: number | undefined;
-  /**
-   * Maximum size allowed for an entity value, including nested entities.
-   * @defaultValue 1_000_000
-   */
-  maxEntityLength?: number | undefined;
-  /**
-   * Maximum nesting depth allowed for entities.
-   * @defaultValue 10
-   */
-  maxEntityDepth?: number | undefined;
   /**
    * Emit {@linkcode SaxHandler.text} as soon as data becomes available.
    *
@@ -363,6 +331,43 @@ export interface SaxOptions {
    * @defaultValue false
    */
   incrementalText?: boolean | undefined;
+  // Limiting the memory usage of the parser is one of, if not the, most
+  // important security proofing step for XML.
+  // https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
+  /**
+   * Maximum size allowed for the attributes in a single tag. Counts the total
+   * combined length of names and values of attributes.
+   * @defaultValue 10_000_000
+   */
+  maxAttributesLength?: number | undefined;
+  /**
+   * Maximum nesting depth allowed for elements.
+   * @defaultValue 200
+   */
+  maxElementDepth?: number | undefined;
+  /**
+   * Maximum nesting depth allowed for entities.
+   * @defaultValue 10
+   */
+  maxEntityDepth?: number | undefined;
+  /**
+   * Maximum size allowed for an entity value, including nested entities.
+   * @defaultValue 1_000_000
+   */
+  maxEntityLength?: number | undefined;
+  /**
+   * Maximum size allowed for a markup identifier. Applies to tag names, public
+   * and system identifiers.
+   * @defaultValue 2_000
+   */
+  maxNameLength?: number | undefined;
+  /**
+   * Maximum size allowed for a text node.
+   *
+   * Also applies to comments, processing instructions and DTD declarations.
+   * @defaultValue 10_000_000
+   */
+  maxTextLength?: number | undefined;
 }
 
 const enum State {
@@ -577,15 +582,17 @@ export class SaxParser {
 
   // Options
   /** @internal */
-  private maxNameLength_: number;
-  /** @internal */
   private maxAttributesLength_: number;
   /** @internal */
-  private maxTextLength_: number;
+  private maxElementDepth_: number;
+  /** @internal */
+  private maxEntityDepth_: number;
   /** @internal */
   private maxEntityLength_: number;
   /** @internal */
-  private maxEntityDepth_: number;
+  private maxNameLength_: number;
+  /** @internal */
+  private maxTextLength_: number;
 
   // State
   /** @internal */
@@ -685,11 +692,12 @@ export class SaxParser {
     } else if (dtd !== "process") {
       this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
     }
-    this.maxNameLength_ = options.maxNameLength ?? 2_000;
     this.maxAttributesLength_ = options.maxAttributesLength ?? 10_000_000;
-    this.maxTextLength_ = options.maxTextLength ?? 10_000_000;
-    this.maxEntityLength_ = options.maxEntityLength ?? 1_000_000;
+    this.maxElementDepth_ = options.maxElementDepth ?? 200;
     this.maxEntityDepth_ = options.maxEntityDepth ?? 10;
+    this.maxEntityLength_ = options.maxEntityLength ?? 1_000_000;
+    this.maxNameLength_ = options.maxNameLength ?? 2_000;
+    this.maxTextLength_ = options.maxTextLength ?? 10_000_000;
     this.entityProvider_ = options.entityProvider ?? undefined;
   }
 
@@ -1865,7 +1873,6 @@ export class SaxParser {
   private parseOpenAngleBracket_() {
     const codePoint = this.nextCodePoint_();
     if (isNameStartChar(codePoint)) {
-      this.element_ = String.fromCodePoint(codePoint);
       // Cannot have two root elements
       if (
         this.elements_.length === 0 &&
@@ -1874,6 +1881,10 @@ export class SaxParser {
       ) {
         throw new SaxError("InvalidStartTag");
       }
+      if (this.elements_.length >= this.maxElementDepth_) {
+        throw new SaxError("LimitExceeded");
+      }
+      this.element_ = String.fromCodePoint(codePoint);
       this.flags_ |= Flags.SEEN_ROOT;
       this.state_ = State.START_TAG_NAME;
     } else if (codePoint === Chars.SLASH) {

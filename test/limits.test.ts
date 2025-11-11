@@ -93,6 +93,17 @@ describe("limits", function() {
       ], {maxTextLength: 32}),
     ).equals('<a a="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></a>');
   });
+  it("element depth", function() {
+    testLimit(
+      `<a><a><a><a><a><a><a><a><a><a><a></a></a></a></a></a></a></a></a></a></a></a>`,
+      {maxElementDepth: 10},
+    );
+    expect(
+      toCanonicalOpt([
+        `<a><a><a><a><a><a><a><a><a><a></a></a></a></a></a></a></a></a></a></a>`,
+      ], {maxElementDepth: 10}),
+    ).equals('<a><a><a><a><a><a><a><a><a><a></a></a></a></a></a></a></a></a></a></a>');
+  });
   it("text", function() {
     testLimit("<a>aaaaaaaaaaa</a>", {maxTextLength: 10});
     expect(toCanonicalOpt(["<a>aaaaaaaaaa</a>"], {maxTextLength: 10}))
