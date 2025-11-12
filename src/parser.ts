@@ -313,9 +313,8 @@ export interface SaxOptions {
    * An entity provider to use when the value for an entity was not read.
    *
    * Entity values returned by the entity provider are not affected by the
-   * {@linkcode dtd} option. This option can only be recommended for limited,
-   * trusted sets of entities, or it could expose the application to DoS
-   * attacks.
+   * {@linkcode dtd} option. This option is only recommended for limited,
+   * trusted sets of entities.
    */
   entityProvider?: EntityProvider | undefined;
   /**
@@ -358,6 +357,8 @@ export interface SaxOptions {
   /**
    * Maximum size allowed for a markup identifier. Applies to tag names, public
    * and system identifiers.
+   *
+   * In {@linkcode SaxNamespaceParser}, it also applies to namespace URIs.
    * @defaultValue 2_000
    */
   maxNameLength?: number | undefined;

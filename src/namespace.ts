@@ -271,6 +271,13 @@ export const XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
 
 /** @internal */
 class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
+  /** @internal */
+  private maxNamespacePrefixes_: number;
+  /** @internal */
+  private maxNameLength_: number;
+  /** @internal */
+  private prefixCount_ = 0;
+  /** @internal */
   // prefix -> namespace URI
   /** @internal */
   private namespaces_ = new Map<string, string>([
@@ -286,8 +293,13 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
   private elementPrefixes_: string[] = [];
   /** @internal */
   private handler_: SaxNamespaceHandler;
-  constructor(handler: SaxNamespaceHandler) {
+  constructor(
+    handler: SaxNamespaceHandler,
+    options: SaxNamespaceOptions,
+  ) {
     this.handler_ = handler;
+    this.maxNameLength_ = options.maxNameLength ?? 2_000;
+    this.maxNamespacePrefixes_ = options.maxNamespacePrefixes ?? 200;
   }
   lookupNamespace(prefix?: string | undefined): string | undefined {
     if (prefix === "") {
@@ -398,7 +410,7 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
   /** @internal */
   private handleAttributes_(attributes: Attributes): NamespaceAttributes {
     const nsAttributes = new NamespaceAttributes_();
-    const bindings = [];
+    const bindings: string[] = [];
     // Collect namespaces first.
     for (const [name, value] of attributes) {
       if (
@@ -424,6 +436,13 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
       }
       if (value === "" && prefix !== "") {
         throw new SaxError("PrefixUndeclaring", {attribute: name});
+      }
+      ++this.prefixCount_;
+      if (
+        value.length > this.maxNameLength_ ||
+        this.prefixCount_ > this.maxNamespacePrefixes_
+      ) {
+        throw new SaxError("LimitExceeded");
       }
       const shadowed = this.namespaces_.get(prefix);
       this.namespaces_.set(prefix, value);
@@ -452,6 +471,7 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
         } else {
           this.namespaces_.set(prefix, shadowed);
         }
+        --this.prefixCount_;
       }
     }
   }
@@ -471,6 +491,11 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
 }
 
 export interface SaxNamespaceOptions extends SaxOptions {
+  /**
+   * Maximum number of namespace prefix mappings allowed.
+   * @defaultValue 200
+   */
+  maxNamespacePrefixes?: number | undefined;
 }
 
 /**
@@ -495,7 +520,10 @@ export class SaxNamespaceParser extends SaxParser {
     handler: SaxNamespaceHandler,
     options: SaxNamespaceOptions | undefined = undefined,
   ) {
-    super(new NamespaceResolver_(handler), options);
+    if (options == null) {
+      options = {};
+    }
+    super(new NamespaceResolver_(handler, options), options);
     if (handler.processingInstruction == null) {
       this.flags_ &= ~Flags.CAPTURE_PI;
     }
