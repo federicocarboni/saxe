@@ -4,6 +4,7 @@ import type {
   NamespaceResolver,
   QName,
   SaxNamespaceHandler,
+  SaxNamespaceOptions,
 } from "../src/index.ts";
 import {
   SaxNamespaceParser,
@@ -76,9 +77,12 @@ class TreeBuilder implements SaxNamespaceHandler {
   }
 }
 
-function getTree(input: string): Node | undefined {
+function getTree(
+  input: string,
+  options?: SaxNamespaceOptions,
+): Node | undefined {
   const treeBuilder = new TreeBuilder();
-  const parser = new SaxNamespaceParser(treeBuilder);
+  const parser = new SaxNamespaceParser(treeBuilder, options);
   parser.parse(input);
   return treeBuilder.root;
 }
@@ -295,9 +299,7 @@ describe("namespace", function() {
   });
   it("wf: xml prefix declaration", function() {
     expect(
-      getTree(
-        '<root xmlns:xml="http://www.w3.org/XML/1998/namespace"></root>',
-      ),
+      getTree('<root xmlns:xml="http://www.w3.org/XML/1998/namespace"></root>'),
     ).deep.equals(
       {
         name: {localName: "root", name: "root"},
@@ -312,44 +314,28 @@ describe("namespace", function() {
     );
   });
   it("wf: doctype name matches QName", function() {
-    expect(
-      getTree(
-        "<!DOCTYPE doc:doc [ <!ELEMENT doc:doc EMPTY> ]><doc/>",
-      ),
-    ).deep.equals({
-      name: {localName: "doc", name: "doc"},
-      attributes: [],
-      children: [],
-    });
+    expect(getTree("<!DOCTYPE doc:doc [ <!ELEMENT doc:doc EMPTY> ]><doc/>"))
+      .deep.equals({
+        name: {localName: "doc", name: "doc"},
+        attributes: [],
+        children: [],
+      });
   });
   it("wf: element name in DTD matches QName", function() {
-    expect(
-      getTree(
-        "<!DOCTYPE doc [ <!ELEMENT doc:doc EMPTY> ]><doc/>",
-      ),
-    ).deep.equals({
-      name: {localName: "doc", name: "doc"},
-      attributes: [],
-      children: [],
-    });
+    expect(getTree("<!DOCTYPE doc [ <!ELEMENT doc:doc EMPTY> ]><doc/>"))
+      .deep.equals({
+        name: {localName: "doc", name: "doc"},
+        attributes: [],
+        children: [],
+      });
   });
   it("not-wf: doctype name must match QName", function() {
     expect(() => getTree("<!DOCTYPE doc: []><doc/>"))
-      .throws()
-      .and.includes({
-        name: "InvalidQName",
-      });
+      .throws().and.includes({name: "InvalidQName"});
   });
   it("not-wf: element name in DTD must match QName", function() {
-    expect(() =>
-      getTree(
-        "<!DOCTYPE doc [ <!ELEMENT doc: EMPTY> ]><doc/>",
-      )
-    )
-      .throws()
-      .and.includes({
-        name: "InvalidQName",
-      });
+    expect(() => getTree("<!DOCTYPE doc [ <!ELEMENT doc: EMPTY> ]><doc/>"))
+      .throws().and.includes({name: "InvalidQName"});
   });
   it("not-wf: attribute name in DTD must match QName", function() {
     expect(() =>
@@ -357,43 +343,170 @@ describe("namespace", function() {
         "<!DOCTYPE doc [ <!ATTLIST doc foo: #REQUIRED> ]><doc/>",
       )
     )
-      .throws()
-      .and.includes({
-        name: "InvalidQName",
-      });
+      .throws().and.includes({name: "InvalidQName"});
   });
   it("not-wf: notation name must match NCName", function() {
     expect(() =>
-      getTree(
-        '<!DOCTYPE doc [ <!NOTATION ent: PUBLIC "ent"> ]><doc/>',
-      )
-    )
-      .throws()
-      .and.includes({
-        name: "InvalidNcName",
-      });
+      getTree('<!DOCTYPE doc [ <!NOTATION ent: PUBLIC "ent"> ]><doc/>')
+    ).throws().and.includes({name: "InvalidNcName"});
   });
   it("not-wf: entity name must match NCName", function() {
-    expect(() =>
-      getTree(
-        '<!DOCTYPE doc [ <!ENTITY ent: "ent"> ]><doc/>',
-      )
-    )
-      .throws()
-      .and.includes({
-        name: "InvalidNcName",
-      });
+    expect(() => getTree('<!DOCTYPE doc [ <!ENTITY ent: "ent"> ]><doc/>'))
+      .throws().and.includes({name: "InvalidNcName"});
   });
   it("not-wf: PI target must match NCName", function() {
+    expect(() => getTree("<?foo: x?><doc/>"))
+      .throws().and.includes({name: "InvalidNcName"});
+  });
+  it("wf: limits namespace URIs to maxNameLength", function() {
+    expect(() => getTree('<a xmlns="aaaaaaaaaaa"></a>', {maxNameLength: 10}))
+      .throws()
+      .and.includes({name: "LimitExceeded"});
+    expect(getTree('<a xmlns="aaaaaaaaaa"></a>', {maxNameLength: 10}))
+      .deep.equals(
+        {
+          attributes: [
+            [
+              {
+                localName: "xmlns",
+                name: "xmlns",
+                namespace: "http://www.w3.org/2000/xmlns/",
+              },
+              "aaaaaaaaaa",
+            ],
+          ],
+          children: [],
+          name: {
+            localName: "a",
+            name: "a",
+            namespace: "aaaaaaaaaa",
+          },
+        } satisfies Node,
+      );
+  });
+  it("wf: limits namespace prefixes to maxNamespacePrefixes", function() {
     expect(() =>
       getTree(
-        "<?foo: x?><doc/>",
+        '<a xmlns="z" xmlns:a="a" xmlns:b="b" xmlns:c="c" xmlns:d="d"><a xmlns="z" xmlns:a="a" xmlns:b="b" xmlns:c="c" xmlns:d="d" xmlns:e="e"></a></a>',
+        {maxNamespacePrefixes: 10},
       )
-    )
-      .throws()
-      .and.includes({
-        name: "InvalidNcName",
-      });
+    ).throws().and.includes({name: "LimitExceeded"});
+    expect(
+      getTree(
+        '<a xmlns="z" xmlns:a="a" xmlns:b="b" xmlns:c="c" xmlns:d="d"><a xmlns="z" xmlns:a="a" xmlns:b="b" xmlns:c="c" xmlns:d="d"></a></a>',
+        {maxNamespacePrefixes: 10},
+      ),
+    ).deep.equals(
+      {
+        attributes: [
+          [
+            {
+              localName: "xmlns",
+              name: "xmlns",
+              namespace: "http://www.w3.org/2000/xmlns/",
+            },
+            "z",
+          ],
+          [
+            {
+              localName: "a",
+              name: "xmlns:a",
+              namespace: "http://www.w3.org/2000/xmlns/",
+              prefix: "xmlns",
+            },
+            "a",
+          ],
+          [
+            {
+              localName: "b",
+              name: "xmlns:b",
+              namespace: "http://www.w3.org/2000/xmlns/",
+              prefix: "xmlns",
+            },
+            "b",
+          ],
+          [
+            {
+              localName: "c",
+              name: "xmlns:c",
+              namespace: "http://www.w3.org/2000/xmlns/",
+              prefix: "xmlns",
+            },
+            "c",
+          ],
+          [
+            {
+              localName: "d",
+              name: "xmlns:d",
+              namespace: "http://www.w3.org/2000/xmlns/",
+              prefix: "xmlns",
+            },
+            "d",
+          ],
+        ],
+        children: [
+          {
+            attributes: [
+              [
+                {
+                  localName: "xmlns",
+                  name: "xmlns",
+                  namespace: "http://www.w3.org/2000/xmlns/",
+                },
+                "z",
+              ],
+              [
+                {
+                  localName: "a",
+                  name: "xmlns:a",
+                  namespace: "http://www.w3.org/2000/xmlns/",
+                  prefix: "xmlns",
+                },
+                "a",
+              ],
+              [
+                {
+                  localName: "b",
+                  name: "xmlns:b",
+                  namespace: "http://www.w3.org/2000/xmlns/",
+                  prefix: "xmlns",
+                },
+                "b",
+              ],
+              [
+                {
+                  localName: "c",
+                  name: "xmlns:c",
+                  namespace: "http://www.w3.org/2000/xmlns/",
+                  prefix: "xmlns",
+                },
+                "c",
+              ],
+              [
+                {
+                  localName: "d",
+                  name: "xmlns:d",
+                  namespace: "http://www.w3.org/2000/xmlns/",
+                  prefix: "xmlns",
+                },
+                "d",
+              ],
+            ],
+            children: [],
+            name: {
+              localName: "a",
+              name: "a",
+              namespace: "z",
+            },
+          },
+        ],
+        name: {
+          localName: "a",
+          name: "a",
+          namespace: "z",
+        },
+      } satisfies Node,
+    );
   });
 });
 
