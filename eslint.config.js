@@ -70,6 +70,13 @@ export default defineConfig([
       }],
     },
   },
+  {
+    files: ["test/**/*ts"],
+    rules: {
+      // chai expressions are not unused
+      "@typescript-eslint/no-unused-expressions": "off",
+    },
+  },
   globalIgnores([
     "eslint.config.js",
     "lib",
