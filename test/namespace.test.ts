@@ -12,19 +12,21 @@ import {
   XMLNS_NAMESPACE,
 } from "../src/index.ts";
 
+interface PlainQName {
+  name: string;
+  localName: string;
+  prefix?: string;
+  namespace?: string;
+}
+
 interface Node {
-  name: QName;
-  attributes: [QName, string][];
+  name: PlainQName;
+  attributes: [PlainQName, string][];
   children: (Node | string)[];
 }
 
 function copyQName(name: QName) {
-  const nameCopy: {
-    name: string;
-    localName: string;
-    prefix?: string;
-    namespace?: string;
-  } = {
+  const nameCopy: PlainQName = {
     name: name.name,
     localName: name.localName,
   };
@@ -648,6 +650,33 @@ describe("NamespaceAttributes", function() {
     readAttributes((attributes) => {
       expect([...attributes]).deep.equals(ITER_RESULT);
     }, ITER_INPUT);
+  });
+});
+
+function readQName(
+  callback: (name: QName) => void,
+  input: string,
+) {
+  new SaxNamespaceParser(
+    new Handler((_resolver, _depth, name, _attributes) => {
+      callback(name);
+    }),
+  ).parse(input);
+}
+
+describe("QName", function() {
+  it("matches()", function() {
+    readQName((name) => {
+      expect(name).deep.equals({
+        name: "prefix:localName",
+        localName: "localName",
+        prefix: "prefix",
+        namespace: "namespace",
+      });
+      expect(name.matches("localName", "namespace")).to.be.true;
+      expect(name.matches("localName")).to.be.false;
+      expect(name.matches("localName", "other")).to.be.false;
+    }, '<prefix:localName xmlns:prefix="namespace" />');
   });
 });
 

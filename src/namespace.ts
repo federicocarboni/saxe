@@ -10,16 +10,49 @@ import type {
 } from "./parser.ts";
 import {Flags, SaxParser} from "./parser.ts";
 
-/** A qualified XML name for elements or attributes. */
+/**
+ * A qualified name for elements or attributes.
+ *
+ * Qualified names associate a namespace URI with a local name. To make the
+ * association it defines a prefix which corresponds to the namespace URI. So a
+ * qualified name consists of the namespace URI, the prefix and the local name.
+ *
+ * Prefixes are defined by documents and are not intended for identification
+ * purposes.
+ */
 export interface QName {
-  /** Qualified name of the element or attribute. */
+  /**
+   * Qualified name, including the namespace prefix if present. Unlike the HTML
+   * DOM it is case sensitive and not uppercased.
+   *
+   * In namespace-aware processing always prefer matching by namespace URI and
+   * local name instead.
+   * @see {@linkcode matches}
+   */
   readonly name: string;
-  /** Local part of the name. */
+  /**
+   * Local part of the qualified name. Together with {@linkcode namespace} it
+   * univocally identifies the name.
+   */
   readonly localName: string;
-  /** Prefix part of the name, if any. */
+  /**
+   * Prefix part of the name, if there is none it is `undefined`.
+   *
+   * In namespace-aware processing always prefer matching on
+   * {@linkcode namespace} instead.
+   */
   readonly prefix?: string | undefined;
-  /** Namespace URI, if any. */
+  /** Namespace URI. If there is none it is `undefined`. */
   readonly namespace?: string | undefined;
+  /**
+   * Identifies the qualified name by local name and namespace URI.
+   * @param localName - Local name to match for.
+   * @param namespace - Namespace URI to match for. When not defined, matches
+   * for qualified names without a namespace.
+   * @returns - Returns `true` if it matches the specified local name and
+   * namespace URI, `false` otherwise.
+   */
+  matches(localName: string, namespace?: string | undefined): boolean;
 }
 
 /**
@@ -187,6 +220,10 @@ class QName_ implements QName {
     readonly prefix?: string | undefined,
     readonly namespace?: string | undefined,
   ) {}
+  matches(localName: string, namespace?: string | undefined): boolean {
+    return this.localName === localName &&
+      this.namespace === (namespace ?? undefined);
+  }
 }
 
 /** @internal */
