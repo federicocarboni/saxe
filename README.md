@@ -8,8 +8,7 @@ Light-weight and efficient SAX-style XML parser for JavaScript.
 
 ## Goals
 
-- Full XML 1.0 standard conformance
-- Full Namespace in XML 1.0 standard conformance
+- Full XML 1.0 and Namespaces in XML 1.0 standard conformance
 - Simple and terse API
 - Reduced code footprint
 - Set a base for other standards built on XML (e.g. XHTML)
@@ -78,13 +77,47 @@ this parser implements the entire specification:
   values to attributes.
 - `ENTITY` declarations are recognized to expand entity references.
 
-This process has [security implications](#security); so if the default behavior
-is undesirable it may be configured.
+This process has [security implications](#security); so DTD processing can be
+enabled by configuring [`SaxOptions.dtd`].
 
 External markup declarations and external entities are not required for
 non-validating[^2] processors and are explicitly not supported.
 
-[^1]: Other JavaScript XML parser inspected include [isaacs/sax-js],
+## Security
+
+XML parsers may be subject to a number of possible vulnerabilities, most common
+attacks exploit external entity resolution and entity expansion.
+
+This parser is strictly non-validating, so by design it should not be vulnerable
+to any XXE[^3] based attack. Additionally the length of strings collected during
+parsing is capped to limit the efficacy of other denial-of-service attacks[^4].
+
+Following OWASP recommendations DTD processing is prohibited by default.
+
+```js
+new SaxParser(handler, {
+  // Reject any DOCTYPE declaration
+  dtd: "prohibit", // default
+  // Alternatively, allow it but ignore any declarations
+  // dtd: "ignore",
+
+  // Enforce stricter limits over strings and values
+  // collected during parsing.
+  maxAttributesLength: 10000,
+  maxElementDepth: 30,
+  maxEntityDepth: 5,
+  maxEntityLength: 1000,
+  maxNameLength: 500,
+  maxTextLength: 10000,
+})
+```
+
+[Known XML Bombs](/test/data/) are tested for as part of regular integration
+tests and the parser is [fuzz tested](/fuzz/) regularly. Despite this being the
+case, for very sensible or security oriented apps you may want to conduct your
+own security audit.
+
+[^1]: Other JavaScript XML parsers inspected include [isaacs/sax-js],
   [NaturalIntelligence/fast-xml-parser] and [lddubeau/saxes]
 [^2]: Non-validating XML processors (parsers) do not validate documents, but
   must still recognize and report well-formedness (syntax) errors.
@@ -96,47 +129,15 @@ non-validating[^2] processors and are explicitly not supported.
 
 [lddubeau/saxes]: https://github.com/lddubeau/saxes
 [isaacs/sax-js]: https://github.com/isaacs/sax-js
-[NaturalIntelligence/fast-xml-parser]: https://github.com/NaturalIntelligence/fast-xml-parser
+[NaturalIntelligence/fast-xml-parser]:
+https://github.com/NaturalIntelligence/fast-xml-parser
 [xml proc types]: https://www.w3.org/TR/REC-xml/#proc-types
+[`SaxOptions.dtd`]:
+https://federicocarboni.github.io/saxe/interfaces/SaxOptions.html#dtd
 
 <!-- https://web.archive.org/web/20240515024616/https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing -->
 [xxe owasp]: https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing
 [msdn xml dos]: https://web.archive.org/web/20240318075117/https://learn.microsoft.com/en-us/archive/msdn-magazine/2009/november/xml-denial-of-service-attacks-and-defenses
-
-## Security
-
-XML Parsers may be subject to a number of possible vulnerabilities, most common
-attacks exploit external entity resolution and entity expansion.
-
-This parser is strictly non-validating, so by design it should not be vulnerable
-to any XXE[^3] based attack. Additionally the length of strings collected during
-parsing is capped to limit the efficacy of other denial-of-service attacks[^4].
-
-Document Type Declaration processing may (at user option) be disabled altogether
-to prevent any attack based on them.
-
-```js
-new SaxParser(handler, {
-  // Reject any DOCTYPE declaration
-  dtd: "prohibit",
-
-  // Alternatively, allow it but ignore any declarations
-  // dtd: "ignore",
-
-  // Enforce stricter limits over strings and values
-  // collected during parsing.
-  maxNameLength: 500,
-  maxAttributesLength: 1000,
-  maxTextLength: 10000,
-  maxEntityLength: 1000,
-  maxEntityDepth: 5,
-})
-```
-
-[Known XML Bombs](/test/data/) are tested for as part of regular integration
-tests and the parser is [fuzz tested](/fuzz/) regularly. Despite this being the
-case, for very sensible or security oriented apps you may want to conduct your
-own security audit.
 
 ## License
 
