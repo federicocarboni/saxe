@@ -102,7 +102,9 @@ describe("limits", function() {
       toCanonicalOpt([
         `<a><a><a><a><a><a><a><a><a><a></a></a></a></a></a></a></a></a></a></a>`,
       ], {maxElementDepth: 10}),
-    ).equals('<a><a><a><a><a><a><a><a><a><a></a></a></a></a></a></a></a></a></a></a>');
+    ).equals(
+      "<a><a><a><a><a><a><a><a><a><a></a></a></a></a></a></a></a></a></a></a>",
+    );
   });
   it("text", function() {
     testLimit("<a>aaaaaaaaaaa</a>", {maxTextLength: 10});
