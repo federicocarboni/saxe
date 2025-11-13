@@ -1,6 +1,6 @@
 {
   "name": "@federicocarboni/saxe",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Light-weight and efficient SAX-style XML parser",
   "type": "module",
   "exports": {
@@ -17,7 +17,7 @@
     "doc": "typedoc",
     "prepublishOnly": "npm run lint && npm run build"
   },
-  "keywords": [],
+  "keywords": ["xml", "parser", "sax", "streaming", "namespaces"],
   "author": {
     "name": "Federico Carboni"
   },
