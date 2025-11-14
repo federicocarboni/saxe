@@ -2212,8 +2212,9 @@ export class SaxParser {
     this.appendTextContent_(start);
     // Emit text content as needed
     if (
-      this.state_ !== State.TEXT_CONTENT ||
-      this.flags_ & Flags.OPT_INCREMENTAL_TEXT
+      this.content_ !== "" &&
+      (this.state_ !== State.TEXT_CONTENT ||
+        this.flags_ & Flags.OPT_INCREMENTAL_TEXT)
     ) {
       this.handler_.text(this.content_);
       this.content_ = "";
