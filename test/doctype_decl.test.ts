@@ -66,6 +66,39 @@ describe("Document type declaration", function() {
       systemId: "-//DTD/something",
     });
   });
+  it("wf: doctypedecl with leading space in PUBLIC ExternalID ", function() {
+    expect(
+      getDoctypeDecl(
+        '<!DOCTYPE doctypeName PUBLIC " -//Example/dtd" "./example.dtd">',
+      ),
+    ).deep.equals({
+      name: "doctypeName",
+      publicId: "-//Example/dtd",
+      systemId: "./example.dtd",
+    });
+  });
+  it("wf: doctypedecl with trailing space in PUBLIC ExternalID", function() {
+    expect(
+      getDoctypeDecl(
+        '<!DOCTYPE doctypeName PUBLIC "-//Example/dtd " "./example.dtd">',
+      ),
+    ).deep.equals({
+      name: "doctypeName",
+      publicId: "-//Example/dtd",
+      systemId: "./example.dtd",
+    });
+  });
+  it("wf: doctypedecl with internal spaces in PUBLIC ExternalID", function() {
+    expect(
+      getDoctypeDecl(
+        '<!DOCTYPE doctypeName PUBLIC "\n\r -//Example\n\r dtd\n\r " "./example.dtd">',
+      ),
+    ).deep.equals({
+      name: "doctypeName",
+      publicId: "-//Example dtd",
+      systemId: "./example.dtd",
+    });
+  });
   it("wf: doctypedecl with an astral character name", function() {
     expect(getDoctypeDecl("<!DOCTYPE \u{1F000}\u{1F001}\u{1F002}>"))
       .to.has.property("name", "\u{1F000}\u{1F001}\u{1F002}");

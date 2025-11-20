@@ -984,8 +984,8 @@ export class SaxParser {
       // white space MUST be removed
       // TAB is not allowed in public identifiers
       ? this.attribute_
-        .replace(/^[\n\r ]*|[\n\r ]*$|[\n\r ]+/g, " ")
-        .slice(1, -1)
+        .replace(/^[\n\r ]*|[\n\r ]*$/g, "")
+        .replace(/[\n\r ]+/g, " ")
       : undefined;
     this.content_ = "";
     this.attribute_ = "";
