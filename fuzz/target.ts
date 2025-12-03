@@ -17,8 +17,14 @@ export function fuzz(data: Buffer) {
   }
   const writer1 = new CanonicalXmlWriter();
   const writer2 = new CanonicalXmlWriter();
-  const parser1 = new SaxParser(writer1, {incrementalText: true, dtd: "process"});
-  const parser2 = new SaxParser(writer2, {incrementalText: true, dtd: "process"});
+  const parser1 = new SaxParser(writer1, {
+    incrementalText: true,
+    dtd: "process",
+  });
+  const parser2 = new SaxParser(writer2, {
+    incrementalText: true,
+    dtd: "process",
+  });
   let error1: SaxError | undefined;
   let error2: SaxError | undefined;
   try {
