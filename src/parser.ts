@@ -686,10 +686,10 @@ export class SaxParser {
       this.flags_ |= Flags.OPT_INCREMENTAL_TEXT;
     }
     const dtd = opts.dtd;
-    if (dtd === "prohibit") {
-      this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
-    } else if (dtd !== "process") {
+    if (dtd === "ignore") {
       this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
+    } else if (dtd !== "process") {
+      this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
     }
     this.maxAttributesLength_ = opts.maxAttributesLength ?? 10_000_000;
     this.maxElementDepth_ = opts.maxElementDepth ?? 200;

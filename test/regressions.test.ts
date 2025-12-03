@@ -18,8 +18,8 @@ const REGRESSION001 = `<!DOCTYPE doc [
 function testRegression(content: string, expectedError?: SaxErrorName) {
   const writer1 = new CanonicalXmlWriter();
   const writer2 = new CanonicalXmlWriter();
-  const parser1 = new SaxParser(writer1);
-  const parser2 = new SaxParser(writer2);
+  const parser1 = new SaxParser(writer1, {dtd: "process"});
+  const parser2 = new SaxParser(writer2, {dtd: "process"});
   let error1: SaxError | undefined = undefined;
   let error2: SaxError | undefined = undefined;
   try {

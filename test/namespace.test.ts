@@ -84,7 +84,10 @@ function getTree(
   options?: SaxNamespaceOptions,
 ): Node | undefined {
   const treeBuilder = new TreeBuilder();
-  const parser = new SaxNamespaceParser(treeBuilder, options);
+  const parser = new SaxNamespaceParser(treeBuilder, {
+    dtd: "process",
+    ...options,
+  });
   parser.parse(input);
   return treeBuilder.root;
 }
@@ -661,6 +664,7 @@ function readQName(
     new Handler((_resolver, _depth, name, _attributes) => {
       callback(name);
     }),
+    {dtd: "process"},
   ).parse(input);
 }
 
@@ -688,6 +692,7 @@ function readResolver(
     new Handler((resolver, depth, _name, _attributes) => {
       callback(resolver, depth);
     }),
+    {dtd: "process"},
   ).parse(input);
 }
 

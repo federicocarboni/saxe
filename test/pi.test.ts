@@ -13,7 +13,7 @@ function getPi(...chunks: string[]) {
     startTag() {},
     endTag() {},
     text() {},
-  });
+  }, {dtd: "process"});
   for (const chunk of chunks) {
     parser.parse(chunk, {stream: true});
   }
