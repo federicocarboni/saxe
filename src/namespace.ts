@@ -557,10 +557,8 @@ export class SaxNamespaceParser extends SaxParser {
     handler: SaxNamespaceHandler,
     options: SaxNamespaceOptions | undefined = undefined,
   ) {
-    if (options == null) {
-      options = {};
-    }
-    super(new NamespaceResolver_(handler, options), options);
+    const opts = options ?? {};
+    super(new NamespaceResolver_(handler, opts), opts);
     if (handler.processingInstruction == null) {
       this.flags_ &= ~Flags.CAPTURE_PI;
     }

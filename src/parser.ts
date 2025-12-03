@@ -673,9 +673,7 @@ export class SaxParser {
     handler: SaxHandler,
     options: SaxOptions | undefined = undefined,
   ) {
-    if (options == null) {
-      options = {};
-    }
+    const opts = options ?? {};
     this.handler_ = handler;
     // Avoid capturing information that will be ignored
     if (this.handler_.processingInstruction != null) {
@@ -684,22 +682,22 @@ export class SaxParser {
     if (this.handler_.comment != null) {
       this.flags_ |= Flags.CAPTURE_COMMENT;
     }
-    if (options.incrementalText) {
+    if (opts.incrementalText) {
       this.flags_ |= Flags.OPT_INCREMENTAL_TEXT;
     }
-    const dtd = options.dtd;
+    const dtd = opts.dtd;
     if (dtd === "prohibit") {
       this.flags_ |= Flags.PROHIBIT_DOCTYPE_DECL;
     } else if (dtd !== "process") {
       this.flags_ |= Flags.IGNORE_INT_SUBSET_DECL;
     }
-    this.maxAttributesLength_ = options.maxAttributesLength ?? 10_000_000;
-    this.maxElementDepth_ = options.maxElementDepth ?? 200;
-    this.maxEntityDepth_ = options.maxEntityDepth ?? 10;
-    this.maxEntityLength_ = options.maxEntityLength ?? 1_000_000;
-    this.maxNameLength_ = options.maxNameLength ?? 2_000;
-    this.maxTextLength_ = options.maxTextLength ?? 10_000_000;
-    this.entityProvider_ = options.entityProvider ?? undefined;
+    this.maxAttributesLength_ = opts.maxAttributesLength ?? 10_000_000;
+    this.maxElementDepth_ = opts.maxElementDepth ?? 200;
+    this.maxEntityDepth_ = opts.maxEntityDepth ?? 10;
+    this.maxEntityLength_ = opts.maxEntityLength ?? 1_000_000;
+    this.maxNameLength_ = opts.maxNameLength ?? 2_000;
+    this.maxTextLength_ = opts.maxTextLength ?? 10_000_000;
+    this.entityProvider_ = opts.entityProvider ?? undefined;
   }
 
   /**

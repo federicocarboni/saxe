@@ -33,6 +33,7 @@ export default defineConfig([
     },
 
     rules: {
+      "no-param-reassign": "error",
       "no-prototype-builtins": "off",
       "no-proto": "error",
 

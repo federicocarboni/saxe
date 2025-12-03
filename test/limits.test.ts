@@ -5,13 +5,13 @@ import {CanonicalXmlWriter} from "./canonical_xml.ts";
 import {toCanonicalOpt} from "./template.ts";
 
 function testLimit(chunk: string, options?: SaxOptions) {
-  options = {dtd: "process", ...options};
+  const opts = {dtd: "process", ...options} satisfies SaxOptions;
   expect(() => {
-    const parser = new SaxParser(new CanonicalXmlWriter(), options);
+    const parser = new SaxParser(new CanonicalXmlWriter(), opts);
     parser.parse(chunk);
   }).throws().instanceOf(SaxError).includes({name: "LimitExceeded"});
   expect(() => {
-    const parser = new SaxParser(new CanonicalXmlWriter(), options);
+    const parser = new SaxParser(new CanonicalXmlWriter(), opts);
     for (const c of chunk) {
       parser.parse(c, {stream: true});
     }
@@ -19,14 +19,14 @@ function testLimit(chunk: string, options?: SaxOptions) {
   }).throws().instanceOf(SaxError).includes({name: "LimitExceeded"});
   expect(() => {
     const parser = new SaxParser(new CanonicalXmlWriter(), {
-      ...options,
+      ...opts,
       incrementalText: true,
     });
     parser.parse(chunk);
   }).throws().instanceOf(SaxError).includes({name: "LimitExceeded"});
   expect(() => {
     const parser = new SaxParser(new CanonicalXmlWriter(), {
-      ...options,
+      ...opts,
       incrementalText: true,
     });
     for (const c of chunk) {

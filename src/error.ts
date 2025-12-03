@@ -122,19 +122,17 @@ export class SaxError extends Error {
     name: SaxErrorName,
     options: SaxErrorOptions | undefined = undefined,
   ) {
-    if (options == null) {
-      options = {};
-    }
+    const opts = options ?? {};
     super(
-      ERRORS.hasOwnProperty(name) ? ERRORS[name](options) : undefined,
+      ERRORS.hasOwnProperty(name) ? ERRORS[name](opts) : undefined,
       // Only pass cause through, if any option names happen to overlap with
       // any future ErrorOptions it might accidentally change behavior.
       // Use in here because `cause` is allowed to be null or undefined.
-      "cause" in options ? {cause: options.cause} : undefined,
+      "cause" in opts ? {cause: opts.cause} : undefined,
     );
     this.name = name;
-    this.element = options.element;
-    this.attribute = options.attribute;
-    this.entity = options.entity;
+    this.element = opts.element;
+    this.attribute = opts.attribute;
+    this.entity = opts.entity;
   }
 }
