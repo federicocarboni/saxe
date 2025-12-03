@@ -1,6 +1,6 @@
 {
   "name": "@federicocarboni/saxe",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Light-weight and efficient SAX-style XML parser",
   "type": "module",
   "exports": {
