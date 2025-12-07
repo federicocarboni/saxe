@@ -482,7 +482,11 @@ class NamespaceResolver_ implements SaxHandler, NamespaceResolver {
         throw new SaxError("LimitExceeded");
       }
       const shadowed = this.namespaces_.get(prefix);
-      this.namespaces_.set(prefix, value);
+      if (value === "") {
+        this.namespaces_.delete(prefix);
+      } else {
+        this.namespaces_.set(prefix, value);
+      }
       bindings.push(prefix, shadowed !== undefined ? shadowed : "");
     }
     if (bindings.length > 0) {
