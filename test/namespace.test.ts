@@ -725,6 +725,15 @@ describe("NamespaceResolver", function() {
       `<doc xmlns:foo="urn:a" xmlns="urn:d" xmlns:bar="urn:c"><foo:empty xmlns:foo="urn:b" /></doc>`,
     );
   });
+  it("lookupNamespace returns undefined for default namespace after undeclaration", function() {
+    readResolver((resolver, depth) => {
+      if (depth === 0) {
+        expect(resolver.lookupNamespace()).equals("x");
+      } else if (depth === 1) {
+        expect(resolver.lookupNamespace()).equals(undefined);
+      }
+    }, `<doc xmlns="x"><a xmlns="" /></doc>`);
+  });
   it("lookupNamespace returns undefined for undeclared prefixes", function() {
     readResolver((resolver) => {
       expect(resolver.lookupNamespace("foo")).equals(undefined);
